@@ -1,0 +1,20 @@
+{
+  "name": "relateready-iprd",
+  "version": "1.0.0",
+  "description": "RelateReady — IPRD (Indice de Preparacion para Relaciones Duraderas). Test bilingue, motor de puntuacion, informes en PDF con secciones generadas por IA.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "pdfkit": "^0.15.0"
+  }
+}

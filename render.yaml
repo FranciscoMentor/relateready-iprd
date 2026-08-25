@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: relateready-iprd
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    disk:
+      name: relateready-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DB_PATH
+        value: /var/data/relateready.sqlite
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-5-20250929
+      - key: PAYPHONE_TOKEN
+        sync: false
+      - key: PAYPHONE_STORE_ID
+        sync: false
+      - key: ADMIN_USER
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
