@@ -71,6 +71,10 @@ button.secondary {
 .band-d { color: var(--clay); font-weight: 700; }
 .error { color: var(--clay); font-size: 14px; margin-top: 8px; }
 .hint { color: var(--muted); font-size: 13px; margin-top: 8px; }
+.code-redeem { margin-top: 18px; }
+.link-btn { background: none; border: none; color: var(--accent); text-decoration: underline; cursor: pointer; font-size: 13px; padding: 0; }
+#code-form { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+#code-form input#f-code { width: auto; flex: 1; min-width: 160px; }
 #radarCanvas { display: block; margin: 20px auto; }
 .vignette-option { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 8px 0; cursor: pointer; }
 .vignette-option:hover { border-color: var(--accent); }

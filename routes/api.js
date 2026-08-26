@@ -17,7 +17,23 @@ const CORE_ITEMS_FLAT = buildFlatCoreItems();
 const DESIRABILITY_ITEMS_FLAT = buildFlatDesirabilityItems();
 const QUALITATIVE_ITEMS_FLAT = buildFlatQualitativeItems();
 
-const EXTENDED_PRICE_CENTS = 2499; // $24.99, ver IPRD_estrategia_mercado_y_precio.docx
+// Precio del Informe Extendido, en centavos. Por defecto $24.99 (ver
+// IPRD_estrategia_mercado_y_precio.docx), pero se puede cambiar en cualquier
+// momento sin tocar código: agrega/edita la variable de entorno
+// EXTENDED_PRICE_CENTS en Render → Environment (ej. 1999 = $19.99) y el
+// servicio se reinicia solo con el nuevo precio.
+const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Number(process.env.EXTENDED_PRICE_CENTS) : 2499;
+
+// Códigos de acceso gratuito (para paneles de prueba). Configúralos en Render
+// → Environment, variable FREE_ACCESS_CODES, separados por coma
+// (ej. "PANEL2026,BETA-ADAMANTINE"). Cualquier persona que ingrese uno de
+// estos códigos en la pantalla de resultados desbloquea el Informe Extendido
+// sin pagar. No distingue mayúsculas/minúsculas. Vacío por defecto = nadie
+// puede canjear nada.
+const FREE_ACCESS_CODES = (process.env.FREE_ACCESS_CODES || "")
+  .split(",")
+  .map((c) => c.trim().toUpperCase())
+  .filter(Boolean);
 
 // GET /api/meta?lang=es — todo lo que el frontend necesita para renderizar el test.
 // No se exponen 'keying' ni 'dimension' de los ítems núcleo, para no sesgar
@@ -27,6 +43,7 @@ router.get("/meta", (req, res) => {
   res.json({
     lang,
     payphoneEnabled: PAYPHONE_ENABLED,
+    extendedPriceCents: EXTENDED_PRICE_CENTS,
     dimensions: DIMENSIONS.map((d) => ({ code: d.code, label: d[lang] })),
     relationshipContexts: RELATIONSHIP_CONTEXTS.map((c) => ({ code: c.code, label: c[lang] })),
     vignettes: VIGNETTES.map((v) => ({
@@ -172,6 +189,23 @@ router.get("/submission/:id/status", (req, res) => {
     referralTriggered: !!sub.referral_triggered,
     paymentStatus: sub.payment_status,
   });
+});
+
+// POST /api/payment/redeem/:id — código de acceso gratuito (paneles de prueba).
+// Ver FREE_ACCESS_CODES arriba.
+router.post("/payment/redeem/:id", (req, res) => {
+  const sub = loadSubmission(req.params.id);
+  if (!sub) return res.status(404).json({ error: "No encontrado." });
+  const code = String((req.body || {}).code || "").trim().toUpperCase();
+  if (!code || !FREE_ACCESS_CODES.includes(code)) {
+    return res.status(400).json({ error: "Código no válido." });
+  }
+  db.prepare("UPDATE submissions SET payment_status = ?, payment_reference = ? WHERE id = ?").run(
+    "free",
+    `CODE:${code}`,
+    sub.id
+  );
+  res.json({ ok: true });
 });
 
 // POST /api/payment/prepare/:id — pago real con Payphone: prepara la

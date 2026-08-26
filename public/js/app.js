@@ -35,8 +35,9 @@
       resultsIntro: "Este es tu resultado en las 8 dimensiones del IPRD.",
       extendedTitle: "¿Quieres el detalle completo?",
       extendedIntro: "El Informe Extendido incluye tus 8 dimensiones completas, recomendaciones concretas, 5 secciones escritas especialmente para ti por IA, y tu plan de acción a 90 días.",
-      payBtn: "Desbloquear Informe Extendido — $24.99 (simulado)",
-      payBtnReal: "Pagar Informe Extendido — $24.99",
+      payBtnLabel: "Desbloquear Informe Extendido",
+      payBtnRealLabel: "Pagar Informe Extendido",
+      simulatedTag: "simulado",
       payHint: "Se abrirá una pestaña nueva para completar el pago de forma segura con Payphone. Cuando termines, vuelve a esta pestaña.",
       verifyBtn: "Ya pagué — verificar",
       verifying: "Verificando...",
@@ -44,6 +45,11 @@
       paymentError: "No se pudo iniciar el pago. Intenta de nuevo en unos momentos.",
       paying: "Procesando...",
       downloadExtended: "Descargar mi Informe Extendido (PDF)",
+      haveCode: "¿Tienes un código de acceso gratuito?",
+      codePlaceholder: "Código de acceso",
+      redeemBtn: "Canjear código",
+      redeeming: "Verificando código...",
+      codeInvalid: "Ese código no es válido.",
       referralNotice: "Tus respuestas sugieren que este podría ser un buen momento para hablar con alguien de confianza o un profesional de salud mental. RelateReady no es una herramienta de diagnóstico ni de crisis.",
       errorRequired: "Por favor completa todos los campos obligatorios.",
       progress: "Pregunta",
@@ -83,8 +89,9 @@
       resultsIntro: "This is your result across the IPRD's 8 dimensions.",
       extendedTitle: "Want the full detail?",
       extendedIntro: "The Extended Report includes all 8 full dimensions, concrete recommendations, 5 sections written specifically for you by AI, and your 90-day action plan.",
-      payBtn: "Unlock Extended Report — $24.99 (simulated)",
-      payBtnReal: "Pay for Extended Report — $24.99",
+      payBtnLabel: "Unlock Extended Report",
+      payBtnRealLabel: "Pay for Extended Report",
+      simulatedTag: "simulated",
       payHint: "A new tab will open to complete your payment securely with Payphone. When you're done, come back to this tab.",
       verifyBtn: "I already paid — verify",
       verifying: "Verifying...",
@@ -92,6 +99,11 @@
       paymentError: "Couldn't start the payment. Please try again in a moment.",
       paying: "Processing...",
       downloadExtended: "Download my Extended Report (PDF)",
+      haveCode: "Have a free access code?",
+      codePlaceholder: "Access code",
+      redeemBtn: "Redeem code",
+      redeeming: "Checking code...",
+      codeInvalid: "That code isn't valid.",
       referralNotice: "Your answers suggest this might be a good time to talk with someone you trust or a mental health professional. RelateReady is not a diagnostic or crisis tool.",
       errorRequired: "Please fill in all required fields.",
       progress: "Question",
@@ -476,17 +488,34 @@
       })
       .join("");
 
+    // Precio configurable desde Render (EXTENDED_PRICE_CENTS) — ver routes/api.js.
+    const priceStr = ((state.meta.extendedPriceCents || 2499) / 100).toFixed(2);
+
+    // Bloque de código de acceso gratuito (paneles de prueba) — visible en
+    // cualquier modo de pago mientras no esté pagado. Ver FREE_ACCESS_CODES.
+    const codeBlockHtml = `
+      <div class="code-redeem">
+        <button type="button" class="link-btn" id="btn-toggle-code">${t("haveCode")}</button>
+        <div id="code-form" style="display:none">
+          <input type="text" id="f-code" placeholder="${t("codePlaceholder")}" />
+          <button class="secondary" id="btn-redeem">${t("redeemBtn")}</button>
+        </div>
+        <p class="error" id="code-msg" style="display:none"></p>
+      </div>`;
+
     // El área de pago tiene 3 estados posibles: ya pagado (mostrar descarga),
     // Payphone real activo (botón de pago real + verificación manual de respaldo),
     // o modo simulado (sin Payphone configurado todavía).
     const payAreaHtml = state.paid
       ? `<a class="primary" style="text-decoration:none;display:inline-block" href="/api/report/extended/${state.submissionId}" target="_blank">${t("downloadExtended")}</a>`
       : state.meta.payphoneEnabled
-      ? `<button class="primary" id="btn-pay">${t("payBtnReal")}</button>
+      ? `<button class="primary" id="btn-pay">${t("payBtnRealLabel")} — $${priceStr}</button>
          <p class="hint">${t("payHint")}</p>
          <button class="secondary" id="btn-verify">${t("verifyBtn")}</button>
-         <p class="error" id="pay-msg" style="display:none"></p>`
-      : `<button class="primary" id="btn-pay">${t("payBtn")}</button>`;
+         <p class="error" id="pay-msg" style="display:none"></p>
+         ${codeBlockHtml}`
+      : `<button class="primary" id="btn-pay">${t("payBtnLabel")} — $${priceStr} (${t("simulatedTag")})</button>
+         ${codeBlockHtml}`;
 
     app.innerHTML = `
       <div class="card">
@@ -526,7 +555,7 @@
           msg.style.display = "block";
         } finally {
           btn.disabled = false;
-          btn.textContent = t("payBtnReal");
+          btn.textContent = `${t("payBtnRealLabel")} — $${priceStr}`;
         }
       });
 
@@ -539,7 +568,7 @@
         try {
           const res = await fetch(`/api/submission/${state.submissionId}/status`);
           const data = await res.json();
-          if (data.paymentStatus === "paid" || data.paymentStatus === "simulated") {
+          if (data.paymentStatus === "paid" || data.paymentStatus === "simulated" || data.paymentStatus === "free") {
             state.paid = true;
             renderResults();
             return;
@@ -563,6 +592,44 @@
         if (data.ok) {
           document.getElementById("pay-area").innerHTML = `<a class="primary" style="text-decoration:none;display:inline-block" href="/api/report/extended/${state.submissionId}" target="_blank">${t("downloadExtended")}</a>`;
         }
+      });
+    }
+
+    // Código de acceso gratuito — disponible en cualquier modo mientras no esté pagado.
+    if (!state.paid) {
+      const toggleBtn = document.getElementById("btn-toggle-code");
+      const codeForm = document.getElementById("code-form");
+      toggleBtn.addEventListener("click", () => {
+        codeForm.style.display = codeForm.style.display === "none" ? "block" : "none";
+      });
+
+      document.getElementById("btn-redeem").addEventListener("click", async (e) => {
+        const btn = e.target;
+        const codeMsg = document.getElementById("code-msg");
+        const codeInput = document.getElementById("f-code");
+        codeMsg.style.display = "none";
+        btn.disabled = true;
+        btn.textContent = t("redeeming");
+        try {
+          const res = await fetch(`/api/payment/redeem/${state.submissionId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code: codeInput.value }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            state.paid = true;
+            renderResults();
+            return;
+          }
+          codeMsg.textContent = t("codeInvalid");
+          codeMsg.style.display = "block";
+        } catch (err) {
+          codeMsg.textContent = t("codeInvalid");
+          codeMsg.style.display = "block";
+        }
+        btn.disabled = false;
+        btn.textContent = t("redeemBtn");
       });
     }
   }
@@ -601,7 +668,7 @@
     state.lang = data.lang || state.lang;
     state.scoreSummary = data.scoreSummary;
     state.referralTriggered = data.referralTriggered;
-    state.paid = data.paymentStatus === "paid" || data.paymentStatus === "simulated";
+    state.paid = data.paymentStatus === "paid" || data.paymentStatus === "simulated" || data.paymentStatus === "free";
     state.step = "results";
     return true;
   }

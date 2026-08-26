@@ -9,9 +9,10 @@ patrón técnico de Adamantine SQ Personal (Node/Express + SQLite + pdfkit + Ant
 
 - ✅ Test completo (viñetas, 48 ítems núcleo, 6 de deseabilidad social, 3 cualitativos), bilingüe.
 - ✅ Motor de puntuación (índices 0-100, bandas, protocolo de derivación) — probado.
-- ✅ Preview gratuito en PDF y Informe Extendido en PDF con radar, texto fijo por dimensión, y las 5 secciones de IA — probado.
+- ✅ Informe Extendido en PDF con radar, texto fijo por dimensión, y las 5 secciones de IA — probado. (El preview gratuito se quitó de la interfaz a propósito, para no dar el contenido completo sin pagar; la ruta sigue existiendo en el backend por si se necesita más adelante.)
 - ✅ Panel admin simple en `/admin` (usuario/clave por variables de entorno).
 - ✅ **Pago real con Payphone** (botón de pago por redirección): se activa solo al configurar `PAYPHONE_TOKEN` y `PAYPHONE_STORE_ID`. Sin esas variables, el pago queda simulado automáticamente. Ver "Activar Payphone" más abajo.
+- ✅ **Precio y códigos de acceso gratuito configurables sin tocar código** — ver "Cambiar el precio o dar acceso gratuito" más abajo.
 - ⚠️ **IA en modo simulado si no configuras `ANTHROPIC_API_KEY`**: sin esa variable, las 5 secciones de IA muestran un texto de marcador de posición en vez de contenido real — el resto del informe (texto fijo validado, radar, tablas) funciona igual.
 
 ## Cómo desplegar esto en Render (paso a paso)
@@ -68,6 +69,24 @@ Para activarlo:
 5. Haz una prueba real (invita a un "Probador" desde el portal de Payphone si tu aplicación sigue en modo Prueba) antes de cambiar el switch de la aplicación a Producción.
 
 Cómo funciona el flujo, en resumen: al hacer clic en "Pagar", el backend prepara la transacción con Payphone y abre una pestaña nueva con la pasarela de pago. Al terminar, Payphone redirige esa pestaña de vuelta a tu sitio con los parámetros de la transacción; el frontend los detecta, confirma el pago con el backend, y muestra el enlace de descarga del Informe Extendido. Si por algún motivo la pestaña se cierra antes de redirigir, la persona puede volver a la pestaña original y usar el botón "Ya pagué — verificar".
+
+## Cambiar el precio o dar acceso gratuito (sin tocar código)
+
+Ambas cosas se controlan desde Render → tu servicio → **Environment**, agregando o editando estas dos variables. Guardar cualquiera de las dos hace que Render redepliegue solo (tarda uno o dos minutos, sin necesidad de tocar GitHub ni el código).
+
+**Cambiar el precio del Informe Extendido:**
+
+- Variable `EXTENDED_PRICE_CENTS`, en centavos de dólar. Por ejemplo, `1999` = $19.99, `2999` = $29.99.
+- Si la dejas sin configurar, usa el valor por defecto ($24.99).
+- El precio se actualiza automáticamente en el botón de pago, en el monto que se le cobra a Payphone, y en el panel admin.
+
+**Dar acceso gratuito a un panel de personas (beta testers):**
+
+- Variable `FREE_ACCESS_CODES`, con uno o varios códigos separados por coma. Ejemplo: `PANEL2026` o `PANEL2026,BETA-ADAMANTINE` (mayúsculas/minúsculas no importan).
+- En la pantalla de resultados, debajo del botón de pago, aparece un enlace "¿Tienes un código de acceso gratuito?" — quien escriba ahí uno de esos códigos desbloquea el Informe Extendido sin pagar.
+- El mismo código lo puede usar cualquier cantidad de personas (no es de un solo uso) — pensado para repartirlo a todo un panel de prueba.
+- Si dejas `FREE_ACCESS_CODES` vacío o sin configurar, esa opción simplemente no deja canjear nada (nadie puede colarse).
+- Puedes cambiar o quitar los códigos en cualquier momento desde Environment, sin redeploy manual.
 
 ## Desarrollo local (opcional, para probar cambios antes de subirlos)
 
