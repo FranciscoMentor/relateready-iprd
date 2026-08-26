@@ -8,7 +8,7 @@ const RELATIONSHIP_CONTEXTS = [
   { code: "ruptura_reciente", es: "Saliendo de una ruptura reciente", en: "Recovering from a recent breakup" },
   { code: "primeras_citas", es: "En las primeras citas con alguien", en: "On early dates with someone" },
   { code: "relacion_reciente", es: "En una relación reciente (menos de 6 meses)", en: "In a recent relationship (under 6 months)" },
-  { code: "terapia_pareja", es: "En terapia de pareja o coaching relacional", en: "In couples therapy or relationship coaching" },
+  { code: "relacion_necesita_mejorar", es: "En una relación actual que necesita mejorar", en: "In a current relationship that needs work" },
   { code: "relaciones_cortas", es: "Después de varias relaciones cortas que no prosperan", en: "After several short relationships that didn't work out" },
   { code: "retomando", es: "Volviendo a intentarlo tras mucho tiempo sin buscar pareja", en: "Trying again after a long time not dating" },
   { code: "otra", es: "Otra situación (especificar en el campo de abajo)", en: "Another situation (specify in the field below)" },
