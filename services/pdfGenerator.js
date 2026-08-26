@@ -15,6 +15,22 @@ const CREAM = "#F4F0E9";
 
 const BAND_COLOR = { f: GREEN, m: AMBER, d: CLAY };
 const LOGO_PATH = path.join(__dirname, "..", "public", "assets", "relateready-logo.png");
+const HERO_HOME_PATH = path.join(__dirname, "..", "public", "assets", "hero-home.jpg");
+
+// Inserta una ilustración de marca en el PDF (mismo estilo/paleta que
+// hero-home.jpg, usada también en la página de inicio del sitio). Pensado
+// para poder agregar MÁS ilustraciones similares en otros puntos del informe
+// en el futuro: genera la imagen (mismo prompt/estilo que hero-home.jpg —
+// ver conversación de diseño), guárdala en public/assets/, y llama a esta
+// función con su ruta, posición y ancho. Si el archivo todavía no existe,
+// no rompe la generación del PDF — simplemente no dibuja nada.
+function illustration(doc, imagePath, x, y, width) {
+  try {
+    doc.image(imagePath, x, y, { width });
+  } catch (e) {
+    // imagen no disponible todavía — se omite en silencio.
+  }
+}
 
 const PAGE_MARGIN = 56;
 
@@ -201,6 +217,10 @@ function coverPage(doc, lang, participant, level) {
     .fillColor(ACCENT)
     .font("Helvetica-Bold")
     .text(level === "extended" ? T(lang, "Informe Extendido", "Extended Report") : T(lang, "Preview gratuito", "Free preview"), { align: "center" });
+
+  // Ilustración de marca, misma imagen que la portada del sitio web. Ver
+  // illustration() arriba para agregar más en el futuro.
+  illustration(doc, HERO_HOME_PATH, (612 - 480) / 2, 478, 480);
 }
 
 function introPage(doc, lang, participant) {

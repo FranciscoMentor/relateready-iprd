@@ -322,6 +322,7 @@
 
     app.innerHTML = `
       <div class="card">
+        ${page === 0 ? `<img src="/assets/hero-home.jpg" alt="RelateReady" class="hero-image-small" />` : ""}
         <h1>${t("itemsTitle")}</h1>
         <p class="muted">${t("itemsIntro")}</p>
         <p class="scale-note">${t("itemsScaleNote")}</p>
@@ -530,6 +531,7 @@
         ${state.referralTriggered ? `<p class="error">${t("referralNotice")}</p>` : ""}
       </div>
       <div class="card">
+        <img src="/assets/hero-home.jpg" alt="RelateReady" class="hero-image" />
         <h2>${t("extendedTitle")}</h2>
         <p>${t("extendedIntro")}</p>
         <div id="pay-area">${payAreaHtml}</div>

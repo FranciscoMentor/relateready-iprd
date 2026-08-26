@@ -29,6 +29,7 @@ header.top img.brand-logo { height: 120px; width: auto; }
 .lang-toggle button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 20px; }
 .hero-image { width: 100%; height: auto; display: block; border-radius: 12px; margin-bottom: 20px; }
+.hero-image-small { width: 100%; max-width: 260px; height: auto; display: block; border-radius: 10px; margin-bottom: 16px; }
 h1 { color: var(--accent); font-size: 26px; margin: 0 0 8px; }
 h2 { color: var(--ink); font-size: 19px; margin: 0 0 12px; }
 p { color: var(--ink); }
