@@ -165,6 +165,7 @@
       .map((c) => `<option value="${c.code}" ${state.relationshipContextCode === c.code ? "selected" : ""}>${c.label}</option>`)
       .join("");
     app.innerHTML = `
+      <img src="/assets/hero-home.jpg" alt="RelateReady" class="hero-image" />
       <div class="card">
         <h1>${t("intakeTitle")}</h1>
         <p>${t("intakeIntro")}</p>
