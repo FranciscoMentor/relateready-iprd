@@ -26,7 +26,7 @@ function newDoc() {
   return new PDFDocument({ size: "LETTER", margin: PAGE_MARGIN, bufferPages: true });
 }
 
-function drawHeaderFooter(doc, lang, participantName) {
+function drawHeaderFooter(doc, lang) {
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
@@ -38,7 +38,7 @@ function drawHeaderFooter(doc, lang, participantName) {
         width: 612 - PAGE_MARGIN * 2 - 150,
         continued: false,
       });
-    doc.fontSize(8).fillColor(MUTED).text(participantName || "", 612 - PAGE_MARGIN - 150, 28, { width: 150, align: "right" });
+    doc.fontSize(8).fillColor(MUTED).text("ADAMANTINE", 612 - PAGE_MARGIN - 150, 28, { width: 150, align: "right" });
     doc
       .fontSize(8)
       .fillColor(MUTED)
@@ -296,7 +296,7 @@ async function generatePreviewPDF({ participant, scoreResult, referral }) {
     standardClosePage(doc, lang, "preview");
   }
 
-  drawHeaderFooter(doc, lang, participant.name);
+  drawHeaderFooter(doc, lang);
   doc.end();
   return done;
 }
@@ -385,7 +385,7 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
     standardClosePage(doc, lang, "extended");
   }
 
-  drawHeaderFooter(doc, lang, participant.name);
+  drawHeaderFooter(doc, lang);
   doc.end();
   return done;
 }

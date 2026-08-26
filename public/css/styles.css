@@ -19,8 +19,9 @@ body {
 }
 .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
 header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-header.top img.brand-logo { height: 40px; width: auto; }
+header.top img.brand-logo { height: 120px; width: auto; }
 .slogan { color: var(--muted); font-size: 14px; font-style: italic; margin: -8px 0 24px; }
+.scale-note { color: var(--accent); font-size: 16px; font-weight: 700; margin: 4px 0 18px; }
 .lang-toggle button {
   background: none; border: 1px solid var(--border); border-radius: 6px;
   padding: 6px 12px; margin-left: 6px; cursor: pointer; font-size: 13px; color: var(--muted);

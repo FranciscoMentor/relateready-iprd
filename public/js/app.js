@@ -3,10 +3,11 @@
 
   const I18N = {
     es: {
-      slogan: "Ready Within. Ready Together, la preparación empieza contigo, no con la otra persona.",
+      slogan: "Listos por dentro. Listos en pareja: la preparación empieza contigo, no con la otra persona.",
       footer: "Desarrollado por Adamantine · IPRD — Índice de Preparación para Relaciones Duraderas",
       intakeTitle: "Antes de empezar",
       intakeIntro: "RelateReady evalúa qué tan equipado/a estás — en términos de patrones emocionales y relacionales aprendidos — para sostener una relación sana en el tiempo. No predice compatibilidad con nadie en particular: mide tu propia preparación.",
+      durationNote: "Este test toma entre 10 y 15 minutos.",
       nameLabel: "Tu nombre",
       genderLabel: "Género con el que te identificas",
       genderM: "Masculino",
@@ -23,7 +24,8 @@
       nextBtn: "Siguiente",
       backBtn: "Atrás",
       itemsTitle: "Sobre ti y tus relaciones",
-      itemsIntro: "Responde con lo primero que sientas verdadero, sin pensarlo demasiado. Escala de 1 (totalmente en desacuerdo) a 6 (totalmente de acuerdo).",
+      itemsIntro: "Responde con lo primero que sientas verdadero, sin pensarlo demasiado.",
+      itemsScaleNote: "Escala: 1 = totalmente en desacuerdo · 6 = totalmente de acuerdo.",
       likertLabels: ["Totalmente en desacuerdo", "En desacuerdo", "Algo en desacuerdo", "Algo de acuerdo", "De acuerdo", "Totalmente de acuerdo"],
       qualitativeTitle: "Para conocerte un poco más (opcional)",
       qualitativeIntro: "Estas 3 preguntas son opcionales y no se puntúan, pero enriquecen tu Informe Extendido.",
@@ -31,7 +33,6 @@
       submitting: "Calculando tu perfil...",
       resultsTitle: "Tu perfil RelateReady",
       resultsIntro: "Este es tu resultado en las 8 dimensiones del IPRD.",
-      downloadPreview: "Descargar mi preview gratuito (PDF)",
       extendedTitle: "¿Quieres el detalle completo?",
       extendedIntro: "El Informe Extendido incluye tus 8 dimensiones completas, recomendaciones concretas, 5 secciones escritas especialmente para ti por IA, y tu plan de acción a 90 días.",
       payBtn: "Desbloquear Informe Extendido — $24.99 (simulado)",
@@ -50,10 +51,11 @@
       otherSpecify: "Especifica tu situación",
     },
     en: {
-      slogan: "Ready Within. Ready Together, la preparación empieza contigo, no con la otra persona.",
+      slogan: "Ready Within. Ready Together — readiness starts with you, not the other person.",
       footer: "Developed by Adamantine · IPRD — Relationship Readiness Index",
       intakeTitle: "Before you start",
       intakeIntro: "RelateReady assesses how well-equipped you are — in terms of learned emotional and relational patterns — to sustain a healthy relationship over time. It doesn't predict compatibility with anyone in particular: it measures your own readiness.",
+      durationNote: "This test takes about 10–15 minutes.",
       nameLabel: "Your name",
       genderLabel: "Gender you identify with",
       genderM: "Male",
@@ -70,7 +72,8 @@
       nextBtn: "Next",
       backBtn: "Back",
       itemsTitle: "About you and your relationships",
-      itemsIntro: "Answer with the first thing that feels true, without overthinking it. Scale from 1 (strongly disagree) to 6 (strongly agree).",
+      itemsIntro: "Answer with the first thing that feels true, without overthinking it.",
+      itemsScaleNote: "Scale: 1 = strongly disagree · 6 = strongly agree.",
       likertLabels: ["Strongly disagree", "Disagree", "Somewhat disagree", "Somewhat agree", "Agree", "Strongly agree"],
       qualitativeTitle: "To get to know you a bit more (optional)",
       qualitativeIntro: "These 3 questions are optional and unscored, but they enrich your Extended Report.",
@@ -78,7 +81,6 @@
       submitting: "Calculating your profile...",
       resultsTitle: "Your RelateReady profile",
       resultsIntro: "This is your result across the IPRD's 8 dimensions.",
-      downloadPreview: "Download my free preview (PDF)",
       extendedTitle: "Want the full detail?",
       extendedIntro: "The Extended Report includes all 8 full dimensions, concrete recommendations, 5 sections written specifically for you by AI, and your 90-day action plan.",
       payBtn: "Unlock Extended Report — $24.99 (simulated)",
@@ -154,6 +156,7 @@
       <div class="card">
         <h1>${t("intakeTitle")}</h1>
         <p>${t("intakeIntro")}</p>
+        <p class="muted">${t("durationNote")}</p>
         <label>${t("nameLabel")}</label>
         <input type="text" id="f-name" value="${escapeAttr(state.name)}" />
 
@@ -308,6 +311,7 @@
       <div class="card">
         <h1>${t("itemsTitle")}</h1>
         <p class="muted">${t("itemsIntro")}</p>
+        <p class="scale-note">${t("itemsScaleNote")}</p>
         <div class="progress"><div style="width:${((page + 1) / totalPages) * 100}%"></div></div>
         <p class="muted">${t("progress")} ${page * ITEMS_PER_PAGE + 1}–${Math.min((page + 1) * ITEMS_PER_PAGE, all.length)} ${t("of")} ${all.length}</p>
         ${blocks}
@@ -494,10 +498,6 @@
           <tbody>${rows}</tbody>
         </table>
         ${state.referralTriggered ? `<p class="error">${t("referralNotice")}</p>` : ""}
-        <div class="nav-buttons">
-          <a class="secondary" style="text-decoration:none;display:inline-block" href="/api/report/preview/${state.submissionId}" target="_blank">${t("downloadPreview")}</a>
-          <span></span>
-        </div>
       </div>
       <div class="card">
         <h2>${t("extendedTitle")}</h2>
