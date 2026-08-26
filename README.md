@@ -11,7 +11,7 @@ patrón técnico de Adamantine SQ Personal (Node/Express + SQLite + pdfkit + Ant
 - ✅ Motor de puntuación (índices 0-100, bandas, protocolo de derivación) — probado.
 - ✅ Preview gratuito en PDF y Informe Extendido en PDF con radar, texto fijo por dimensión, y las 5 secciones de IA — probado.
 - ✅ Panel admin simple en `/admin` (usuario/clave por variables de entorno).
-- ⚠️ **Pago simulado**: el botón "Desbloquear Informe Extendido" aprueba la compra sin cobrar de verdad. Ver "Activar Payphone" más abajo para conectar el cobro real.
+- ✅ **Pago real con Payphone** (botón de pago por redirección): se activa solo al configurar `PAYPHONE_TOKEN` y `PAYPHONE_STORE_ID`. Sin esas variables, el pago queda simulado automáticamente. Ver "Activar Payphone" más abajo.
 - ⚠️ **IA en modo simulado si no configuras `ANTHROPIC_API_KEY`**: sin esa variable, las 5 secciones de IA muestran un texto de marcador de posición en vez de contenido real — el resto del informe (texto fijo validado, radar, tablas) funciona igual.
 
 ## Cómo desplegar esto en Render (paso a paso)
@@ -57,12 +57,17 @@ Ya tienes Git GUI instalado. Desde esta misma carpeta:
 
 ## Activar Payphone (pago real)
 
-Mientras `PAYPHONE_TOKEN` y `PAYPHONE_STORE_ID` estén vacíos, el pago queda simulado.
-Cuando tengas tus credenciales de comercio Payphone:
+La integración real ya está implementada (método "Botón de pago por redirección" de Payphone, flujo Prepare + Confirm — ver `services/payphone.js`). Mientras `PAYPHONE_TOKEN` y `PAYPHONE_STORE_ID` estén vacíos en Render, el pago queda simulado automáticamente; en cuanto ambas variables tengan valor, `PAYPHONE_ENABLED` pasa a `true` solo y el sitio empieza a cobrar de verdad — no hace falta tocar código.
 
-1. Sigue la documentación de comercio de Payphone para generar el link de cobro ("API Link") desde el frontend, apuntando al precio del Informe Extendido definido en `IPRD_estrategia_mercado_y_precio.docx` ($24.99).
-2. Completa el cuerpo de la función `confirmPayment()` en `services/payphone.js` con la llamada real a su API de confirmación (el archivo ya trae comentado el esqueleto exacto de esa llamada).
-3. Configura `PAYPHONE_TOKEN` y `PAYPHONE_STORE_ID` en Render — en cuanto ambas tengan valor, `PAYPHONE_ENABLED` pasa a `true` automáticamente y el flujo deja de simular el cobro.
+Para activarlo:
+
+1. Crea (o usa) una aplicación en el [portal de desarrolladores de Payphone](https://appdeveloper.payphonetodoesposible.com), con el dominio real de tu sitio (con `https://`) como "Dominio web" y "Url de respuesta".
+2. En la pestaña **Credenciales** de esa aplicación, copia el **Token** (es el valor de `PAYPHONE_TOKEN`).
+3. Copia el **Store ID** desde el popup **Listado de tiendas** (un identificador tipo UUID, no el "Identificador" de la pestaña Detalles — es el valor de `PAYPHONE_STORE_ID`).
+4. Configura esas dos variables en Render (Environment del servicio web) y guarda — Render redepliega automáticamente.
+5. Haz una prueba real (invita a un "Probador" desde el portal de Payphone si tu aplicación sigue en modo Prueba) antes de cambiar el switch de la aplicación a Producción.
+
+Cómo funciona el flujo, en resumen: al hacer clic en "Pagar", el backend prepara la transacción con Payphone y abre una pestaña nueva con la pasarela de pago. Al terminar, Payphone redirige esa pestaña de vuelta a tu sitio con los parámetros de la transacción; el frontend los detecta, confirma el pago con el backend, y muestra el enlace de descarga del Informe Extendido. Si por algún motivo la pestaña se cierra antes de redirigir, la persona puede volver a la pestaña original y usar el botón "Ya pagué — verificar".
 
 ## Desarrollo local (opcional, para probar cambios antes de subirlos)
 

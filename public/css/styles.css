@@ -69,6 +69,7 @@ button.secondary {
 .band-m { color: var(--amber); font-weight: 700; }
 .band-d { color: var(--clay); font-weight: 700; }
 .error { color: var(--clay); font-size: 14px; margin-top: 8px; }
+.hint { color: var(--muted); font-size: 13px; margin-top: 8px; }
 #radarCanvas { display: block; margin: 20px auto; }
 .vignette-option { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 8px 0; cursor: pointer; }
 .vignette-option:hover { border-color: var(--accent); }

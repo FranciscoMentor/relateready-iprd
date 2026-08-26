@@ -6,6 +6,7 @@ const apiRoutes = require("./routes/api");
 const adminRoutes = require("./routes/admin");
 
 const app = express();
+app.set("trust proxy", 1); // necesario en Render para que req.protocol refleje https
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 

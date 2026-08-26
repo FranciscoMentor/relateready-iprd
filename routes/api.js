@@ -11,11 +11,13 @@ const { scoreTest, checkReferralProtocol } = require("../services/scoring");
 const { getBandContent } = require("../data/reportContent");
 const { generatePreviewPDF, generateExtendedReportPDF } = require("../services/pdfGenerator");
 const { generateAISections } = require("../services/aiAnalysis");
-const { confirmPayment } = require("../services/payphone");
+const { preparePayment, confirmPayment, PAYPHONE_ENABLED } = require("../services/payphone");
 
 const CORE_ITEMS_FLAT = buildFlatCoreItems();
 const DESIRABILITY_ITEMS_FLAT = buildFlatDesirabilityItems();
 const QUALITATIVE_ITEMS_FLAT = buildFlatQualitativeItems();
+
+const EXTENDED_PRICE_CENTS = 2499; // $24.99, ver IPRD_estrategia_mercado_y_precio.docx
 
 // GET /api/meta?lang=es — todo lo que el frontend necesita para renderizar el test.
 // No se exponen 'keying' ni 'dimension' de los ítems núcleo, para no sesgar
@@ -24,6 +26,7 @@ router.get("/meta", (req, res) => {
   const lang = req.query.lang === "en" ? "en" : "es";
   res.json({
     lang,
+    payphoneEnabled: PAYPHONE_ENABLED,
     dimensions: DIMENSIONS.map((d) => ({ code: d.code, label: d[lang] })),
     relationshipContexts: RELATIONSHIP_CONTEXTS.map((c) => ({ code: c.code, label: c[lang] })),
     vignettes: VIGNETTES.map((v) => ({
@@ -138,8 +141,9 @@ router.get("/report/preview/:id", async (req, res) => {
 });
 
 // POST /api/payment/simulate/:id — desbloquea el Informe Extendido sin cobrar
-// de verdad. Ver services/payphone.js para activar el pago real.
+// de verdad. Solo funciona mientras Payphone NO esté configurado (ver services/payphone.js).
 router.post("/payment/simulate/:id", async (req, res) => {
+  if (PAYPHONE_ENABLED) return res.status(400).json({ error: "Payphone ya está activo — usa /api/payment/prepare." });
   const sub = loadSubmission(req.params.id);
   if (!sub) return res.status(404).json({ error: "No encontrado." });
   const result = await confirmPayment({ clientTransactionId: sub.id });
@@ -149,6 +153,72 @@ router.post("/payment/simulate/:id", async (req, res) => {
     sub.id
   );
   res.json({ ok: true, simulated: result.simulated, reference: result.reference });
+});
+
+// GET /api/submission/:id/status — para reconstruir el estado del frontend
+// después de volver de la pestaña de pago de Payphone (recarga la página).
+router.get("/submission/:id/status", (req, res) => {
+  const sub = loadSubmission(req.params.id);
+  if (!sub) return res.status(404).json({ error: "No encontrado." });
+  res.json({
+    id: sub.id,
+    lang: sub.lang,
+    scoreSummary: {
+      dimensions: sub.scoreResult.dimensions,
+      topStrengths: sub.scoreResult.topStrengths,
+      topDevelopmentAreas: sub.scoreResult.topDevelopmentAreas,
+      overallAverage: sub.scoreResult.overallAverage,
+    },
+    referralTriggered: !!sub.referral_triggered,
+    paymentStatus: sub.payment_status,
+  });
+});
+
+// POST /api/payment/prepare/:id — pago real con Payphone: prepara la
+// transacción y devuelve la URL a la que abrir una pestaña nueva para pagar.
+router.post("/payment/prepare/:id", async (req, res) => {
+  if (!PAYPHONE_ENABLED) return res.status(400).json({ error: "Payphone no está configurado todavía." });
+  const sub = loadSubmission(req.params.id);
+  if (!sub) return res.status(404).json({ error: "No encontrado." });
+  try {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const clientTransactionId = `${sub.id}-${Date.now()}`;
+    const result = await preparePayment({
+      amountCents: EXTENDED_PRICE_CENTS,
+      clientTransactionId,
+      reference: "RelateReady - Informe Extendido (IPRD)",
+      responseUrl: `${baseUrl}/?sid=${sub.id}`,
+    });
+    db.prepare("UPDATE submissions SET payment_reference = ? WHERE id = ?").run(clientTransactionId, sub.id);
+    res.json({ ok: true, payWithCard: result.payWithCard, payWithPayPhone: result.payWithPayPhone });
+  } catch (err) {
+    console.error("POST /api/payment/prepare —", err.message);
+    res.status(500).json({ error: "No se pudo iniciar el pago con Payphone." });
+  }
+});
+
+// GET /api/payment/confirm/:id — llamado por el frontend al volver de Payphone,
+// con los parámetros ?id=...&clientTransactionId=... que Payphone añade a responseUrl.
+router.get("/payment/confirm/:id", async (req, res) => {
+  if (!PAYPHONE_ENABLED) return res.status(400).json({ error: "Payphone no está configurado todavía." });
+  const sub = loadSubmission(req.params.id);
+  if (!sub) return res.status(404).json({ error: "No encontrado." });
+  const { id: payphoneId, clientTransactionId } = req.query;
+  if (!payphoneId || !clientTransactionId) return res.status(400).json({ error: "Faltan parámetros de Payphone." });
+  try {
+    const result = await confirmPayment({ id: payphoneId, clientTransactionId });
+    if (result.approved) {
+      db.prepare("UPDATE submissions SET payment_status = ?, payment_reference = ? WHERE id = ?").run(
+        "paid",
+        result.reference || clientTransactionId,
+        sub.id
+      );
+    }
+    res.json({ ok: true, approved: result.approved });
+  } catch (err) {
+    console.error("GET /api/payment/confirm —", err.message);
+    res.status(500).json({ error: "No se pudo confirmar el pago con Payphone." });
+  }
 });
 
 // GET /api/report/extended/:id — requiere pago (simulado o real).

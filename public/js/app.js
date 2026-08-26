@@ -35,6 +35,12 @@
       extendedTitle: "¿Quieres el detalle completo?",
       extendedIntro: "El Informe Extendido incluye tus 8 dimensiones completas, recomendaciones concretas, 5 secciones escritas especialmente para ti por IA, y tu plan de acción a 90 días.",
       payBtn: "Desbloquear Informe Extendido — $24.99 (simulado)",
+      payBtnReal: "Pagar Informe Extendido — $24.99",
+      payHint: "Se abrirá una pestaña nueva para completar el pago de forma segura con Payphone. Cuando termines, vuelve a esta pestaña.",
+      verifyBtn: "Ya pagué — verificar",
+      verifying: "Verificando...",
+      paymentNotConfirmed: "Todavía no detectamos tu pago. Si ya completaste el pago hace unos segundos, espera un momento y vuelve a intentar.",
+      paymentError: "No se pudo iniciar el pago. Intenta de nuevo en unos momentos.",
       paying: "Procesando...",
       downloadExtended: "Descargar mi Informe Extendido (PDF)",
       referralNotice: "Tus respuestas sugieren que este podría ser un buen momento para hablar con alguien de confianza o un profesional de salud mental. RelateReady no es una herramienta de diagnóstico ni de crisis.",
@@ -76,6 +82,12 @@
       extendedTitle: "Want the full detail?",
       extendedIntro: "The Extended Report includes all 8 full dimensions, concrete recommendations, 5 sections written specifically for you by AI, and your 90-day action plan.",
       payBtn: "Unlock Extended Report — $24.99 (simulated)",
+      payBtnReal: "Pay for Extended Report — $24.99",
+      payHint: "A new tab will open to complete your payment securely with Payphone. When you're done, come back to this tab.",
+      verifyBtn: "I already paid — verify",
+      verifying: "Verifying...",
+      paymentNotConfirmed: "We haven't detected your payment yet. If you just completed it, wait a moment and try again.",
+      paymentError: "Couldn't start the payment. Please try again in a moment.",
       paying: "Processing...",
       downloadExtended: "Download my Extended Report (PDF)",
       referralNotice: "Your answers suggest this might be a good time to talk with someone you trust or a mental health professional. RelateReady is not a diagnostic or crisis tool.",
@@ -460,6 +472,18 @@
       })
       .join("");
 
+    // El área de pago tiene 3 estados posibles: ya pagado (mostrar descarga),
+    // Payphone real activo (botón de pago real + verificación manual de respaldo),
+    // o modo simulado (sin Payphone configurado todavía).
+    const payAreaHtml = state.paid
+      ? `<a class="primary" style="text-decoration:none;display:inline-block" href="/api/report/extended/${state.submissionId}" target="_blank">${t("downloadExtended")}</a>`
+      : state.meta.payphoneEnabled
+      ? `<button class="primary" id="btn-pay">${t("payBtnReal")}</button>
+         <p class="hint">${t("payHint")}</p>
+         <button class="secondary" id="btn-verify">${t("verifyBtn")}</button>
+         <p class="error" id="pay-msg" style="display:none"></p>`
+      : `<button class="primary" id="btn-pay">${t("payBtn")}</button>`;
+
     app.innerHTML = `
       <div class="card">
         <h1>${t("resultsTitle")}</h1>
@@ -478,23 +502,69 @@
       <div class="card">
         <h2>${t("extendedTitle")}</h2>
         <p>${t("extendedIntro")}</p>
-        <div id="pay-area">
-          <button class="primary" id="btn-pay">${t("payBtn")}</button>
-        </div>
+        <div id="pay-area">${payAreaHtml}</div>
       </div>`;
 
     drawRadar(document.getElementById("radarCanvas"), dims, codes);
 
-    document.getElementById("btn-pay").addEventListener("click", async (e) => {
-      const btn = e.target;
-      btn.disabled = true;
-      btn.textContent = t("paying");
-      const res = await fetch(`/api/payment/simulate/${state.submissionId}`, { method: "POST" });
-      const data = await res.json();
-      if (data.ok) {
-        document.getElementById("pay-area").innerHTML = `<a class="primary" style="text-decoration:none;display:inline-block" href="/api/report/extended/${state.submissionId}" target="_blank">${t("downloadExtended")}</a>`;
-      }
-    });
+    if (state.paid) {
+      // Ya está pagado — el enlace de descarga ya se muestra arriba, nada más que hacer.
+    } else if (state.meta.payphoneEnabled) {
+      document.getElementById("btn-pay").addEventListener("click", async (e) => {
+        const btn = e.target;
+        const msg = document.getElementById("pay-msg");
+        msg.style.display = "none";
+        btn.disabled = true;
+        btn.textContent = t("paying");
+        try {
+          const res = await fetch(`/api/payment/prepare/${state.submissionId}`, { method: "POST" });
+          const data = await res.json();
+          if (!data.ok || !data.payWithCard) throw new Error(data.error || "prepare failed");
+          window.open(data.payWithCard, "_blank");
+        } catch (err) {
+          msg.textContent = t("paymentError");
+          msg.style.display = "block";
+        } finally {
+          btn.disabled = false;
+          btn.textContent = t("payBtnReal");
+        }
+      });
+
+      document.getElementById("btn-verify").addEventListener("click", async (e) => {
+        const btn = e.target;
+        const msg = document.getElementById("pay-msg");
+        msg.style.display = "none";
+        btn.disabled = true;
+        btn.textContent = t("verifying");
+        try {
+          const res = await fetch(`/api/submission/${state.submissionId}/status`);
+          const data = await res.json();
+          if (data.paymentStatus === "paid" || data.paymentStatus === "simulated") {
+            state.paid = true;
+            renderResults();
+            return;
+          }
+          msg.textContent = t("paymentNotConfirmed");
+          msg.style.display = "block";
+        } catch (err) {
+          msg.textContent = t("paymentError");
+          msg.style.display = "block";
+        }
+        btn.disabled = false;
+        btn.textContent = t("verifyBtn");
+      });
+    } else {
+      document.getElementById("btn-pay").addEventListener("click", async (e) => {
+        const btn = e.target;
+        btn.disabled = true;
+        btn.textContent = t("paying");
+        const res = await fetch(`/api/payment/simulate/${state.submissionId}`, { method: "POST" });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById("pay-area").innerHTML = `<a class="primary" style="text-decoration:none;display:inline-block" href="/api/report/extended/${state.submissionId}" target="_blank">${t("downloadExtended")}</a>`;
+        }
+      });
+    }
   }
 
   function escapeHtml(s) {
@@ -504,5 +574,43 @@
     return escapeHtml(s);
   }
 
-  loadMeta().then(render);
+  // Al volver de la pestaña de pago de Payphone, la URL trae ?sid=<envío>
+  // (y, si el pago se completó, también ?id=...&clientTransactionId=... que
+  // añade Payphone). Reconstruye el estado a partir de esos parámetros.
+  async function restoreFromPayphoneReturn() {
+    const params = new URLSearchParams(window.location.search);
+    const sid = params.get("sid");
+    if (!sid) return false;
+
+    const payphoneId = params.get("id");
+    const clientTransactionId = params.get("clientTransactionId");
+    history.replaceState({}, "", window.location.pathname); // limpia la URL
+
+    if (payphoneId && clientTransactionId) {
+      try {
+        await fetch(`/api/payment/confirm/${sid}?id=${encodeURIComponent(payphoneId)}&clientTransactionId=${encodeURIComponent(clientTransactionId)}`);
+      } catch (e) {
+        console.error("No se pudo confirmar el pago:", e);
+      }
+    }
+
+    const res = await fetch(`/api/submission/${sid}/status`);
+    if (!res.ok) return false;
+    const data = await res.json();
+    state.submissionId = sid;
+    state.lang = data.lang || state.lang;
+    state.scoreSummary = data.scoreSummary;
+    state.referralTriggered = data.referralTriggered;
+    state.paid = data.paymentStatus === "paid" || data.paymentStatus === "simulated";
+    state.step = "results";
+    return true;
+  }
+
+  restoreFromPayphoneReturn().then((restored) => {
+    loadMeta().then(() => {
+      document.getElementById("btn-es").classList.toggle("active", state.lang === "es");
+      document.getElementById("btn-en").classList.toggle("active", state.lang === "en");
+      render();
+    });
+  });
 })();
