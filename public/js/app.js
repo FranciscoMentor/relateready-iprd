@@ -35,6 +35,10 @@
       resultsIntro: "Este es tu resultado en las 8 dimensiones del IPRD.",
       extendedTitle: "¿Quieres el detalle completo?",
       extendedIntro: "El Informe Extendido incluye tus 8 dimensiones completas, recomendaciones concretas, 5 secciones escritas especialmente para ti por IA, y tu plan de acción a 90 días.",
+      freeSessionNote: "Además, al adquirir tu Informe Extendido recibes una sesión de mentoría gratuita de 60 minutos con Francisco para revisarlo juntos.",
+      scheduleSessionTitle: "Tu sesión de mentoría gratuita",
+      scheduleSessionIntro: "Como parte de tu Informe Extendido, tienes una sesión de mentoría gratuita de 60 minutos con Francisco para revisar tus resultados.",
+      scheduleSessionBtn: "Agendar mi sesión gratuita",
       payBtnLabel: "Desbloquear Informe Extendido",
       payBtnRealLabel: "Pagar Informe Extendido",
       simulatedTag: "simulado",
@@ -89,6 +93,10 @@
       resultsIntro: "This is your result across the IPRD's 8 dimensions.",
       extendedTitle: "Want the full detail?",
       extendedIntro: "The Extended Report includes all 8 full dimensions, concrete recommendations, 5 sections written specifically for you by AI, and your 90-day action plan.",
+      freeSessionNote: "Plus, getting your Extended Report includes a free 60-minute mentoring session with Francisco to review it together.",
+      scheduleSessionTitle: "Your free mentoring session",
+      scheduleSessionIntro: "As part of your Extended Report, you get a free 60-minute mentoring session with Francisco to review your results.",
+      scheduleSessionBtn: "Schedule my free session",
       payBtnLabel: "Unlock Extended Report",
       payBtnRealLabel: "Pay for Extended Report",
       simulatedTag: "simulated",
@@ -110,6 +118,14 @@
       of: "of",
       otherSpecify: "Specify your situation",
     },
+  };
+
+  // Enlaces de agendamiento para la sesión de mentoría gratuita de 60 min
+  // incluida con el Informe Extendido (uno por idioma). Si Francisco necesita
+  // cambiarlos en el futuro, basta con actualizar estas dos URLs.
+  const BOOKING_LINKS = {
+    es: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/eMJ5GQhw_0W_-z2cJN-S9g2",
+    en: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/K4DmDOt-kUSplfAlddYmbw2",
   };
 
   const state = {
@@ -497,7 +513,7 @@
     // cualquier modo de pago mientras no esté pagado. Ver FREE_ACCESS_CODES.
     const codeBlockHtml = `
       <div class="code-redeem">
-        <button type="button" class="link-btn" id="btn-toggle-code">${t("haveCode")}</button>
+        <button type="button" class="secondary" id="btn-toggle-code">${t("haveCode")}</button>
         <div id="code-form" style="display:none">
           <input type="text" id="f-code" placeholder="${t("codePlaceholder")}" />
           <button class="secondary" id="btn-redeem">${t("redeemBtn")}</button>
@@ -505,11 +521,22 @@
         <p class="error" id="code-msg" style="display:none"></p>
       </div>`;
 
-    // El área de pago tiene 3 estados posibles: ya pagado (mostrar descarga),
-    // Payphone real activo (botón de pago real + verificación manual de respaldo),
-    // o modo simulado (sin Payphone configurado todavía).
+    // Bloque de agendamiento de la sesión de mentoría gratuita de 60 min,
+    // incluida con el Informe Extendido — se muestra una vez pagado/liberado.
+    const sessionBlockHtml = `
+      <div class="session-block">
+        <h2>${t("scheduleSessionTitle")}</h2>
+        <p>${t("scheduleSessionIntro")}</p>
+        <a class="primary" style="text-decoration:none;display:inline-block" href="${BOOKING_LINKS[state.lang] || BOOKING_LINKS.es}" target="_blank">${t("scheduleSessionBtn")}</a>
+      </div>`;
+
+    // El área de pago tiene 3 estados posibles: ya pagado (mostrar descarga
+    // + agendamiento de la sesión gratuita), Payphone real activo (botón de
+    // pago real + verificación manual de respaldo), o modo simulado (sin
+    // Payphone configurado todavía).
     const payAreaHtml = state.paid
-      ? `<a class="primary" style="text-decoration:none;display:inline-block" href="/api/report/extended/${state.submissionId}" target="_blank">${t("downloadExtended")}</a>`
+      ? `<a class="primary" style="text-decoration:none;display:inline-block" href="/api/report/extended/${state.submissionId}" target="_blank">${t("downloadExtended")}</a>
+         ${sessionBlockHtml}`
       : state.meta.payphoneEnabled
       ? `<button class="primary" id="btn-pay">${t("payBtnRealLabel")} — $${priceStr}</button>
          <p class="hint">${t("payHint")}</p>
@@ -534,6 +561,7 @@
         <img src="/assets/hero-home.jpg" alt="RelateReady" class="hero-image" />
         <h2>${t("extendedTitle")}</h2>
         <p>${t("extendedIntro")}</p>
+        ${!state.paid ? `<p class="bonus-note">${t("freeSessionNote")}</p>` : ""}
         <div id="pay-area">${payAreaHtml}</div>
       </div>`;
 
@@ -593,7 +621,8 @@
         const res = await fetch(`/api/payment/simulate/${state.submissionId}`, { method: "POST" });
         const data = await res.json();
         if (data.ok) {
-          document.getElementById("pay-area").innerHTML = `<a class="primary" style="text-decoration:none;display:inline-block" href="/api/report/extended/${state.submissionId}" target="_blank">${t("downloadExtended")}</a>`;
+          state.paid = true;
+          renderResults();
         }
       });
     }
