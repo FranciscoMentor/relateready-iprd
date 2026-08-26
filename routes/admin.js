@@ -39,22 +39,29 @@ router.get("/", (req, res) => {
     .join("");
 
   res.send(`<!doctype html>
-<html lang="es"><head><meta charset="utf-8"><title>RelateReady — Admin</title>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RelateReady — Admin</title>
 <style>
-  body{font-family:Arial,sans-serif;background:#F4F0E9;color:#2A2A28;padding:32px;}
-  h1{color:#B5732A;}
-  table{border-collapse:collapse;width:100%;background:#fff;}
+  * { box-sizing: border-box; }
+  body{font-family:Arial,sans-serif;background:#F4F0E9;color:#2A2A28;padding:20px;}
+  h1{color:#B5732A;font-size:22px;}
+  .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{border-collapse:collapse;width:100%;min-width:640px;background:#fff;}
   th,td{border:1px solid #DDD6CE;padding:8px 10px;font-size:14px;text-align:left;}
   th{background:#B5732A;color:#fff;}
   tr:nth-child(even){background:#ECE4D6;}
+  @media (min-width: 640px) { body{padding:32px;} }
 </style></head>
 <body>
   <h1>RelateReady — Panel admin</h1>
   <p>${rows.length} envíos más recientes.</p>
-  <table>
-    <thead><tr><th>Fecha</th><th>Nombre</th><th>Idioma</th><th>Pago</th><th>Informes</th></tr></thead>
-    <tbody>${trs}</tbody>
-  </table>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Fecha</th><th>Nombre</th><th>Idioma</th><th>Pago</th><th>Informes</th></tr></thead>
+      <tbody>${trs}</tbody>
+    </table>
+  </div>
 </body></html>`);
 });
 

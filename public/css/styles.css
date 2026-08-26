@@ -18,13 +18,16 @@ body {
   line-height: 1.5;
 }
 .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
-header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-header.top img.brand-logo { height: 120px; width: auto; }
+header.top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+header.top img.brand-logo { height: auto; width: clamp(160px, 45vw, 300px); max-width: 100%; }
 .slogan { color: var(--muted); font-size: 14px; font-style: italic; margin: -8px 0 24px; }
 .scale-note { color: var(--accent); font-size: 16px; font-weight: 700; margin: 4px 0 18px; }
+.lang-toggle { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.lang-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.lang-buttons { display: flex; gap: 6px; }
 .lang-toggle button {
   background: none; border: 1px solid var(--border); border-radius: 6px;
-  padding: 6px 12px; margin-left: 6px; cursor: pointer; font-size: 13px; color: var(--muted);
+  padding: 6px 12px; cursor: pointer; font-size: 13px; color: var(--muted);
 }
 .lang-toggle button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 20px; }
@@ -77,7 +80,7 @@ button.secondary {
 .link-btn { background: none; border: none; color: var(--accent); text-decoration: underline; cursor: pointer; font-size: 13px; padding: 0; }
 #code-form { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 #code-form input#f-code { width: auto; flex: 1; min-width: 160px; }
-#radarCanvas { display: block; margin: 20px auto; }
+#radarCanvas { display: block; margin: 20px auto; max-width: 100%; height: auto; }
 .vignette-option { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 8px 0; cursor: pointer; }
 .vignette-option:hover { border-color: var(--accent); }
 .vignette-option.selected { border-color: var(--accent); background: var(--light); }
