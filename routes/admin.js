@@ -31,8 +31,7 @@ router.get("/", (req, res) => {
       <td>${r.lang}</td>
       <td>${r.payment_status}${r.referral_triggered ? ' <span style="color:#9C3B2E">⚠ derivación</span>' : ""}</td>
       <td>
-        <a href="/api/report/preview/${r.id}" target="_blank">Preview</a>
-        ${r.payment_status !== "pending" ? ` · <a href="/api/report/extended/${r.id}" target="_blank">Extendido</a>` : ""}
+        ${r.payment_status !== "pending" ? `<a href="/api/report/extended/${r.id}" target="_blank">Extendido</a>` : "—"}
       </td>
     </tr>`
     )

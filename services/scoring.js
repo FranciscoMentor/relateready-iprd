@@ -1,4 +1,4 @@
-// Motor de puntuación del IPRD — TODO el cálculo vive aquí, en JS puro.
+// Motor de puntuación del Índice de Desarrollo y Fortalecimiento Relacional — TODO el cálculo vive aquí, en JS puro.
 // La IA (services/aiAnalysis.js) nunca decide ni recalcula un resultado:
 // solo redacta a partir de las variables que este archivo ya resolvió.
 // Ver IPRD_especificacion_tecnica.docx, secciones 5 y 5bis.
@@ -17,7 +17,7 @@ function bandForIndex(index) {
 }
 
 /**
- * @param {Object} coreResponses  { AS01: 1-6, AS02: 1-6, ... } — 48 respuestas
+ * @param {Object} coreResponses  { AS01: 1-6, AS02: 1-6, ... } — 40 respuestas (5 por dimensión)
  * @param {Object} desirabilityResponses { DES01: 1-6, ... } — 6 respuestas
  * @returns {Object} resultado completo de puntuación
  */
@@ -26,6 +26,9 @@ function scoreTest(coreResponses, desirabilityResponses) {
 
   for (const code of DIMENSION_CODES) {
     const items = CORE_ITEMS_FLAT.filter((i) => i.dimension === code);
+    const n = items.length; // ítems de esta dimensión (5 por defecto) — el rango
+    // mín/máx posible de rawSum se deriva de n, así el índice 0-100 sigue siendo
+    // correcto sin importar cuántos ítems tenga cada dimensión.
     let rawSum = 0;
     for (const item of items) {
       const raw = Number(coreResponses[item.id]);
@@ -35,7 +38,7 @@ function scoreTest(coreResponses, desirabilityResponses) {
       const coded = item.keying === "R" ? 7 - raw : raw;
       rawSum += coded;
     }
-    const index = Math.round(((rawSum - 6) / 30) * 100);
+    const index = Math.round(((rawSum - n) / (n * 5)) * 100);
     dimensions[code] = {
       code,
       rawSum,

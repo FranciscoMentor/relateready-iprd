@@ -252,8 +252,8 @@ const SOCIAL_DESIRABILITY_NOTE = {
 };
 
 const REFERRAL_MESSAGE = {
-  es: "Tus respuestas muestran un patrón que sugiere que podrías estar pasando por un momento emocionalmente difícil. El IPRD no es una herramienta de diagnóstico ni de crisis. Si sientes que necesitas apoyo ahora, te recomendamos hablar con un profesional de salud mental o con alguien de confianza lo antes posible.",
-  en: "Your answers show a pattern that suggests you may be going through an emotionally difficult time. The IPRD is not a diagnostic or crisis tool. If you feel you need support right now, we recommend speaking with a mental health professional or someone you trust as soon as possible.",
+  es: "Tus respuestas muestran un patrón que sugiere que podrías estar pasando por un momento emocionalmente difícil. El Índice de Desarrollo y Fortalecimiento Relacional no es una herramienta de diagnóstico ni de crisis. Si sientes que necesitas apoyo ahora, te recomendamos hablar con un profesional de salud mental o con alguien de confianza lo antes posible.",
+  en: "Your answers show a pattern that suggests you may be going through an emotionally difficult time. The Relationship Development and Strengthening Index is not a diagnostic or crisis tool. If you feel you need support right now, we recommend speaking with a mental health professional or someone you trust as soon as possible.",
 };
 
 module.exports = {

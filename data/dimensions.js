@@ -1,4 +1,4 @@
-// 8 dimensiones del IPRD. El orden aquí es el orden canónico usado en todo
+// 8 dimensiones del Índice de Desarrollo y Fortalecimiento Relacional. El orden aquí es el orden canónico usado en todo
 // el sistema (radar, informe, base de datos).
 const DIMENSIONS = [
   { code: "AS", es: "Seguridad de apego", en: "Attachment Security" },

@@ -9,7 +9,7 @@ const { RELATIONSHIP_CONTEXTS } = require("../data/relationshipContexts");
 const { buildFlatCoreItems, buildFlatDesirabilityItems, buildFlatQualitativeItems } = require("../data/items");
 const { scoreTest, checkReferralProtocol } = require("../services/scoring");
 const { getBandContent } = require("../data/reportContent");
-const { generatePreviewPDF, generateExtendedReportPDF } = require("../services/pdfGenerator");
+const { generateExtendedReportPDF } = require("../services/pdfGenerator");
 const { generateAISections } = require("../services/aiAnalysis");
 const { preparePayment, confirmPayment, PAYPHONE_ENABLED } = require("../services/payphone");
 
@@ -61,6 +61,26 @@ router.get("/meta", (req, res) => {
 function mapGender(value) {
   if (value === "M" || value === "F") return value;
   return "N";
+}
+
+// Nombre de archivo para los PDF descargados: "RelateReady - <Nombre> -
+// <Tipo>.pdf" en vez del id/UUID interno, para que el cliente pueda
+// identificar y guardar el archivo fácilmente. Quita caracteres que no son
+// seguros en un nombre de archivo, conservando acentos y espacios.
+function pdfFilename(clientName, label) {
+  const safeName = String(clientName || "")
+    .replace(/[\\/:*?"<>|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `RelateReady - ${safeName || "Informe"} - ${label}.pdf`;
+}
+
+// Header Content-Disposition con soporte para nombres con acentos: incluye
+// tanto un fallback ASCII (filename=) para lectores antiguos, como la
+// versión UTF-8 completa (filename*=) que usan los navegadores modernos.
+function contentDispositionHeader(filename) {
+  const asciiFallback = filename.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\x20-\x7E]/g, "_");
+  return `inline; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
 // POST /api/submit — recibe todas las respuestas, califica, guarda, devuelve resumen.
@@ -139,24 +159,6 @@ function loadSubmission(id) {
   };
 }
 
-// GET /api/report/preview/:id — PDF del preview gratuito (siempre disponible).
-router.get("/report/preview/:id", async (req, res) => {
-  const sub = loadSubmission(req.params.id);
-  if (!sub) return res.status(404).send("No encontrado.");
-  try {
-    const pdf = await generatePreviewPDF({
-      participant: { name: sub.name, lang: sub.lang, gender: sub.gender },
-      scoreResult: sub.scoreResult,
-      referral: { triggered: !!sub.referral_triggered },
-    });
-    res.set("Content-Type", "application/pdf");
-    res.send(pdf);
-  } catch (err) {
-    console.error("GET /api/report/preview —", err);
-    res.status(500).send("No se pudo generar el preview.");
-  }
-});
-
 // POST /api/payment/simulate/:id — desbloquea el Informe Extendido sin cobrar
 // de verdad. Solo funciona mientras Payphone NO esté configurado (ver services/payphone.js).
 router.post("/payment/simulate/:id", async (req, res) => {
@@ -220,7 +222,7 @@ router.post("/payment/prepare/:id", async (req, res) => {
     const result = await preparePayment({
       amountCents: EXTENDED_PRICE_CENTS,
       clientTransactionId,
-      reference: "RelateReady - Informe Extendido (IPRD)",
+      reference: "RelateReady - Informe Extendido",
       responseUrl: `${baseUrl}/?sid=${sub.id}`,
     });
     db.prepare("UPDATE submissions SET payment_reference = ? WHERE id = ?").run(clientTransactionId, sub.id);
@@ -293,7 +295,9 @@ router.get("/report/extended/:id", async (req, res) => {
 
     db.prepare("UPDATE submissions SET extended_generated_at = ? WHERE id = ?").run(new Date().toISOString(), sub.id);
 
+    const filename = pdfFilename(sub.name, sub.lang === "en" ? "Extended Report" : "Informe Extendido");
     res.set("Content-Type", "application/pdf");
+    res.set("Content-Disposition", contentDispositionHeader(filename));
     res.send(pdf);
   } catch (err) {
     console.error("GET /api/report/extended —", err);

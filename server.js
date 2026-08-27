@@ -21,5 +21,5 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`RelateReady (IPRD) escuchando en el puerto ${PORT}`);
+  console.log(`RelateReady escuchando en el puerto ${PORT}`);
 });

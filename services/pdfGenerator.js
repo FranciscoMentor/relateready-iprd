@@ -1,5 +1,4 @@
 // Generador de PDF (pdfkit) — Preview gratuito e Informe Extendido de RelateReady.
-// Identidad de marca: ver IPRD_estructura_informe.docx (Fase D).
 const PDFDocument = require("pdfkit");
 const path = require("path");
 const { dimensionLabel, DIMENSION_CODES } = require("../data/dimensions");
@@ -12,10 +11,27 @@ const GREEN = "#3F6B4F";
 const AMBER = "#9C6B14";
 const CLAY = "#9C3B2E";
 const CREAM = "#F4F0E9";
+const LIGHT = "#ECE4D6";
 
 const BAND_COLOR = { f: GREEN, m: AMBER, d: CLAY };
 const LOGO_PATH = path.join(__dirname, "..", "public", "assets", "relateready-logo.png");
 const HERO_HOME_PATH = path.join(__dirname, "..", "public", "assets", "hero-home.jpg");
+const ADAMANTINE_LOGO_PATH = path.join(__dirname, "..", "public", "assets", "adamantine-logo.png");
+const ADAMANTINE_LOGO_RATIO = 400 / 304; // ancho/alto real del archivo adamantine-logo.png
+
+// Nombre oficial del índice — reemplaza en todo el informe al antiguo
+// "IPRD — Índice de Preparación para Relaciones Duraderas".
+const INDEX_NAME = { es: "Índice de Desarrollo y Fortalecimiento Relacional", en: "Relationship Development and Strengthening Index" };
+
+// Enlaces de agendamiento de la sesión de mentoría indagatoria gratuita de
+// 60 min incluida con el Informe Extendido (mismos enlaces que
+// public/js/app.js — si cambian alguno, actualizar en ambos lugares).
+// El mentor se menciona de forma genérica (sin nombre propio) en el informe.
+const MENTOR_NAME = { es: "un mentor en relaciones y desarrollo personal", en: "a relationship & personal development mentor" };
+const BOOKING_LINKS = {
+  es: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/eMJ5GQhw_0W_-z2cJN-S9g2",
+  en: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/K4DmDOt-kUSplfAlddYmbw2",
+};
 
 // Inserta una ilustración de marca en el PDF (mismo estilo/paleta que
 // hero-home.jpg, usada también en la página de inicio del sitio). Pensado
@@ -32,6 +48,27 @@ function illustration(doc, imagePath, x, y, width) {
   }
 }
 
+// Dibuja "Desarrollado por" + el logotipo real de Adamantine (no el nombre
+// en texto), centrado horizontalmente en centerX. Usado tanto en el pie de
+// página de cada página de contenido como en la portada, cada uno con su
+// propio tamaño de texto/logo.
+function developedByLockup(doc, lang, centerX, y, fontSize, logoH) {
+  const label = T(lang, "Desarrollado por", "Developed by");
+  const logoW = logoH * ADAMANTINE_LOGO_RATIO;
+  const gap = 6;
+  doc.fontSize(fontSize).font("Helvetica").fillColor(MUTED);
+  const labelW = doc.widthOfString(label);
+  const totalW = labelW + gap + logoW;
+  const startX = centerX - totalW / 2;
+  doc.text(label, startX, y, { width: labelW + 2, lineBreak: false });
+  try {
+    doc.image(ADAMANTINE_LOGO_PATH, startX + labelW + gap, y - (logoH - fontSize * 1.15) / 2, { width: logoW, height: logoH });
+  } catch (e) {
+    // logo todavía no disponible — se omite en silencio, queda solo el texto.
+  }
+  doc.fillColor(INK).font("Helvetica");
+}
+
 const PAGE_MARGIN = 56;
 
 function T(lang, es, en) {
@@ -44,21 +81,43 @@ function newDoc() {
 
 function drawHeaderFooter(doc, lang) {
   const range = doc.bufferedPageRange();
+  // El número de página visible empieza en 1 en la primera página de
+  // contenido (la portada, i === 0, no lleva encabezado ni número).
+  let pageNum = 0;
+  // El pie de página se dibuja en y=762, que cae DEBAJO del margen inferior
+  // de la página (792 - 56 = 736). pdfkit interpreta cualquier .text() más
+  // allá del margen como desborde y agrega automáticamente una página nueva
+  // en blanco (bug clásico de pdfkit con encabezados/pies). La solución
+  // estándar: poner el margen inferior en 0 mientras se dibuja el pie, y
+  // restaurarlo después — así pdfkit ya no "corrige" nada por su cuenta.
+  const originalBottomMargin = doc.page.margins.bottom;
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
-    if (i === 0) continue; // sin encabezado en la portada
+    if (i === 0) continue; // sin encabezado/pie en la portada
+    pageNum += 1;
+    doc.page.margins.bottom = 0;
     doc
       .fontSize(8)
       .fillColor(MUTED)
-      .text(T(lang, "RELATEREADY · Índice de Preparación para Relaciones Duraderas (IPRD)", "RELATEREADY · Relationship Readiness Index (IPRD)"), PAGE_MARGIN, 28, {
+      .text(T(lang, `RELATEREADY · ${INDEX_NAME.es}`, `RELATEREADY · ${INDEX_NAME.en}`), PAGE_MARGIN, 28, {
         width: 612 - PAGE_MARGIN * 2 - 150,
         continued: false,
       });
     doc.fontSize(8).fillColor(MUTED).text("ADAMANTINE", 612 - PAGE_MARGIN - 150, 28, { width: 150, align: "right" });
-    doc
-      .fontSize(8)
-      .fillColor(MUTED)
-      .text(T(lang, "Desarrollado por Adamantine", "Developed by Adamantine"), PAGE_MARGIN, 760, { width: 612 - PAGE_MARGIN * 2, align: "center" });
+
+    // Pie de página en TODAS las páginas de contenido: "Desarrollado por" +
+    // el logotipo real de Adamantine (no el nombre en texto) + número de
+    // página dentro de un círculo de color de marca. Logo a 40pt de alto
+    // (el doble que la versión anterior de 20pt, a pedido explícito).
+    developedByLockup(doc, lang, 306, 762, 8, 40);
+
+    const circleR = 10;
+    const circleCx = 612 - PAGE_MARGIN - circleR;
+    const circleCy = 762 + 5;
+    doc.circle(circleCx, circleCy, circleR).fill(ACCENT);
+    doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#FFFFFF").text(String(pageNum), circleCx - circleR, circleCy - 4, { width: circleR * 2, align: "center" });
+    doc.fillColor(INK).font("Helvetica");
+    doc.page.margins.bottom = originalBottomMargin;
   }
 }
 
@@ -88,19 +147,77 @@ function note(doc, text) {
   doc.font("Helvetica");
 }
 
-function bulletList(doc, items) {
-  doc.fontSize(10.5).fillColor(INK).font("Helvetica");
+// Límite inferior útil del contenido, antes del pie de página (que ocupa
+// desde ~755 hacia abajo). Todas las secciones del informe deben chequear
+// contra este límite en vez de forzar doc.addPage() sin necesidad — así se
+// evitan páginas casi vacías y saltos de sección con demasiado aire.
+const CONTENT_BOTTOM = 730;
+
+// Solo agrega una página nueva si lo que sigue (de altura aproximada
+// minHeight) ya no cabe en el espacio restante de la página actual. Es el
+// reemplazo de los doc.addPage() incondicionales que dejaban páginas casi
+// en blanco cuando una sección terminaba temprano.
+function ensureSpace(doc, minHeight) {
+  if (doc.y + minHeight > CONTENT_BOTTOM) {
+    doc.addPage();
+  } else {
+    doc.moveDown(0.8);
+  }
+}
+
+// Dibuja un "botón" real dentro del PDF: un rectángulo redondeado de color
+// de marca con texto centrado, y una anotación de enlace clicable encima que
+// abre `url` en el navegador al hacer clic (pdfkit -> doc.link()).
+function linkButton(doc, text, url, opts = {}) {
+  const width = opts.width || 612 - PAGE_MARGIN * 2;
+  const height = opts.height || 28;
+  const x = opts.x !== undefined ? opts.x : PAGE_MARGIN;
+  if (doc.y + height > CONTENT_BOTTOM) doc.addPage();
+  const y = doc.y;
+  doc.roundedRect(x, y, width, height, 6).fill(ACCENT);
+  doc
+    .fontSize(10.5)
+    .font("Helvetica-Bold")
+    .fillColor("#FFFFFF")
+    .text(text, x, y + height / 2 - 5.5, { width, align: "center" });
+  doc.link(x, y, width, height, url);
+  doc.font("Helvetica").fillColor(INK);
+  doc.y = y + height;
+  doc.x = PAGE_MARGIN;
+  doc.moveDown(0.6);
+}
+
+// Lista de viñetas con el punto en color de acento (en vez del carácter "•"
+// en negro plano) — usada en las recomendaciones y en el bloque de venta del
+// preview para que se vea más cuidada/profesional.
+function bulletList(doc, items, opts = {}) {
+  const bulletColor = opts.color || ACCENT;
+  const textWidth = 612 - PAGE_MARGIN * 2 - 16;
   items.forEach((it) => {
-    doc.text(`•  ${it}`, { indent: 10, lineGap: 3 });
+    doc.fontSize(10.5).font("Helvetica").fillColor(INK);
+    const textHeight = doc.heightOfString(it, { width: textWidth, lineGap: 3 });
+    if (doc.y + textHeight + 6 > CONTENT_BOTTOM) doc.addPage();
+    const startX = doc.x;
+    const startY = doc.y;
+    doc.fillColor(bulletColor).circle(startX + 3, startY + 6, 2.5).fill();
+    doc.fillColor(INK).text(it, startX + 16, startY, { width: textWidth, lineGap: 3 });
+    doc.x = startX;
+    doc.y = startY + textHeight + 6;
   });
-  doc.moveDown(0.4);
+  doc.moveDown(0.3);
 }
 
 function aiBlock(doc, text) {
+  doc.fontSize(10.5).font("Helvetica-Oblique");
+  const textHeight = doc.heightOfString(text, { width: 612 - PAGE_MARGIN * 2 - 14 });
+  // Protección de desborde: si este bloque (texto generado por IA, de
+  // longitud variable) no cabe en lo que queda de página, empieza una
+  // página nueva en vez de dejar que se corte contra el pie de página.
+  if (doc.y + textHeight + 16 > CONTENT_BOTTOM) {
+    doc.addPage();
+  }
   const startX = doc.x;
   const startY = doc.y;
-  doc.fontSize(10.5).fillColor(INK).font("Helvetica-Oblique");
-  const textHeight = doc.heightOfString(text, { width: 612 - PAGE_MARGIN * 2 - 14 });
   doc.rect(startX - 8, startY - 4, 612 - PAGE_MARGIN * 2 + 8, textHeight + 16).fill(CREAM);
   doc.fillColor(INK).text(text, startX, startY + 4, { width: 612 - PAGE_MARGIN * 2 - 14, lineGap: 3 });
   doc.moveDown(0.6);
@@ -113,9 +230,8 @@ function drawRadarChart(doc, cx, cy, maxRadius, dims, lang) {
   const angleFor = (i) => -Math.PI / 2 + i * ((2 * Math.PI) / n);
 
   // Anillos de referencia (25/50/75/100%)
+  doc.strokeColor("#DDD6CE").lineWidth(0.5);
   [0.25, 0.5, 0.75, 1].forEach((frac) => {
-    doc.save();
-    doc.strokeColor("#DDD6CE").lineWidth(0.5);
     for (let i = 0; i <= n; i++) {
       const a = angleFor(i % n);
       const r = maxRadius * frac;
@@ -125,26 +241,46 @@ function drawRadarChart(doc, cx, cy, maxRadius, dims, lang) {
       else doc.lineTo(x, y);
     }
     doc.stroke();
-    doc.restore();
   });
 
-  // Ejes + etiquetas
+  // Ejes + etiquetas — nombre completo de cada pilar (no las iniciales), con
+  // alineación según el cuadrante para que el texto no quede montado sobre
+  // el gráfico ni sobre las etiquetas vecinas.
+  doc.strokeColor("#DDD6CE").lineWidth(0.5);
   DIMENSION_CODES.forEach((code, i) => {
     const a = angleFor(i);
+    const cosA = Math.cos(a);
+    const sinA = Math.sin(a);
     const x = cx + maxRadius * Math.cos(a);
     const y = cy + maxRadius * Math.sin(a);
-    doc.save().strokeColor("#DDD6CE").lineWidth(0.5).moveTo(cx, cy).lineTo(x, y).stroke().restore();
-    const labelX = cx + (maxRadius + 14) * Math.cos(a);
-    const labelY = cy + (maxRadius + 14) * Math.sin(a);
-    doc
-      .fontSize(8)
-      .fillColor(INK)
-      .font("Helvetica-Bold")
-      .text(code, labelX - 10, labelY - 4, { width: 20, align: "center" });
+    doc.moveTo(cx, cy).lineTo(x, y).stroke();
+
+    doc.fontSize(7.2).font("Helvetica-Bold");
+    const label = dimensionLabel(code, lang);
+    const gap = 12;
+    const anchorX = cx + (maxRadius + gap) * cosA;
+    const anchorY = cy + (maxRadius + gap) * sinA;
+
+    let width, align, boxX;
+    if (cosA > 0.3) {
+      width = 92; align = "left"; boxX = anchorX;
+    } else if (cosA < -0.3) {
+      width = 92; align = "right"; boxX = anchorX - width;
+    } else {
+      width = 118; align = "center"; boxX = anchorX - width / 2;
+    }
+
+    const textHeight = doc.heightOfString(label, { width, align });
+    let boxY;
+    if (sinA < -0.3) boxY = anchorY - textHeight; // eje superior: etiqueta encima del punto
+    else if (sinA > 0.3) boxY = anchorY; // eje inferior: etiqueta debajo del punto
+    else boxY = anchorY - textHeight / 2; // eje lateral: centrada verticalmente
+
+    doc.fillColor(INK).text(label, boxX, boxY, { width, align });
   });
+  doc.font("Helvetica").fontSize(10.5);
 
   // Polígono de datos
-  doc.save();
   doc.fillOpacity(0.25).strokeColor(ACCENT).fillColor(ACCENT).lineWidth(1.5);
   DIMENSION_CODES.forEach((code, i) => {
     const a = angleFor(i);
@@ -155,8 +291,8 @@ function drawRadarChart(doc, cx, cy, maxRadius, dims, lang) {
     else doc.lineTo(x, y);
   });
   doc.closePath().fillAndStroke(ACCENT, ACCENT);
-  doc.restore();
   doc.fillOpacity(1);
+  doc.fillColor(INK);
 }
 
 function supportTable(doc, dims, lang) {
@@ -164,6 +300,16 @@ function supportTable(doc, dims, lang) {
   const colW = [260, 70, 140];
   let x = PAGE_MARGIN;
   let y = doc.y;
+  // Protección de desborde: si la tabla completa (encabezado + 8 filas, ~146pt)
+  // no cabe en lo que queda de página, empieza en una página nueva en vez de
+  // dejar que pdfkit auto-pagine fila por fila (lo que dejaba una fila sola
+  // por página). Salvaguarda además de la reserva de espacio ya hecha antes
+  // de llamar a esta función.
+  const TABLE_HEIGHT = 18 + DIMENSION_CODES.length * 16;
+  if (y + TABLE_HEIGHT > CONTENT_BOTTOM) {
+    doc.addPage();
+    y = doc.y;
+  }
   doc.fontSize(9).font("Helvetica-Bold").fillColor("#FFFFFF");
   doc.rect(x, y, colW[0] + colW[1] + colW[2], 18).fill(ACCENT);
   doc.fillColor("#FFFFFF");
@@ -185,42 +331,102 @@ function supportTable(doc, dims, lang) {
   doc.x = PAGE_MARGIN;
 }
 
-function coverPage(doc, lang, participant, level) {
-  doc.rect(0, 0, 612, 792).fill("#FFFFFF");
+function coverPage(doc, lang, participant) {
+  const W = 612;
+  doc.rect(0, 0, W, 792).fill("#FFFFFF");
+
+  // Franjas de marca arriba y abajo — le dan a la portada un acabado más
+  // cuidado que una hoja en blanco lisa.
+  doc.rect(0, 0, W, 7).fill(ACCENT);
+  doc.rect(0, 785, W, 7).fill(ACCENT);
+
+  // Logo
   try {
-    doc.image(LOGO_PATH, 612 / 2 - 130, 90, { width: 260 });
+    doc.image(LOGO_PATH, W / 2 - 105, 46, { width: 210 });
   } catch (e) {
-    doc.fontSize(30).fillColor(ACCENT).font("Helvetica-Bold").text("RelateReady", 0, 120, { align: "center" });
+    doc.fontSize(28).fillColor(ACCENT).font("Helvetica-Bold").text("RelateReady", 0, 60, { align: "center" });
   }
-  doc.moveDown(6);
+
+  // Slogan — fuente más grande y en color de marca (antes era gris pequeño).
+  // En español usa la misma traducción íntegra que el sitio web (antes
+  // mezclaba "Ready Within. Ready Together" en inglés con el resto en
+  // español); en inglés coincide con el slogan del sitio.
   doc
-    .fontSize(9.5)
-    .fillColor(MUTED)
-    .font("Helvetica-Oblique")
-    .text("Ready Within. Ready Together — la preparación empieza contigo, no con la otra persona.", PAGE_MARGIN, 210, {
-      align: "center",
-      width: 612 - PAGE_MARGIN * 2,
-    });
-  doc.font("Helvetica");
-  doc.fontSize(13).fillColor(ACCENT).font("Helvetica-Bold").text(T(lang, "IPRD — Índice de Preparación para Relaciones Duraderas", "IPRD — Relationship Readiness Index"), PAGE_MARGIN, 260, {
-    align: "center",
-    width: 612 - PAGE_MARGIN * 2,
-  });
-  doc.moveDown(1);
-  doc.fontSize(11).fillColor(INK).font("Helvetica").text(`${participant.name}`, { align: "center" });
-  doc.fontSize(10).fillColor(MUTED).text(`${T(lang, "Informe generado el", "Report generated on")} ${new Date().toLocaleDateString(lang === "en" ? "en-US" : "es-EC")}`, { align: "center" });
-  doc.moveDown(0.3);
-  doc.fontSize(10).fillColor(MUTED).text(T(lang, "Desarrollado por Adamantine", "Developed by Adamantine"), { align: "center" });
-  doc.moveDown(2);
-  doc
-    .fontSize(11)
+    .fontSize(12.5)
     .fillColor(ACCENT)
-    .font("Helvetica-Bold")
-    .text(level === "extended" ? T(lang, "Informe Extendido", "Extended Report") : T(lang, "Preview gratuito", "Free preview"), { align: "center" });
+    .font("Helvetica-Oblique")
+    .text(
+      T(
+        lang,
+        "Listos por dentro. Listos en pareja: la preparación empieza contigo, no con la otra persona.",
+        "Ready Within. Ready Together — readiness starts with you, not the other person."
+      ),
+      70,
+      122,
+      { align: "center", width: W - 140 }
+    );
+  doc.font("Helvetica");
+
+  // Título del informe = nombre oficial del índice.
+  doc.fontSize(16.5).fillColor(ACCENT).font("Helvetica-Bold").text(INDEX_NAME[lang] || INDEX_NAME.es, 66, 163, {
+    align: "center",
+    width: W - 132,
+  });
+  doc.font("Helvetica");
+
+  doc.moveTo(W / 2 - 55, 191).lineTo(W / 2 + 55, 191).strokeColor(ACCENT).lineWidth(1.2).stroke();
+
+  // Insignia "Informe Extendido" / "Preview gratuito", como una píldora de color.
+  const badgeText = T(lang, "INFORME EXTENDIDO", "EXTENDED REPORT");
+  doc.fontSize(9.5).font("Helvetica-Bold");
+  const badgeTextWidth = doc.widthOfString(badgeText);
+  const badgeW = badgeTextWidth + 28;
+  const badgeH = 20;
+  const badgeX = W / 2 - badgeW / 2;
+  const badgeY = 202;
+  doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 10).fill(ACCENT);
+  doc.fillColor("#FFFFFF").text(badgeText, badgeX, badgeY + 5.5, { width: badgeW, align: "center" });
+  doc.font("Helvetica").fillColor(INK);
 
   // Ilustración de marca, misma imagen que la portada del sitio web. Ver
   // illustration() arriba para agregar más en el futuro.
-  illustration(doc, HERO_HOME_PATH, (612 - 480) / 2, 478, 480);
+  illustration(doc, HERO_HOME_PATH, (W - 380) / 2, 240, 380);
+
+  // Nombre del participante y fecha — fuente más grande y prominente.
+  doc.fontSize(19).fillColor(INK).font("Helvetica-Bold").text(`${participant.name}`, 66, 472, { align: "center", width: W - 132 });
+  doc.font("Helvetica");
+  doc
+    .fontSize(11.5)
+    .fillColor(MUTED)
+    .text(
+      `${T(lang, "Informe generado el", "Report generated on")} ${new Date().toLocaleDateString(lang === "en" ? "en-US" : "es-EC")}`,
+      66,
+      500,
+      { align: "center", width: W - 132 }
+    );
+
+  doc.moveTo(W / 2 - 40, 526).lineTo(W / 2 + 40, 526).strokeColor("#DDD6CE").lineWidth(1).stroke();
+  // "Desarrollado por" + el logotipo real de Adamantine (no el nombre en
+  // texto), igual que en el pie de página de las páginas de contenido.
+  developedByLockup(doc, lang, W / 2, 540, 10, 24);
+
+  // Nota de confidencialidad — deja claro que el informe es un documento
+  // personal y no debe circular sin autorización del titular.
+  doc
+    .fontSize(8.5)
+    .fillColor(MUTED)
+    .font("Helvetica-Oblique")
+    .text(
+      T(
+        lang,
+        `Documento confidencial. Preparado exclusivamente para uso personal de ${participant.name}; su contenido no debe compartirse, publicarse ni distribuirse sin su autorización.`,
+        `Confidential document. Prepared exclusively for the personal use of ${participant.name}; its contents should not be shared, published, or distributed without their authorization.`
+      ),
+      86,
+      568,
+      { align: "center", width: W - 172 }
+    );
+  doc.font("Helvetica");
 }
 
 function introPage(doc, lang, participant) {
@@ -237,88 +443,26 @@ function introPage(doc, lang, participant) {
 }
 
 function referralClosePage(doc, lang) {
-  doc.addPage();
+  ensureSpace(doc, 130);
   h1(doc, T(lang, "Un mensaje importante", "An important message"));
   aiBlock(doc, T(lang, REFERRAL_MESSAGE.es, REFERRAL_MESSAGE.en));
 }
 
-function standardClosePage(doc, lang, level) {
-  doc.addPage();
+// Página de cierre del Informe Extendido: metodología + disclaimer estándar.
+// (El preview gratuito ya no existe como PDF descargable — la experiencia
+// gratuita real es la pantalla de resultados del sitio, con las 8
+// dimensiones. Ver services/pdfGenerator.js más abajo.)
+function standardClosePage(doc, lang) {
+  ensureSpace(doc, 160);
   h1(doc, T(lang, "Metodología y cierre", "Methodology and closing"));
   body(
     doc,
     T(
       lang,
-      "RelateReady es una herramienta de autoconocimiento basada en el Índice de Preparación para Relaciones Duraderas (IPRD), y no sustituye el diagnóstico ni el tratamiento de un profesional de salud mental. Los ítems y el algoritmo de puntuación son de autoría original de Adamantine; las bandas de puntuación son PROVISIONALES y se irán refinando con más datos.",
-      "RelateReady is a self-knowledge tool based on the Relationship Readiness Index (IPRD), and does not replace the diagnosis or treatment of a mental health professional. The items and scoring algorithm are original work by Adamantine; the scoring bands are PROVISIONAL and will be refined as more data becomes available."
+      `RelateReady es una herramienta de autoconocimiento basada en el ${INDEX_NAME.es}, y no sustituye el diagnóstico ni el tratamiento de un profesional de salud mental. Los ítems y el algoritmo de puntuación son de autoría original de Adamantine.`,
+      `RelateReady is a self-knowledge tool based on the ${INDEX_NAME.en}, and does not replace the diagnosis or treatment of a mental health professional. The items and scoring algorithm are original work by Adamantine.`
     )
   );
-  if (level !== "extended") {
-    doc.moveDown(1);
-    h2(doc, T(lang, "¿Quieres tu Informe Extendido?", "Want your Extended Report?"));
-    body(
-      doc,
-      T(
-        lang,
-        "El Informe Extendido incluye el detalle completo de tus 8 dimensiones, tus áreas de desarrollo con recomendaciones concretas, cinco secciones narrativas generadas especialmente para ti por IA, y tu plan de acción a 90 días.",
-        "The Extended Report includes the full detail of all 8 dimensions, your development areas with concrete recommendations, five narrative sections generated specifically for you by AI, and your 90-day action plan."
-      )
-    );
-  }
-}
-
-/**
- * @returns {Buffer}
- */
-async function generatePreviewPDF({ participant, scoreResult, referral }) {
-  const lang = participant.lang;
-  const doc = newDoc();
-  const chunks = [];
-  doc.on("data", (c) => chunks.push(c));
-  const done = new Promise((resolve) => doc.on("end", () => resolve(Buffer.concat(chunks))));
-
-  coverPage(doc, lang, participant, "preview");
-  introPage(doc, lang, participant);
-
-  doc.addPage();
-  h1(doc, T(lang, "Cómo leer tu perfil", "How to read your profile"));
-  body(
-    doc,
-    T(
-      lang,
-      "RelateReady no te da una sola nota. Te muestra tu preparación en 8 áreas distintas de la vida en pareja, cada una con su propio resultado. Vas a ver tres niveles posibles en cada una: Fortaleza, Funcional, y Área de desarrollo. Ninguno de los tres es un diagnóstico — son un punto de partida para saber en qué invertir tu energía.",
-      "RelateReady doesn't give you a single score. It shows your readiness across 8 different areas of relationship life, each with its own result. You'll see three possible levels for each: Strength, Functional, and Area for development. None of the three is a diagnosis — they're a starting point for knowing where to invest your energy."
-    )
-  );
-  doc.moveDown(0.5);
-  drawRadarChart(doc, 306, doc.y + 110, 100, scoreResult.dimensions, lang);
-  doc.y += 240;
-  supportTable(doc, scoreResult.dimensions, lang);
-
-  doc.addPage();
-  const topCode = scoreResult.topStrengths[0];
-  h1(doc, T(lang, "Tu fortaleza principal — muestra", "Your top strength — sample"));
-  const bc = getBandContent(topCode, "f", lang, participant.gender);
-  h2(doc, `${dimensionLabel(topCode, lang)} — ${bc.bandLabel}`, GREEN);
-  body(doc, bc.text);
-  note(
-    doc,
-    T(
-      lang,
-      "Esta es 1 de tus 8 dimensiones. El Informe Extendido incluye el detalle completo de las 8, tus áreas de desarrollo con recomendaciones, y las secciones narrativas generadas por IA especialmente para ti.",
-      "This is 1 of your 8 dimensions. The Extended Report includes the full detail of all 8, your development areas with recommendations, and the AI-generated narrative sections written specifically for you."
-    )
-  );
-
-  if (referral.triggered) {
-    referralClosePage(doc, lang);
-  } else {
-    standardClosePage(doc, lang, "preview");
-  }
-
-  drawHeaderFooter(doc, lang);
-  doc.end();
-  return done;
 }
 
 async function generateExtendedReportPDF({ participant, scoreResult, referral, aiSections, qualitativeAnswers }) {
@@ -328,10 +472,10 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
   doc.on("data", (c) => chunks.push(c));
   const done = new Promise((resolve) => doc.on("end", () => resolve(Buffer.concat(chunks))));
 
-  coverPage(doc, lang, participant, "extended");
+  coverPage(doc, lang, participant);
   introPage(doc, lang, participant);
 
-  doc.addPage();
+  ensureSpace(doc, 160); // reserva espacio solo para título + párrafo intro
   h1(doc, T(lang, "Cómo leer tu perfil", "How to read your profile"));
   body(
     doc,
@@ -341,40 +485,44 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
       "RelateReady doesn't give you a single score. It shows your readiness across 8 different areas of relationship life, each with its own result."
     )
   );
-  drawRadarChart(doc, 306, doc.y + 110, 100, scoreResult.dimensions, lang);
-  doc.y += 240;
+  doc.moveDown(0.5);
+  ensureSpace(doc, 460); // reserva espacio solo para el bloque radar + tabla
+  drawRadarChart(doc, 306, doc.y + 150, 95, scoreResult.dimensions, lang);
+  doc.y += 300;
   supportTable(doc, scoreResult.dimensions, lang);
 
-  // Página 4bis — Lectura integral (IA)
-  doc.addPage();
+  // Lectura integral (IA)
+  ensureSpace(doc, 220);
   h1(doc, T(lang, "Lectura integral de tu perfil", "Integral reading of your profile"));
   aiBlock(doc, aiSections.integralReading);
 
   // Fortalezas
-  doc.addPage();
+  ensureSpace(doc, 220);
   h1(doc, T(lang, "Tus fortalezas principales", "Your top strengths"));
   aiBlock(doc, aiSections.strengthsSynthesis);
   scoreResult.topStrengths.forEach((code) => {
     const band = scoreResult.dimensions[code].band;
     const bc = getBandContent(code, band, lang, participant.gender);
+    ensureSpace(doc, 90);
     h2(doc, `${dimensionLabel(code, lang)} — ${bc.bandLabel}`, BAND_COLOR[band]);
     body(doc, bc.text);
   });
 
   // Áreas de desarrollo
-  doc.addPage();
+  ensureSpace(doc, 220);
   h1(doc, T(lang, "Tus áreas de desarrollo prioritarias", "Your priority development areas"));
   aiBlock(doc, aiSections.developmentSynthesis);
   scoreResult.topDevelopmentAreas.forEach((code) => {
     const band = scoreResult.dimensions[code].band;
     const bc = getBandContent(code, band, lang, participant.gender);
+    ensureSpace(doc, 120);
     h2(doc, `${dimensionLabel(code, lang)} — ${bc.bandLabel}`, BAND_COLOR[band]);
     body(doc, bc.text);
     if (band === "d") bulletList(doc, bc.recommendations);
   });
 
   // Síntesis general
-  doc.addPage();
+  ensureSpace(doc, 200);
   h1(doc, T(lang, "Síntesis general", "Overall synthesis"));
   aiBlock(doc, aiSections.overallSynthesis);
 
@@ -383,26 +531,37 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
   }
 
   // Detalle completo de las 8 dimensiones
-  doc.addPage();
+  ensureSpace(doc, 260);
   h1(doc, T(lang, "Detalle completo de tus 8 dimensiones", "Full detail of your 8 dimensions"));
   DIMENSION_CODES.forEach((code) => {
     const band = scoreResult.dimensions[code].band;
     const bc = getBandContent(code, band, lang, participant.gender);
+    ensureSpace(doc, 110);
     h2(doc, `${dimensionLabel(code, lang)} — ${bc.bandLabel} (${scoreResult.dimensions[code].index}/100)`, BAND_COLOR[band]);
     body(doc, bc.text);
     if (band === "d") bulletList(doc, bc.recommendations);
-    if (doc.y > 650) doc.addPage();
   });
 
-  // Plan de acción a 90 días
-  doc.addPage();
-  h1(doc, T(lang, "Tu plan de acción a 90 días", "Your 90-day action plan"));
+  // Plan de acción a 3 semanas + invitación a la sesión de mentoría gratuita
+  ensureSpace(doc, 320);
+  h1(doc, T(lang, "Tu plan de acción a 3 semanas", "Your 3-week action plan"));
   aiBlock(doc, aiSections.actionPlanNarrative);
+  ensureSpace(doc, 90);
+  h2(doc, T(lang, "Tu sesión de mentoría indagatoria gratuita", "Your free intake mentoring session"));
+  body(
+    doc,
+    T(
+      lang,
+      `Como parte de tu Informe Extendido, tienes una sesión de mentoría indagatoria GRATUITA de 60 minutos con ${MENTOR_NAME.es} para revisar juntos este plan y tus resultados.`,
+      `As part of your Extended Report, you have a FREE 60-minute intake mentoring session with ${MENTOR_NAME.en} to review this plan and your results together.`
+    )
+  );
+  linkButton(doc, T(lang, "Agendar mi sesión gratuita", "Schedule my free session"), BOOKING_LINKS[lang] || BOOKING_LINKS.es);
 
   if (referral.triggered) {
     referralClosePage(doc, lang);
   } else {
-    standardClosePage(doc, lang, "extended");
+    standardClosePage(doc, lang);
   }
 
   drawHeaderFooter(doc, lang);
@@ -410,4 +569,4 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
   return done;
 }
 
-module.exports = { generatePreviewPDF, generateExtendedReportPDF };
+module.exports = { generateExtendedReportPDF };
