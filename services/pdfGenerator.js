@@ -209,7 +209,11 @@ function bulletList(doc, items, opts = {}) {
 
 function aiBlock(doc, text) {
   doc.fontSize(10.5).font("Helvetica-Oblique");
-  const textHeight = doc.heightOfString(text, { width: 612 - PAGE_MARGIN * 2 - 14 });
+  // Importante: el lineGap aquí debe coincidir con el que se usa más abajo en
+  // el doc.text() real — si no, heightOfString() subestima la altura (no
+  // cuenta el interlineado extra) y el rectángulo de fondo queda más corto
+  // que el texto, cortando visualmente el último párrafo fuera de la caja.
+  const textHeight = doc.heightOfString(text, { width: 612 - PAGE_MARGIN * 2 - 14, lineGap: 3 });
   // Protección de desborde: si este bloque (texto generado por IA, de
   // longitud variable) no cabe en lo que queda de página, empieza una
   // página nueva en vez de dejar que se corte contra el pie de página.
@@ -443,9 +447,16 @@ function introPage(doc, lang, participant) {
 }
 
 function referralClosePage(doc, lang) {
-  ensureSpace(doc, 130);
+  const message = T(lang, REFERRAL_MESSAGE.es, REFERRAL_MESSAGE.en);
+  // El mensaje de derivación es largo (varios párrafos): reservamos espacio
+  // según su altura real, no un número fijo, para que el título "Un mensaje
+  // importante" nunca quede solo al final de una página sin el texto debajo.
+  doc.fontSize(10.5).font("Helvetica-Oblique");
+  const msgHeight = doc.heightOfString(message, { width: 612 - PAGE_MARGIN * 2 - 14, lineGap: 3 });
+  doc.font("Helvetica");
+  ensureSpace(doc, 55 + msgHeight + 16);
   h1(doc, T(lang, "Un mensaje importante", "An important message"));
-  aiBlock(doc, T(lang, REFERRAL_MESSAGE.es, REFERRAL_MESSAGE.en));
+  aiBlock(doc, message);
 }
 
 // Página de cierre del Informe Extendido: metodología + disclaimer estándar.
