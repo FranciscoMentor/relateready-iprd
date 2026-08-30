@@ -35,4 +35,29 @@ db.exec(`
   );
 `);
 
+// ── Migraciones incrementales del panel-control (2026-08) ─────────────────
+// Igual que hace el panel de referencia de SQ Assessment: se revisa qué
+// columnas existen ya en la tabla antes de agregar, así este bloque es
+// seguro de ejecutar en cada arranque del servidor, tanto en local como en
+// cada despliegue nuevo en Render (nunca destruye datos existentes).
+//
+// Columnas nuevas:
+//  - email / phone: para poder dar seguimiento comercial real por persona
+//    desde el panel (antes solo existía "name"). Se agregan también al
+//    formulario del test (routes/api.js + public/js/app.js) como opcionales.
+//  - follow_up_status / follow_up_notes: estado de seguimiento comercial
+//    editable desde el panel (chips + notas), mismo patrón que el panel de
+//    referencia. "nuevo" es el estado inicial de cualquier envío existente.
+const existingColumns = db.prepare("PRAGMA table_info(submissions)").all().map((c) => c.name);
+function addColumnIfMissing(name, ddl) {
+  if (!existingColumns.includes(name)) {
+    db.exec(`ALTER TABLE submissions ADD COLUMN ${ddl}`);
+    existingColumns.push(name);
+  }
+}
+addColumnIfMissing("email", "email TEXT");
+addColumnIfMissing("phone", "phone TEXT");
+addColumnIfMissing("follow_up_status", "follow_up_status TEXT NOT NULL DEFAULT 'nuevo'");
+addColumnIfMissing("follow_up_notes", "follow_up_notes TEXT");
+
 module.exports = db;

@@ -9,6 +9,9 @@
       intakeIntro: "RelateReady evalúa qué tan equipado/a estás — en términos de patrones emocionales y relacionales aprendidos — para sostener una relación sana en el tiempo. No predice compatibilidad con nadie en particular: mide tu propia preparación.",
       durationNote: "Este test toma entre 10 y 15 minutos.",
       nameLabel: "Tu nombre",
+      emailLabel: "Tu correo (opcional)",
+      phoneLabel: "Tu teléfono (opcional)",
+      contactNote: "Solo lo usamos para enviarte tu informe y coordinar tu sesión de mentoría gratuita — nunca para spam.",
       genderLabel: "Género con el que te identificas",
       genderM: "Masculino",
       genderF: "Femenino",
@@ -67,6 +70,9 @@
       intakeIntro: "RelateReady assesses how well-equipped you are — in terms of learned emotional and relational patterns — to sustain a healthy relationship over time. It doesn't predict compatibility with anyone in particular: it measures your own readiness.",
       durationNote: "This test takes about 10–15 minutes.",
       nameLabel: "Your name",
+      emailLabel: "Your email (optional)",
+      phoneLabel: "Your phone (optional)",
+      contactNote: "We only use this to send you your report and coordinate your free mentoring session — never for spam.",
       genderLabel: "Gender you identify with",
       genderM: "Male",
       genderF: "Female",
@@ -133,6 +139,8 @@
     meta: null,
     step: "intake",
     name: "",
+    email: "",
+    phone: "",
     gender: "",
     relationshipContextCode: "",
     relationshipContextText: "",
@@ -189,6 +197,13 @@
         <label>${t("nameLabel")}</label>
         <input type="text" id="f-name" value="${escapeAttr(state.name)}" />
 
+        <label>${t("emailLabel")}</label>
+        <input type="email" id="f-email" value="${escapeAttr(state.email)}" />
+
+        <label>${t("phoneLabel")}</label>
+        <input type="tel" id="f-phone" value="${escapeAttr(state.phone)}" />
+        <p class="muted">${t("contactNote")}</p>
+
         <label>${t("genderLabel")}</label>
         <div class="radio-group">
           <label><input type="radio" name="gender" value="M" ${state.gender === "M" ? "checked" : ""}/> ${t("genderM")}</label>
@@ -216,6 +231,8 @@
 
     document.getElementById("btn-start").addEventListener("click", () => {
       const name = document.getElementById("f-name").value.trim();
+      const email = document.getElementById("f-email").value.trim();
+      const phone = document.getElementById("f-phone").value.trim();
       const gender = (document.querySelector('input[name="gender"]:checked') || {}).value;
       const contextCode = document.getElementById("f-context-code").value;
       const contextText = document.getElementById("f-context-text").value.trim();
@@ -224,6 +241,8 @@
         return;
       }
       state.name = name;
+      state.email = email;
+      state.phone = phone;
       state.gender = gender;
       state.relationshipContextCode = contextCode;
       state.relationshipContextText = contextText;
@@ -413,6 +432,8 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: state.name,
+            email: state.email,
+            phone: state.phone,
             lang: state.lang,
             gender: state.gender,
             relationshipContextCode: state.relationshipContextCode,

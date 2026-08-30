@@ -88,6 +88,8 @@ router.post("/submit", (req, res) => {
   try {
     const {
       name,
+      email,
+      phone,
       lang,
       gender,
       relationshipContextCode,
@@ -110,17 +112,25 @@ router.post("/submit", (req, res) => {
     const scoreResult = scoreTest(coreResponses || {}, desirabilityResponses || {});
     const referral = checkReferralProtocol(scoreResult, relationshipContextText, effLang);
 
+    // email/phone son opcionales (agregados 2026-08 para el panel-control):
+    // el test sigue funcionando sin ellos, pero cuando la persona los deja,
+    // permiten darle seguimiento comercial real por persona desde el panel.
+    const cleanEmail = typeof email === "string" && email.trim() ? email.trim() : null;
+    const cleanPhone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
+
     const id = crypto.randomUUID();
     db.prepare(
       `INSERT INTO submissions
-        (id, created_at, name, lang, gender, relationship_context_code, relationship_context_text,
+        (id, created_at, name, email, phone, lang, gender, relationship_context_code, relationship_context_text,
          core_responses, desirability_responses, vignette_responses, qualitative_answers,
          score_result, referral_triggered, payment_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')`
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')`
     ).run(
       id,
       new Date().toISOString(),
       name.trim(),
+      cleanEmail,
+      cleanPhone,
       effLang,
       effGender,
       relationshipContextCode,

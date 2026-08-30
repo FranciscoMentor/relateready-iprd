@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RelateReady — Panel de Control</title>
+<link rel="icon" type="image/png" href="/assets/relateready-icon.png">
+<style>
+  :root{
+    --accent:#B5732A; --ink:#2A2A28; --muted:#6B6259;
+    --green:#3F6B4F; --amber:#9C6B14; --clay:#9C3B2E;
+    --cream:#F4F0E9; --light:#ECE4D6; --border:#DDD6CE;
+    --panel:#fff; --panel2:#FBF9F5; --bad:#c0392b;
+  }
+  *{box-sizing:border-box;font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;}
+  body{margin:0;background:var(--cream);color:var(--ink);}
+  a{color:inherit;}
+  header.topbar{background:var(--ink);color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:20;}
+  header.topbar .brand{display:flex;align-items:center;gap:10px;}
+  header.topbar .brand img{height:26px;width:auto;display:block;}
+  header.topbar .brand span{font-weight:700;font-size:14px;letter-spacing:.02em;}
+  header.topbar .meta{font-size:11.5px;color:var(--light);text-align:right;}
+  header.topbar nav{display:flex;gap:6px;align-items:center;font-size:12.5px;flex-wrap:wrap;}
+  .navlink{background:none;border:1px solid transparent;color:var(--light);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600;}
+  .navlink.active{background:#fff;color:var(--ink);}
+  header.topbar nav a.exit{color:#e8b4b4;text-decoration:none;margin-left:8px;font-size:12px;}
+  .container{padding:26px;max-width:1280px;margin:0 auto;}
+  .section{display:none;}
+  .section.active{display:block;}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+  .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;}
+  .stat-num{font-size:26px;font-weight:700;color:var(--accent);}
+  .stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px 24px;margin-bottom:20px;}
+  .filters{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+  .filters input,.filters select{padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;color:var(--ink);}
+  .btn{padding:9px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:12.5px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+  .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--ink);}
+  .btn.small{padding:6px 12px;font-size:11.5px;}
+  table{width:100%;border-collapse:collapse;background:#fff;font-size:13px;}
+  th{background:var(--ink);color:var(--light);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:11px 12px;text-align:left;}
+  td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  tr.clickable{cursor:pointer;}
+  tr.clickable:hover{background:var(--panel2);}
+  .muted{color:var(--muted);font-size:11.5px;}
+  .badge{color:#fff;font-size:10.5px;padding:4px 10px;border-radius:100px;display:inline-block;}
+  .badge.confirmed{background:var(--green);}
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:12px;}
+  .table-scroll table{border-radius:0;min-width:900px;border:none;}
+  .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+  .chip{background:#fff;border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;}
+  .chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+  .link-btn{background:none;border:none;padding:0;color:var(--accent);font-weight:600;font-size:11px;text-decoration:underline;cursor:pointer;}
+  .link-btn:hover{color:var(--ink);}
+
+  /* Calendario */
+  .cal-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .cal-nav{display:flex;align-items:center;gap:8px;}
+  .view-toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .view-toggle button{background:#fff;border:none;padding:7px 14px;font-size:12px;cursor:pointer;color:var(--muted);}
+  .view-toggle button.active{background:var(--accent);color:#fff;}
+  #calGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
+  .cal-day{background:#fff;border:1px solid var(--border);border-radius:10px;padding:8px;min-height:120px;font-size:11.5px;}
+  .cal-day.today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;}
+  .cal-day .d-num{font-weight:700;margin-bottom:6px;color:var(--muted);}
+  .cal-day .slot{background:var(--panel2);border-radius:6px;padding:5px 7px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;gap:4px;}
+  .cal-day .slot .t{color:var(--accent);font-weight:700;margin-right:4px;}
+  .cal-day .slot.blocked{opacity:.6;}
+  .join-btn{background:var(--accent);color:#fff;border:none;border-radius:5px;padding:3px 7px;font-size:10px;cursor:pointer;}
+  @media (max-width:900px){#calGrid{grid-template-columns:1fr;} }
+
+  .session-row{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  .session-row:last-child{border-bottom:none;}
+  .s-avatar{width:32px;height:32px;border-radius:50%;background:var(--light);color:var(--accent);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .s-info{flex:1;min-width:120px;}
+  .s-name{font-weight:600;font-size:13px;}
+  .s-meta{color:var(--muted);font-size:11.5px;}
+  .btn.teams{background:#464EB8;}
+
+  /* Modal genérico */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;z-index:100;padding:20px;}
+  .modal-box{background:#fff;border-radius:14px;padding:26px 28px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;}
+  .modal-box h2{margin:0 0 16px;font-size:16px;}
+  .form-field{display:flex;flex-direction:column;margin-bottom:12px;}
+  .form-field label{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;}
+  .form-field input,.form-field select,.form-field textarea{padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;}
+  .form-field textarea{min-height:70px;}
+
+  .score-hero{text-align:center;padding:6px 0 18px;}
+  .score-hero .num{font-size:42px;font-weight:700;color:var(--accent);}
+  .score-hero .lvl{font-size:12.5px;font-weight:600;color:var(--ink);margin-top:2px;}
+  .dim-bar{margin-bottom:12px;}
+  .dim-bar .row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;}
+  .dim-bar .track{background:var(--light);border-radius:20px;height:8px;overflow:hidden;}
+  .dim-bar .fill{height:100%;}
+
+  @media (max-width:700px){
+    header.topbar{padding:12px 16px;}
+    .container{padding:14px;}
+    .stats{grid-template-columns:repeat(2,1fr);gap:10px;}
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="/assets/adamantine-logo.png" alt="Adamantine"><span>RelateReady · Panel de Control</span></div>
+  <nav>
+    <button class="navlink active" data-nav="inicio">Inicio</button>
+    <button class="navlink" data-nav="resultados">Resultados</button>
+    <button class="navlink" data-nav="calendario">Calendario</button>
+    <a href="/admin" class="exit" style="text-decoration:none;">Admin básico</a>
+    <a href="/admin/logout" class="exit">Cerrar sesión</a>
+  </nav>
+</header>
+
+<div class="container">
+
+  <!-- ═══════════════════ INICIO ═══════════════════ -->
+  <section class="section active" id="sec-inicio">
+    <div class="stats" id="kpiCards">
+      <div class="stat-card"><div class="stat-num" id="kpiTotal">—</div><div class="stat-label">Total de envíos</div></div>
+      <div class="stat-card"><div class="stat-num" id="kpiConversion">—</div><div class="stat-label">Conversión a informe pagado</div></div>
+      <div class="stat-card"><div class="stat-num" id="kpiReferral">—</div><div class="stat-label">Protocolo de derivación activado</div></div>
+      <div class="stat-card"><div class="stat-num" id="kpiRevenue">—</div><div class="stat-label">Ingresos aprox. (informes pagados)</div></div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 4px;font-size:15px;">Próximas sesiones (Outlook / Teams)</h2>
+      <p class="muted" style="margin:0 0 14px;">Conecta tu cuenta de Microsoft en la pestaña Calendario para verlas aquí.</p>
+      <div id="sessionList"></div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 14px;font-size:15px;">Envíos más recientes</h2>
+      <div id="recentList"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ RESULTADOS ═══════════════════ -->
+  <section class="section" id="sec-resultados">
+    <form class="filters" id="resultsFilters">
+      <input type="text" id="fSearch" placeholder="Buscar por nombre, correo o teléfono...">
+      <select id="fStatus">
+        <option value="">Todos los estados de pago</option>
+        <option value="paid">Pagado</option>
+        <option value="pending">Pendiente</option>
+        <option value="simulated">Simulado</option>
+        <option value="free">Cortesía / gratis</option>
+      </select>
+      <button type="button" class="btn ghost" id="btnExportCsv">Exportar CSV</button>
+    </form>
+    <div class="chip-row" id="followupChips"></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Persona</th><th>Idioma</th><th>Promedio</th><th>Pago</th><th>Derivación</th><th>Seguimiento</th><th>Fecha</th></tr></thead>
+        <tbody id="resultsBody"><tr><td colspan="7" style="text-align:center;color:#999;padding:30px;">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ CALENDARIO ═══════════════════ -->
+  <section class="section" id="sec-calendario">
+    <div class="card">
+      <h2 style="margin:0 0 4px;font-size:15px;">Cuentas de Microsoft conectadas</h2>
+      <p class="muted" style="margin:0 0 14px;">Sesión de mentoría gratuita de RelateReady, agendada vía Outlook Bookings — conecta la cuenta que la recibe para ver y gestionar esas citas aquí mismo.</p>
+      <div id="syncAccountsBox" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <input type="email" id="extraAccountInput" placeholder="otra-cuenta@dominio.com" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;min-width:220px;">
+        <button class="btn small ghost" id="connectExtraBtn">+ Conectar otra cuenta</button>
+      </div>
+      <p class="muted" id="syncStatusNote" style="margin-top:10px;"></p>
+    </div>
+
+    <div class="card">
+      <div class="cal-toolbar">
+        <div class="cal-nav">
+          <button class="btn ghost small" id="calPrevBtn">←</button>
+          <strong id="calLabel">Semana</strong>
+          <button class="btn ghost small" id="calNextBtn">→</button>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <div class="view-toggle">
+            <button class="active" data-view="week">Semana</button>
+            <button data-view="month">Mes</button>
+          </div>
+          <button class="btn small" id="newEventBtn">+ Nueva cita</button>
+        </div>
+      </div>
+      <div id="calGrid"></div>
+    </div>
+  </section>
+
+</div>
+
+<!-- Modal: detalle de resultado -->
+<div class="modal-overlay" id="detailModalOverlay">
+  <div class="modal-box" id="detailModalBox"></div>
+</div>
+
+<!-- Modal: crear / reprogramar cita -->
+<div class="modal-overlay" id="eventModalOverlay">
+  <div class="modal-box">
+    <h2 id="eventModalTitle">Nueva Cita</h2>
+    <div class="form-field"><label>Título</label><input type="text" id="eventSubjectInput" placeholder="Sesión con..."></div>
+    <div class="form-field"><label>Cuenta</label><select id="eventAccountInput"></select></div>
+    <div class="form-field"><label>Fecha</label><input type="date" id="eventDateInput"></div>
+    <div style="display:flex;gap:10px;">
+      <div class="form-field" style="flex:1;"><label>Inicio</label><input type="time" id="eventStartInput"></div>
+      <div class="form-field" style="flex:1;"><label>Fin</label><input type="time" id="eventEndInput"></div>
+    </div>
+    <div class="form-field" style="flex-direction:row;align-items:center;gap:8px;">
+      <input type="checkbox" id="eventTeamsInput" style="width:auto;" checked>
+      <label style="margin:0;">Crear como reunión de Teams</label>
+    </div>
+    <div id="eventModalError" style="display:none;color:var(--bad);font-size:12px;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn" id="eventSaveBtn">Guardar</button>
+      <button class="btn ghost" id="eventDeleteBtn" style="display:none;color:var(--bad);">Eliminar cita</button>
+      <button class="btn ghost" id="eventCancelBtn">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/lib/msal-browser.min.js"></script>
+<script>
+  const DIMENSIONS = [
+    { code:"AS", es:"Seguridad de apego" },
+    { code:"DS", es:"Diferenciación del self" },
+    { code:"RS", es:"Manejo de la sensibilidad al rechazo" },
+    { code:"CG", es:"Creencias de crecimiento relacional" },
+    { code:"CR", es:"Comunicación y reparación" },
+    { code:"AR", es:"Autoestima relacional" },
+    { code:"IA", es:"Intimidad y apertura" },
+    { code:"CV", es:"Claridad de valores y proyecto de vida" },
+  ];
+  const BAND_COLOR = { f:"#3F6B4F", m:"#9C6B14", d:"#9C3B2E" };
+  const BAND_LABEL = { f:"Fortaleza", m:"Funcional", d:"Área de desarrollo" };
+  const STATUS_LABEL = { pending:"Pendiente de pago", simulated:"Simulado (prueba)", paid:"Pagado", free:"Cortesía / código gratis" };
+  const STATUS_COLOR = { pending:"#999", simulated:"#9C6B14", paid:"#3F6B4F", free:"#B5732A" };
+  const FOLLOWUP_LABEL = { nuevo:"Nuevo", contactado:"Contactado", sesion_agendada:"Sesión agendada", sesion_realizada:"Sesión realizada", cliente_mentoring:"Cliente de mentoría", sin_interes:"Sin interés" };
+  const FOLLOWUP_COLOR = { nuevo:"#B5732A", contactado:"#6B6259", sesion_agendada:"#2E7D32", sesion_realizada:"#1565C0", cliente_mentoring:"#2A2A28", sin_interes:"#999" };
+
+  function esc(s){ return (s===null||s===undefined) ? "" : String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+  // ── Navegación entre secciones ──
+  document.querySelectorAll(".navlink").forEach(link=>{
+    link.addEventListener("click", ()=>{
+      document.querySelectorAll(".navlink").forEach(l=>l.classList.remove("active"));
+      link.classList.add("active");
+      document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+      document.getElementById("sec-"+link.dataset.nav).classList.add("active");
+    });
+  });
+
+  // ── Estado local de resultados ──
+  let allResults = [];
+  let activeFollowup = "";
+
+  async function loadKpis() {
+    try {
+      const res = await fetch("/admin/api/kpis");
+      if (!res.ok) throw new Error();
+      const k = await res.json();
+      document.getElementById("kpiTotal").textContent = k.total;
+      document.getElementById("kpiConversion").textContent = k.conversionPct + "%";
+      document.getElementById("kpiReferral").textContent = k.referralCount;
+      document.getElementById("kpiRevenue").textContent = "$" + k.revenueApprox.toFixed(2);
+    } catch (e) { console.error("No se pudieron cargar los KPIs", e); }
+  }
+
+  async function loadResults() {
+    try {
+      const res = await fetch("/admin/api/results");
+      if (!res.ok) throw new Error();
+      allResults = await res.json();
+      renderFollowupChips();
+      renderResultsTable();
+      renderRecentList();
+    } catch (e) {
+      document.getElementById("resultsBody").innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:30px;">No se pudieron cargar los resultados.</td></tr>';
+    }
+  }
+
+  function filteredResults() {
+    const search = (document.getElementById("fSearch").value || "").toLowerCase();
+    const status = document.getElementById("fStatus").value;
+    return allResults.filter(r=>{
+      if (status && r.payment_status !== status) return false;
+      if (activeFollowup && r.follow_up_status !== activeFollowup) return false;
+      if (search) {
+        const hay = `${r.name||""} ${r.email||""} ${r.phone||""}`.toLowerCase();
+        if (!hay.includes(search)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderFollowupChips() {
+    const box = document.getElementById("followupChips");
+    const options = ["", ...Object.keys(FOLLOWUP_LABEL)];
+    box.innerHTML = options.map(k=>{
+      const label = k ? FOLLOWUP_LABEL[k] : "Todo seguimiento";
+      return `<span class="chip ${activeFollowup===k?'active':''}" data-k="${k}">${label}</span>`;
+    }).join("");
+    box.querySelectorAll(".chip").forEach(chip=>{
+      chip.addEventListener("click", ()=>{ activeFollowup = chip.dataset.k; renderFollowupChips(); renderResultsTable(); });
+    });
+  }
+
+  function renderResultsTable() {
+    const rows = filteredResults();
+    const tbody = document.getElementById("resultsBody");
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:30px;">Ningún registro coincide con el filtro.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r=>`
+      <tr class="clickable" data-id="${r.id}">
+        <td><strong>${esc(r.name)}</strong><br><span class="muted">${esc(r.email)||"—"}${r.phone?" · "+esc(r.phone):""}</span></td>
+        <td>${r.lang==="en"?"Inglés":"Español"}</td>
+        <td>${r.overall_average!==null?r.overall_average:"—"}</td>
+        <td><span class="badge" style="background:${STATUS_COLOR[r.payment_status]||'#999'}">${STATUS_LABEL[r.payment_status]||r.payment_status}</span></td>
+        <td>${r.referral_triggered?'<span style="color:#9C3B2E;font-weight:600;">⚠ Sí</span>':'—'}</td>
+        <td><span class="badge" style="background:${FOLLOWUP_COLOR[r.follow_up_status]||'#999'}">${FOLLOWUP_LABEL[r.follow_up_status]||r.follow_up_status}</span></td>
+        <td>${esc((r.created_at||"").slice(0,10))}</td>
+      </tr>`).join("");
+    tbody.querySelectorAll("tr[data-id]").forEach(tr=>{
+      tr.addEventListener("click", ()=>openDetailModal(tr.dataset.id));
+    });
+  }
+
+  function renderRecentList() {
+    const box = document.getElementById("recentList");
+    const recent = allResults.slice(0, 6);
+    box.innerHTML = recent.length ? recent.map(r=>`
+      <div class="session-row" style="cursor:pointer;" data-id="${r.id}">
+        <div class="s-avatar">${(r.name||"?").split(" ").filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join("")}</div>
+        <div class="s-info">
+          <div class="s-name">${esc(r.name)}</div>
+          <div class="s-meta">${esc((r.created_at||"").slice(0,10))} · Promedio ${r.overall_average!==null?r.overall_average:"—"}</div>
+        </div>
+        <span class="badge" style="background:${STATUS_COLOR[r.payment_status]||'#999'}">${STATUS_LABEL[r.payment_status]||r.payment_status}</span>
+      </div>`).join("") : '<p class="muted">Todavía no hay envíos.</p>';
+    box.querySelectorAll("[data-id]").forEach(el=>el.addEventListener("click", ()=>openDetailModal(el.dataset.id)));
+  }
+
+  document.getElementById("fSearch").addEventListener("input", renderResultsTable);
+  document.getElementById("fStatus").addEventListener("change", renderResultsTable);
+  document.getElementById("btnExportCsv").addEventListener("click", ()=>{
+    const status = document.getElementById("fStatus").value;
+    const qs = new URLSearchParams({...(status?{status}:{}), ...(activeFollowup?{followup:activeFollowup}:{})});
+    window.open("/admin/export.csv" + (qs.toString() ? "?"+qs.toString() : ""), "_blank");
+  });
+
+  // ── Modal de detalle ──
+  async function openDetailModal(id) {
+    const overlay = document.getElementById("detailModalOverlay");
+    const box = document.getElementById("detailModalBox");
+    box.innerHTML = '<p class="muted">Cargando…</p>';
+    overlay.style.display = "flex";
+    try {
+      const res = await fetch(`/admin/api/results/${id}`);
+      if (!res.ok) throw new Error();
+      const r = await res.json();
+      renderDetailModal(r);
+    } catch (e) {
+      box.innerHTML = '<p class="muted">No se pudo cargar el detalle.</p>';
+    }
+  }
+
+  function renderDetailModal(r) {
+    const box = document.getElementById("detailModalBox");
+    const resultUrl = `${window.location.origin}/?sid=${r.id}`;
+    const dimBars = DIMENSIONS.map(d=>{
+      const dim = r.dimensions[d.code];
+      const pct = dim && typeof dim.index === "number" ? dim.index : null;
+      const color = dim ? (BAND_COLOR[dim.band]||"#6B6259") : "#6B6259";
+      return `<div class="dim-bar">
+        <div class="row"><span>${esc(d.es)} <span class="muted">(${d.code})</span></span><span>${pct!==null?pct+"%":"—"}${dim?` · <span style="color:${color}">${BAND_LABEL[dim.band]}</span>`:""}</span></div>
+        <div class="track"><div class="fill" style="background:${color};width:${pct!==null?pct:0}%;"></div></div>
+      </div>`;
+    }).join("");
+    const qual = (r.qualitative_answers||[]).filter(a=>a&&a.trim()).map(a=>`<p style="font-size:13px;margin:0 0 10px;">${esc(a)}</p>`).join("") || '<p class="muted">Sin respuestas cualitativas.</p>';
+
+    box.innerHTML = `
+      <h2>${esc(r.name)}</h2>
+      <div class="score-hero"><div class="num">${r.overall_average!==null?r.overall_average:"—"}</div><div class="lvl">Promedio general · 8 dimensiones</div></div>
+
+      <div class="form-field"><label>Nombre</label><input type="text" id="d-name" value="${esc(r.name)}"></div>
+      <div class="form-field"><label>Correo</label><input type="email" id="d-email" value="${esc(r.email)||''}"></div>
+      <div class="form-field"><label>Teléfono</label><input type="tel" id="d-phone" value="${esc(r.phone)||''}"></div>
+      <button class="btn small" id="d-save-contact">Guardar contacto</button>
+
+      <h2 style="margin-top:20px;">Las 8 dimensiones</h2>
+      ${dimBars}
+
+      <h2 style="margin-top:16px;">Respuestas cualitativas</h2>
+      ${qual}
+
+      <h2 style="margin-top:16px;">Pago y protocolo</h2>
+      <p style="font-size:13px;margin:0 0 6px;"><strong>Estado:</strong> <span class="badge" style="background:${STATUS_COLOR[r.payment_status]||'#999'}">${STATUS_LABEL[r.payment_status]||r.payment_status}</span></p>
+      <p style="font-size:13px;margin:0 0 6px;"><strong>Protocolo de derivación:</strong> ${r.referral_triggered ? '<span style="color:#9C3B2E;font-weight:700;">Sí, activado</span>' : "No"}</p>
+      <p style="font-size:13px;margin:0 0 10px;"><strong>Link de resultados:</strong> <button class="link-btn" id="d-copy-link">Copiar link</button></p>
+      ${r.payment_status !== "pending" ? `<p style="font-size:13px;"><a href="/api/report/extended/${r.id}" target="_blank" class="link-btn" style="text-decoration:none;">Ver / descargar informe extendido (PDF)</a></p>` : `<button class="btn small" id="d-mark-paid">Marcar como pagado</button>`}
+
+      <h2 style="margin-top:16px;">Seguimiento comercial</h2>
+      <div class="form-field"><label>Estado</label>
+        <select id="d-followup-status">
+          ${Object.entries(FOLLOWUP_LABEL).map(([k,v])=>`<option value="${k}" ${r.follow_up_status===k?"selected":""}>${v}</option>`).join("")}
+        </select>
+      </div>
+      <div class="form-field"><label>Notas</label><textarea id="d-followup-notes">${esc(r.follow_up_notes)||''}</textarea></div>
+      <button class="btn small" id="d-save-followup">Guardar seguimiento</button>
+      <button class="btn ghost small" id="d-close" style="margin-left:8px;">Cerrar</button>
+    `;
+
+    document.getElementById("d-close").addEventListener("click", closeDetailModal);
+    document.getElementById("d-copy-link").addEventListener("click", (e)=>{
+      navigator.clipboard.writeText(resultUrl).then(()=>{ e.target.textContent="Copiado ✓"; setTimeout(()=>e.target.textContent="Copiar link",1500); });
+    });
+    document.getElementById("d-save-contact").addEventListener("click", async ()=>{
+      const body = { name: document.getElementById("d-name").value, email: document.getElementById("d-email").value, phone: document.getElementById("d-phone").value };
+      await fetch(`/admin/api/results/${r.id}/contact`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+      await loadResults();
+    });
+    document.getElementById("d-save-followup").addEventListener("click", async ()=>{
+      const body = { status: document.getElementById("d-followup-status").value, notes: document.getElementById("d-followup-notes").value };
+      const res = await fetch(`/admin/api/results/${r.id}/follow-up`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+      const data = await res.json();
+      await loadResults();
+      if (data.submission) renderDetailModal(data.submission);
+    });
+    const markPaidBtn = document.getElementById("d-mark-paid");
+    if (markPaidBtn) markPaidBtn.addEventListener("click", async ()=>{
+      if (!confirm("¿Confirmas que viste este pago real?")) return;
+      const res = await fetch(`/admin/api/results/${r.id}/mark-paid`, { method:"POST" });
+      const data = await res.json();
+      await loadResults();
+      if (data.submission) renderDetailModal(data.submission);
+    });
+  }
+  function closeDetailModal(){ document.getElementById("detailModalOverlay").style.display = "none"; }
+  document.getElementById("detailModalOverlay").addEventListener("click", (e)=>{ if (e.target.id==="detailModalOverlay") closeDetailModal(); });
+
+  loadKpis();
+  loadResults();
+</script>
+<script>
+  // ═══════════════════════ Calendario real: Microsoft 365 (MSAL + Graph) ═══════════════════════
+  // Reutiliza el mismo registro de Azure ("Adamantine Panel Interno") ya
+  // aprobado para el panel de SQ Assessment — "public client" con MSAL,
+  // login por popup, sin ningún secreto ni librería adicional en el
+  // backend. Lo único pendiente en Azure Portal: agregar la URL de
+  // producción de RelateReady a sus Redirect URIs (ver .env.example).
+  const MSAL_CLIENT_ID = '2bb58744-ea62-43d5-8cf4-b78243dc31f5';
+  const GRAPH_SCOPES = ['User.Read', 'Calendars.ReadWrite'];
+  // Cuenta confirmada para RelateReady (sesión de mentoría gratuita vía
+  // Outlook Bookings). Se puede conectar cualquier otra cuenta adicional
+  // desde el campo "+ Conectar otra cuenta" de arriba.
+  const ACCOUNT_META = {
+    'adamantinementor@outlook.com': { color: '#B5732A', short: 'RelateReady' },
+  };
+  let SYNC_EMAILS = Object.keys(ACCOUNT_META);
+
+  let msalInstance = null;
+  let connectedAccounts = [];
+  let currentCalView = 'week';
+  let weekOffset = 0;
+  let usingRealData = false;
+  let realWeekData = null;
+
+  function getWeekMonday(offsetWeeks) {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToMonday = (day === 0 ? -6 : 1 - day);
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday + offsetWeeks * 7);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  }
+  function isSameDate(a, b) { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+  async function initMsal() {
+    if (!window.msal) {
+      document.getElementById('syncStatusNote').textContent = 'No se pudo cargar el sistema de inicio de sesión de Microsoft (revisa tu conexión a internet y recarga la página).';
+      renderSyncCard();
+      return;
+    }
+    msalInstance = new msal.PublicClientApplication({
+      auth: { clientId: MSAL_CLIENT_ID, authority: 'https://login.microsoftonline.com/common', redirectUri: window.location.origin + window.location.pathname },
+      cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
+    });
+    await msalInstance.initialize();
+    try { await msalInstance.handleRedirectPromise(); } catch (e) { /* noop */ }
+    (msalInstance.getAllAccounts() || []).forEach(registerConnectedAccount);
+    renderSyncCard();
+    if (connectedAccounts.length) await syncCalendarFromGraph();
+  }
+
+  function registerConnectedAccount(account) {
+    if (connectedAccounts.find(a => a.account.homeAccountId === account.homeAccountId)) return;
+    const email = (account.username || '').toLowerCase();
+    if (!ACCOUNT_META[email]) {
+      ACCOUNT_META[email] = { color: '#7C5C32', short: account.username };
+      SYNC_EMAILS = Object.keys(ACCOUNT_META);
+    }
+    const meta = ACCOUNT_META[email];
+    connectedAccounts.push({ account, meta });
+  }
+
+  window.connectAccount = async function (emailHint) {
+    if (!msalInstance) { alert('El sistema de inicio de sesión de Microsoft no está listo todavía. Espera unos segundos y vuelve a intentar.'); return; }
+    try {
+      const result = await msalInstance.loginPopup({ scopes: GRAPH_SCOPES, loginHint: emailHint });
+      registerConnectedAccount(result.account);
+      renderSyncCard();
+      await syncCalendarFromGraph();
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo conectar esa cuenta. Intenta de nuevo.\n\nDetalle técnico: ' + (err && err.message ? err.message : err));
+    }
+  };
+
+  document.getElementById('connectExtraBtn').addEventListener('click', () => {
+    const val = (document.getElementById('extraAccountInput').value || '').trim();
+    if (!val) { alert('Escribe el correo de la cuenta que quieres conectar.'); return; }
+    window.connectAccount(val);
+  });
+
+  async function getGraphToken(entry, interactive) {
+    try {
+      const res = await msalInstance.acquireTokenSilent({ scopes: GRAPH_SCOPES, account: entry.account });
+      entry.needsReconnect = false;
+      return res.accessToken;
+    } catch (e) {
+      entry.needsReconnect = true;
+      if (interactive) {
+        const res = await msalInstance.acquireTokenPopup({ scopes: GRAPH_SCOPES, account: entry.account });
+        entry.needsReconnect = false;
+        return res.accessToken;
+      }
+      throw e;
+    }
+  }
+
+  function renderSyncCard() {
+    const box = document.getElementById('syncAccountsBox');
+    if (!box) return;
+    box.innerHTML = SYNC_EMAILS.map(email => {
+      const entry = connectedAccounts.find(a => (a.account.username || '').toLowerCase() === email.toLowerCase());
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
+          <span style="font-size:12.5px;display:flex;align-items:center;gap:8px;">
+            <span style="width:8px;height:8px;border-radius:50%;background:${ACCOUNT_META[email].color};display:inline-block;"></span>${email}
+          </span>
+          ${entry
+            ? (entry.needsReconnect
+                ? `<button class="btn small" style="background:var(--bad);border-color:var(--bad);" onclick="connectAccount('${email}')">Reconectar</button>`
+                : `<span class="badge confirmed">Conectado</span>`)
+            : `<button class="btn small" onclick="connectAccount('${email}')">Conectar con Microsoft</button>`}
+        </div>`;
+    }).join('');
+  }
+
+  async function syncCalendarFromGraph() {
+    if (!connectedAccounts.length) { usingRealData = false; renderCalendar(currentCalView); renderUpcomingSessions(); return; }
+    const monday = getWeekMonday(weekOffset);
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 7);
+    const data = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+
+    await Promise.all(connectedAccounts.map(async (entry) => {
+      try {
+        const token = await getGraphToken(entry, false);
+        const url = `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${monday.toISOString()}&endDateTime=${sunday.toISOString()}&$orderby=start/dateTime&$top=50`;
+        const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+        if (!resp.ok) throw new Error('Graph respondió ' + resp.status);
+        const json = await resp.json();
+        (json.value || []).forEach(ev => {
+          const start = new Date(ev.start.dateTime + (ev.start.dateTime.endsWith('Z') ? '' : 'Z'));
+          const dayIdx = Math.round((new Date(start.getFullYear(), start.getMonth(), start.getDate()) - monday) / 86400000);
+          if (dayIdx < 0 || dayIdx > 6) return;
+          data[dayIdx].push({
+            t: start.toLocaleTimeString('es-EC', { hour: 'numeric', minute: '2-digit' }),
+            label: ev.subject || '(Sin título)',
+            teams: !!(ev.isOnlineMeeting && ev.onlineMeeting && ev.onlineMeeting.joinUrl),
+            joinUrl: ev.isOnlineMeeting && ev.onlineMeeting ? ev.onlineMeeting.joinUrl : null,
+            eventId: ev.id, accountUsername: entry.account.username, color: entry.meta.color,
+            startISO: ev.start.dateTime, endISO: ev.end.dateTime, subject: ev.subject || '',
+            sortKey: start.getTime(),
+          });
+        });
+      } catch (err) { console.error('No se pudo sincronizar la cuenta', entry.account.username, err); }
+    }));
+
+    Object.keys(data).forEach(k => data[k].sort((a, b) => a.sortKey - b.sortKey));
+    realWeekData = data;
+    usingRealData = true;
+    renderCalendar(currentCalView);
+    renderUpcomingSessions();
+    renderSyncCard();
+    const failed = connectedAccounts.filter(a => a.needsReconnect);
+    const note = document.getElementById('syncStatusNote');
+    if (failed.length) {
+      note.style.color = 'var(--bad)';
+      note.textContent = `No se pudieron cargar las citas de: ${failed.map(a => a.account.username).join(', ')}. Haz clic en "Reconectar" junto a esa cuenta.`;
+    } else if (connectedAccounts.length) {
+      note.style.color = 'var(--muted)';
+      note.textContent = 'Sincronizado con Outlook/365 · únete a las sesiones de Teams con un clic.';
+    }
+  }
+
+  function renderCalendar(view){
+    currentCalView = view;
+    const calGrid = document.getElementById('calGrid');
+    calGrid.innerHTML = '';
+    const monday = getWeekMonday(weekOffset);
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    if(view === 'month'){
+      document.getElementById('calLabel').textContent = monday.toLocaleDateString('es-EC', {month:'long', year:'numeric'});
+      calGrid.innerHTML = '<p class="muted" style="grid-column:1/-1;">La vista de mes es referencial — usa la vista de semana para ver y gestionar citas reales.</p>';
+      return;
+    }
+
+    const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
+    document.getElementById('calLabel').textContent =
+      `${monday.toLocaleDateString('es-EC',{day:'numeric',month:'short'})} – ${sunday.toLocaleDateString('es-EC',{day:'numeric',month:'short'})}, ${sunday.getFullYear()}`;
+
+    const weekDaysLabels = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+    const source = (usingRealData && realWeekData) ? realWeekData : {0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
+
+    weekDaysLabels.forEach((d,i)=>{
+      const dayDate = new Date(monday); dayDate.setDate(monday.getDate()+i);
+      const el = document.createElement('div');
+      el.className = 'cal-day' + (isSameDate(dayDate, today) ? ' today' : '');
+      let html = `<div class="d-num">${d} ${dayDate.getDate()}</div>`;
+      (source[i]||[]).forEach(s=>{
+        const clickable = usingRealData && s.eventId;
+        html += `<div class="slot" ${clickable ? `style="cursor:pointer;" onclick="openEventModal({mode:'edit', eventId:'${s.eventId}', accountUsername:'${s.accountUsername}', subject:${JSON.stringify(s.subject)}, startISO:'${s.startISO}', endISO:'${s.endISO}', teams:${!!s.teams}})"` : ''}>
+                   <span>${usingRealData && s.color ? `<span style="width:6px;height:6px;border-radius:50%;background:${s.color};display:inline-block;margin-right:5px;"></span>` : ''}<span class="t">${s.t}</span>${esc(s.label)}</span>
+                   ${s.teams ? `<button class="join-btn" onclick="event.stopPropagation();window.open(${s.joinUrl ? "'"+s.joinUrl+"'" : "'#'"},'_blank')">Unirse</button>` : ''}
+                 </div>`;
+      });
+      el.innerHTML = html;
+      calGrid.appendChild(el);
+    });
+  }
+
+  document.getElementById('calPrevBtn').addEventListener('click', async ()=>{ weekOffset -= 1; if (usingRealData) await syncCalendarFromGraph(); else renderCalendar(currentCalView); });
+  document.getElementById('calNextBtn').addEventListener('click', async ()=>{ weekOffset += 1; if (usingRealData) await syncCalendarFromGraph(); else renderCalendar(currentCalView); });
+  document.querySelectorAll('.view-toggle button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.view-toggle button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      renderCalendar(btn.dataset.view);
+    });
+  });
+
+  function initialsOf(name){ return (name||'?').split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join(''); }
+  function renderUpcomingSessions() {
+    const sessionList = document.getElementById('sessionList');
+    if (!sessionList) return;
+    if (!usingRealData || !realWeekData || weekOffset !== 0) {
+      sessionList.innerHTML = connectedAccounts.length
+        ? `<div style="padding:16px 4px;color:var(--muted);font-size:12.5px;">Cargando tus próximas sesiones…</div>`
+        : `<div style="padding:16px 4px;color:var(--muted);font-size:12.5px;">Conecta tu cuenta de Microsoft en la pestaña Calendario para ver aquí tus próximas sesiones reales.</div>`;
+      return;
+    }
+    const now = new Date();
+    const upcoming = Object.values(realWeekData).flat().filter(ev => new Date(ev.endISO) >= now).sort((a,b)=>a.sortKey-b.sortKey).slice(0,5);
+    sessionList.innerHTML = upcoming.length ? upcoming.map(ev => `
+      <div class="session-row">
+        <div class="s-avatar">${initialsOf(ev.label)}</div>
+        <div class="s-info"><div class="s-name">${esc(ev.label)}</div><div class="s-meta">${new Date(ev.startISO).toLocaleDateString('es-EC',{weekday:'short',day:'numeric',month:'short'})} · ${ev.t}</div></div>
+        <div class="badge confirmed">Confirmada</div>
+        ${ev.teams && ev.joinUrl ? `<button class="btn teams" onclick="window.open('${ev.joinUrl}','_blank')">Unirse</button>` : ''}
+      </div>`).join('') : `<div style="padding:16px 4px;color:var(--muted);font-size:12.5px;">No tienes sesiones próximas esta semana.</div>`;
+  }
+
+  renderSyncCard();
+  renderCalendar('week');
+  renderUpcomingSessions();
+  initMsal();
+
+  // ═══════════════════════ Modal: crear / reprogramar cita ═══════════════════════
+  let eventModalState = { mode: 'create' };
+  function fillAccountSelect() {
+    const sel = document.getElementById('eventAccountInput');
+    sel.innerHTML = connectedAccounts.map(a => `<option value="${a.account.username}">${a.account.username}</option>`).join('');
+  }
+  window.openEventModal = function (opts) {
+    if (!connectedAccounts.length) { alert('Primero conecta al menos una cuenta de Microsoft en la parte de arriba del calendario.'); return; }
+    eventModalState = opts;
+    fillAccountSelect();
+    document.getElementById('eventModalError').style.display = 'none';
+    if (opts.mode === 'edit') {
+      document.getElementById('eventModalTitle').textContent = 'Reprogramar / Editar Cita';
+      document.getElementById('eventSubjectInput').value = opts.subject || '';
+      document.getElementById('eventAccountInput').value = opts.accountUsername;
+      const start = new Date(opts.startISO + (opts.startISO.endsWith('Z') ? '' : 'Z'));
+      const end = new Date(opts.endISO + (opts.endISO.endsWith('Z') ? '' : 'Z'));
+      document.getElementById('eventDateInput').value = start.toISOString().slice(0,10);
+      document.getElementById('eventStartInput').value = start.toTimeString().slice(0,5);
+      document.getElementById('eventEndInput').value = end.toTimeString().slice(0,5);
+      document.getElementById('eventTeamsInput').checked = !!opts.teams;
+      document.getElementById('eventDeleteBtn').style.display = 'inline-flex';
+    } else {
+      document.getElementById('eventModalTitle').textContent = 'Nueva Cita';
+      document.getElementById('eventSubjectInput').value = '';
+      const now = new Date();
+      document.getElementById('eventDateInput').value = now.toISOString().slice(0,10);
+      document.getElementById('eventStartInput').value = '10:00';
+      document.getElementById('eventEndInput').value = '10:45';
+      document.getElementById('eventTeamsInput').checked = true;
+      document.getElementById('eventDeleteBtn').style.display = 'none';
+    }
+    document.getElementById('eventModalOverlay').style.display = 'flex';
+  };
+  document.getElementById('newEventBtn').addEventListener('click', () => window.openEventModal({ mode: 'create' }));
+  document.getElementById('eventCancelBtn').addEventListener('click', () => { document.getElementById('eventModalOverlay').style.display = 'none'; });
+  document.getElementById('eventModalOverlay').addEventListener('click', (e) => { if (e.target.id === 'eventModalOverlay') e.target.style.display = 'none'; });
+
+  document.getElementById('eventSaveBtn').addEventListener('click', async () => {
+    const subject = document.getElementById('eventSubjectInput').value.trim();
+    const username = document.getElementById('eventAccountInput').value;
+    const date = document.getElementById('eventDateInput').value;
+    const startTime = document.getElementById('eventStartInput').value;
+    const endTime = document.getElementById('eventEndInput').value;
+    const isTeams = document.getElementById('eventTeamsInput').checked;
+    const errBox = document.getElementById('eventModalError');
+    if (!subject || !date || !startTime || !endTime) { errBox.textContent = 'Completa el título, la fecha y las horas.'; errBox.style.display = 'block'; return; }
+    const entry = connectedAccounts.find(a => a.account.username === username);
+    if (!entry) { errBox.textContent = 'Cuenta no encontrada.'; errBox.style.display = 'block'; return; }
+    const body = {
+      subject,
+      start: { dateTime: `${date}T${startTime}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+      end: { dateTime: `${date}T${endTime}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+      isOnlineMeeting: isTeams, onlineMeetingProvider: isTeams ? 'teamsForBusiness' : undefined,
+    };
+    try {
+      const token = await getGraphToken(entry, true);
+      const isEdit = eventModalState.mode === 'edit';
+      const url = isEdit ? `https://graph.microsoft.com/v1.0/me/events/${eventModalState.eventId}` : `https://graph.microsoft.com/v1.0/me/events`;
+      const resp = await fetch(url, { method: isEdit ? 'PATCH' : 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!resp.ok) throw new Error('Graph respondió ' + resp.status);
+      document.getElementById('eventModalOverlay').style.display = 'none';
+      await syncCalendarFromGraph();
+    } catch (err) {
+      console.error(err);
+      errBox.textContent = 'No se pudo guardar la cita. Detalle: ' + (err && err.message ? err.message : err);
+      errBox.style.display = 'block';
+    }
+  });
+
+  document.getElementById('eventDeleteBtn').addEventListener('click', async () => {
+    if (eventModalState.mode !== 'edit') return;
+    if (!confirm('¿Eliminar esta cita del calendario?')) return;
+    const entry = connectedAccounts.find(a => a.account.username === eventModalState.accountUsername);
+    if (!entry) return;
+    try {
+      const token = await getGraphToken(entry, true);
+      const resp = await fetch(`https://graph.microsoft.com/v1.0/me/events/${eventModalState.eventId}`, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok && resp.status !== 204) throw new Error('Graph respondió ' + resp.status);
+      document.getElementById('eventModalOverlay').style.display = 'none';
+      await syncCalendarFromGraph();
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo eliminar la cita. Detalle: ' + (err && err.message ? err.message : err));
+    }
+  });
+</script>
+</body>
+</html>

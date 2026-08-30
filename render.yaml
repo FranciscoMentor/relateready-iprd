@@ -25,6 +25,8 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
+      - key: SESSION_SECRET
+        sync: false
       - key: EXTENDED_PRICE_CENTS
         sync: false
       - key: FREE_ACCESS_CODES

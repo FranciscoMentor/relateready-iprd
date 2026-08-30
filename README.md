@@ -111,10 +111,38 @@ services/aiAnalysis.js      — las 5 secciones generadas por Claude
 services/pdfGenerator.js    — preview y extendido en PDF (pdfkit)
 services/payphone.js        — pago (simulado / listo para conectar real)
 routes/api.js                — /api/meta, /api/submit, /api/report/*, /api/payment/*
-routes/admin.js              — panel /admin
+routes/admin.js              — panel /admin (básico) + API JSON de /panel-control
+views/panel.html              — panel de control completo (KPIs, resultados, calendario)
 public/                      — frontend (HTML/CSS/JS puro, bilingüe)
 render.yaml                  — blueprint de despliegue en Render
 ```
+
+## Panel de control (`/admin` y `/panel-control`)
+
+Desde 2026-08, el panel de administración usa sesión propia (`express-session`,
+guardada en la misma base SQLite) en vez de HTTP Basic Auth — inicia sesión en
+`/admin/login` con `ADMIN_USER` / `ADMIN_PASSWORD` (variables de entorno) y la
+sesión dura 8 horas. Cambia también `SESSION_SECRET` antes de desplegar (ver
+`.env.example`).
+
+Hay dos vistas, con el mismo login:
+
+- **`/admin`** — tabla básica de envíos, filtros, chips de seguimiento
+  comercial, exportar CSV, marcar como pagado a mano.
+- **`/panel-control`** — panel completo: tarjetas de KPI (conversión a informe
+  pagado, envíos con protocolo de derivación activado, ingresos aproximados),
+  pestaña Resultados con detalle por persona (contacto editable, las 8
+  dimensiones con banda de color, respuestas cualitativas, seguimiento
+  comercial), y pestaña Calendario con Outlook/Teams en vivo vía Microsoft
+  Graph (MSAL, "public client", sin secretos en el backend — reutiliza el
+  registro de Azure "Adamantine Panel Interno" ya creado para el panel de SQ
+  Assessment). Antes de usar el calendario en producción, agrega la URL de
+  RelateReady a las Redirect URIs de ese registro en Azure Portal — ver la
+  nota en `.env.example`.
+
+Los campos de correo y teléfono del test (opcionales) alimentan el
+seguimiento comercial del panel — se agregaron a `submissions` con una
+migración automática (`db/init.js`), segura de correr en cada arranque.
 
 ## Fuente del contenido
 
