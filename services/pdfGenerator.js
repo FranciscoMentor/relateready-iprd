@@ -33,6 +33,56 @@ const BOOKING_LINKS = {
   en: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/K4DmDOt-kUSplfAlddYmbw2",
 };
 
+// Libro digital gratuito "Tu Primero" / "You First" (Dr. Francisco Rosero) —
+// se entrega EXCLUSIVAMENTE durante la sesión de mentoría gratuita, no viene
+// incluido en el Informe Extendido. No está a la venta. Copy aprobado — ver
+// handoff en Documents/Libro para RelateReady/Handoff Informe Extendido.
+// Igual que MENTOR_NAME arriba, el copy evita decir que Francisco da la
+// sesión personalmente (puede ser cualquier mentor del equipo).
+// `segments`: lista de trozos {text, bold} en orden — se concatenan para el
+// párrafo completo. "bold" marca las frases que deben ir en negrilla (el
+// título del libro además va en color de acento, ver bookTeaserBlock).
+const BOOK_TEASER = {
+  es: {
+    label: "Además, recibes",
+    segments: [
+      { text: "Tu Informe Extendido es solo el primer paso. El siguiente es tu ", bold: false },
+      { text: "sesión de mentoría indagatoria gratuita de 60 minutos", bold: true },
+      { text: " con uno de los mentores de nuestro equipo — y ahí, exclusivamente ahí, recibirás ", bold: false },
+      { text: '"Tu Primero"', bold: true, accent: true },
+      { text: ": ", bold: false },
+      { text: "el libro digital gratuito", bold: true },
+      {
+        text: " diseñado para profundizar en tus 8 pilares y acompañarte semanas después de esa conversación. No está a la venta ni disponible por ningún otro medio: es una guía reservada para quienes completan el proceso, informe y sesión de mentoría.",
+        bold: false,
+      },
+    ],
+  },
+  en: {
+    label: "Plus, you get",
+    segments: [
+      { text: "Your Extended Report is only the first step. The next one is your ", bold: false },
+      { text: "free 60-minute discovery mentoring session", bold: true },
+      { text: " with one of our team mentors — and that's the exclusive moment you'll receive ", bold: false },
+      { text: '"You First"', bold: true, accent: true },
+      { text: ": ", bold: false },
+      { text: "the free digital book", bold: true },
+      {
+        text: " designed to deepen your work on the 8 pillars and stay with you long after that conversation ends. It isn't for sale anywhere else: it's reserved for those who complete the process — report and mentoring session.",
+        bold: false,
+      },
+    ],
+  },
+};
+const BOOK_COVER_PATH = {
+  es: path.join(__dirname, "..", "public", "assets", "tu-primero-cover-es.jpg"),
+  en: path.join(__dirname, "..", "public", "assets", "you-first-cover-en.jpg"),
+};
+// Relación alto/ancho real de ambas portadas (1024×1536 y 843×1264 — ambas
+// ~1.5). doc.image() con x/y absolutos no actualiza doc.y solo, así que la
+// usamos para calcular a mano cuánto avanzar el cursor después de dibujarla.
+const BOOK_COVER_RATIO = 1.5;
+
 // Inserta una ilustración de marca en el PDF (mismo estilo/paleta que
 // hero-home.jpg, usada también en la página de inicio del sitio). Pensado
 // para poder agregar MÁS ilustraciones similares en otros puntos del informe
@@ -185,6 +235,53 @@ function linkButton(doc, text, url, opts = {}) {
   doc.y = y + height;
   doc.x = PAGE_MARGIN;
   doc.moveDown(0.6);
+}
+
+// Bloque adicional que anuncia el libro digital gratuito "Tu Primero"/"You
+// First" — NO reemplaza el CTA de agendar la sesión de mentoría (linkButton
+// de arriba); se suma después, como un beneficio extra que el lector todavía
+// no conoce. Ver BOOK_TEASER arriba para el copy aprobado. Layout a dos
+// columnas (portada a la izquierda, texto a la derecha) por pedido explícito
+// del dueño del proyecto — más prolijo que la portada centrada debajo del
+// párrafo que se usó en la primera versión.
+function bookTeaserBlock(doc, lang) {
+  const copy = BOOK_TEASER[lang] || BOOK_TEASER.es;
+  const contentWidth = 612 - PAGE_MARGIN * 2;
+  const imgWidth = 105;
+  const gap = 18;
+  const textX = PAGE_MARGIN + imgWidth + gap;
+  const textWidth = contentWidth - imgWidth - gap;
+  const imgHeight = imgWidth * BOOK_COVER_RATIO;
+
+  // Estimación de la altura del párrafo para reservar espacio (heightOfString
+  // no distingue negrilla/color por tramo, pero Helvetica-Bold a 10.5pt es
+  // apenas un poco más ancha que Helvetica — suficiente para estimar sin
+  // arriesgarse a un salto de página a mitad del bloque).
+  const fullText = copy.segments.map((s) => s.text).join("");
+  doc.fontSize(10.5).font("Helvetica");
+  const textHeight = doc.heightOfString(fullText, { width: textWidth, lineGap: 3 });
+  ensureSpace(doc, 26 + Math.max(imgHeight, textHeight));
+
+  doc.fontSize(8.5).font("Helvetica-Bold").fillColor(ACCENT).text(copy.label.toUpperCase(), { characterSpacing: 1 });
+  doc.moveDown(0.3);
+
+  const rowY = doc.y;
+  illustration(doc, BOOK_COVER_PATH[lang] || BOOK_COVER_PATH.es, PAGE_MARGIN, rowY, imgWidth);
+
+  doc.fontSize(10.5);
+  copy.segments.forEach((seg, i) => {
+    const isLast = i === copy.segments.length - 1;
+    doc.font(seg.bold ? "Helvetica-Bold" : "Helvetica").fillColor(seg.accent ? ACCENT : INK);
+    if (i === 0) {
+      doc.text(seg.text, textX, rowY, { width: textWidth, lineGap: 3, continued: !isLast });
+    } else {
+      doc.text(seg.text, { continued: !isLast, lineGap: 3 });
+    }
+  });
+
+  doc.y = Math.max(doc.y, rowY + imgHeight) + 10;
+  doc.x = PAGE_MARGIN;
+  doc.font("Helvetica").fillColor(INK);
 }
 
 // Lista de viñetas con el punto en color de acento (en vez del carácter "•"
@@ -568,6 +665,7 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
     )
   );
   linkButton(doc, T(lang, "Agendar mi sesión gratuita", "Schedule my free session"), BOOKING_LINKS[lang] || BOOKING_LINKS.es);
+  bookTeaserBlock(doc, lang);
 
   if (referral.triggered) {
     referralClosePage(doc, lang);

@@ -39,6 +39,8 @@
       extendedTitle: "¿Quieres el detalle completo?",
       extendedIntro: "El Informe Extendido incluye tus 8 dimensiones completas, recomendaciones concretas, 5 secciones escritas especialmente para ti por IA, y tu plan de acción a 3 semanas.",
       freeSessionNote: "Además, al adquirir tu Informe Extendido recibes una sesión de mentoría indagatoria gratuita de 60 minutos con el Dr. Francisco Rosero para revisarlo juntos.",
+      bookTeaserLabel: "Además, recibes",
+      bookTeaserCopy: 'Tu Informe Extendido es solo el primer paso. El siguiente es tu <strong>sesión de mentoría indagatoria gratuita de 60 minutos</strong> con uno de los mentores de nuestro equipo — y ahí, exclusivamente ahí, recibirás <strong>"Tu Primero"</strong>: <strong>el libro digital gratuito</strong> diseñado para profundizar en tus 8 pilares y acompañarte semanas después de esa conversación. No está a la venta ni disponible por ningún otro medio: es una guía reservada para quienes completan el proceso, informe y sesión de mentoría.',
       scheduleSessionTitle: "Tu sesión de mentoría gratuita",
       scheduleSessionIntro: "Como parte de tu Informe Extendido, tienes una sesión de mentoría indagatoria gratuita de 60 minutos con el Dr. Francisco Rosero, Mentor en Relaciones y Desarrollo Personal, para revisar tus resultados.",
       scheduleSessionBtn: "Agendar mi sesión gratuita",
@@ -100,6 +102,8 @@
       extendedTitle: "Want the full detail?",
       extendedIntro: "The Extended Report includes all 8 full dimensions, concrete recommendations, 5 sections written specifically for you by AI, and your 3-week action plan.",
       freeSessionNote: "Plus, getting your Extended Report includes a free 60-minute intake mentoring session with Dr. Francisco Rosero to review it together.",
+      bookTeaserLabel: "Plus, you get",
+      bookTeaserCopy: 'Your Extended Report is only the first step. The next one is your <strong>free 60-minute discovery mentoring session</strong> with one of our team mentors — and that\'s the exclusive moment you\'ll receive <strong>"You First"</strong>: <strong>the free digital book</strong> designed to deepen your work on the 8 pillars and stay with you long after that conversation ends. It isn\'t for sale anywhere else: it\'s reserved for those who complete the process — report and mentoring session.',
       scheduleSessionTitle: "Your free mentoring session",
       scheduleSessionIntro: "As part of your Extended Report, you get a free 60-minute intake mentoring session with Dr. Francisco Rosero, Relationship & Personal Development Mentor, to review your results.",
       scheduleSessionBtn: "Schedule my free session",
@@ -132,6 +136,14 @@
   const BOOKING_LINKS = {
     es: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/eMJ5GQhw_0W_-z2cJN-S9g2",
     en: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/K4DmDOt-kUSplfAlddYmbw2",
+  };
+
+  // Portada del libro digital gratuito "Tu Primero"/"You First" — se entrega
+  // exclusivamente durante la sesión de mentoría gratuita (no es parte de la
+  // compra del Informe Extendido). Ver bookTeaserLabel/bookTeaserCopy arriba.
+  const BOOK_COVERS = {
+    es: "/assets/tu-primero-cover-es.jpg",
+    en: "/assets/you-first-cover-en.jpg",
   };
 
   const state = {
@@ -584,7 +596,18 @@
         <p>${t("extendedIntro")}</p>
         ${!state.paid ? `<p class="bonus-note">${t("freeSessionNote")}</p>` : ""}
         <div id="pay-area">${payAreaHtml}</div>
-      </div>`;
+      </div>
+      ${
+        !state.paid
+          ? `<div class="card book-teaser">
+        <img src="${BOOK_COVERS[state.lang] || BOOK_COVERS.es}" alt="" class="book-teaser-cover" />
+        <div class="book-teaser-text">
+          <p class="book-teaser-label">${t("bookTeaserLabel")}</p>
+          <p>${t("bookTeaserCopy")}</p>
+        </div>
+      </div>`
+          : ""
+      }`;
 
     drawRadar(document.getElementById("radarCanvas"), dims, codes);
 
