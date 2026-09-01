@@ -49,7 +49,7 @@ const BOOK_TEASER = {
       { text: "Tu Informe Extendido es solo el primer paso. El siguiente es tu ", bold: false },
       { text: "sesión de mentoría indagatoria gratuita de 60 minutos", bold: true },
       { text: " con uno de los mentores de nuestro equipo — y ahí, exclusivamente ahí, recibirás ", bold: false },
-      { text: '"Tu Primero"', bold: true, accent: true },
+      { text: '"Tú Primero"', bold: true, accent: true },
       { text: ": ", bold: false },
       { text: "el libro digital gratuito", bold: true },
       {
