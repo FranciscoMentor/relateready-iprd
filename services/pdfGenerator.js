@@ -4,6 +4,19 @@ const path = require("path");
 const { dimensionLabel, DIMENSION_CODES } = require("../data/dimensions");
 const { getBandContent, SOCIAL_DESIRABILITY_NOTE, REFERRAL_MESSAGE } = require("../data/reportContent");
 
+// Set de 8 íconos de marca (uno por pilar/dimensión), aprobado por Francisco
+// y ya usado en el libro digital gratuito "Tú Primero"/"You First" para abrir
+// cada capítulo de pilar. Aquí se reutilizan (sin recolorear/redibujar) para
+// que test, informe y libro compartan una sola identidad visual. Ver handoff
+// en Documents/Libro para RelateReady/Handoff Informe Extendido/
+// handoff_iconos_pilares_informe.zip. Mismo código de dimensión (AS/DS/RS/
+// CG/CR/AR/IA/CV, ver data/dimensions.js) usado como llave, así que si el
+// orden canónico de DIMENSIONS cambia algún día, el ícono correcto lo sigue
+// automáticamente.
+const DIMENSION_ICON_PATH = Object.fromEntries(
+  DIMENSION_CODES.map((code) => [code, path.join(__dirname, "..", "public", "assets", "icons", `icon-${code.toLowerCase()}.png`)])
+);
+
 const ACCENT = "#B5732A";
 const INK = "#2A2A28";
 const MUTED = "#6B6259";
@@ -183,6 +196,66 @@ function h2(doc, text, color = INK) {
   doc.moveDown(0.4);
   doc.fontSize(13).fillColor(color).font("Helvetica-Bold").text(text);
   doc.moveDown(0.2);
+  doc.font("Helvetica").fillColor(INK);
+}
+
+// Igual que h2, pero con el ícono de la dimensión a la izquierda del título
+// (en línea, mismo renglón). Usado en el detalle completo de las 8
+// dimensiones, para reforzar visualmente qué pilar es cada sección. El
+// ícono se centra verticalmente respecto al bloque de texto (que puede
+// ocupar 1 o 2 líneas según el largo del título).
+function h2WithIcon(doc, iconPath, text, color = INK) {
+  doc.moveDown(0.4);
+  const iconSize = 26;
+  const gap = 8;
+  const startX = doc.x;
+  const textX = startX + iconSize + gap;
+  const textWidth = 612 - PAGE_MARGIN - textX;
+  const startY = doc.y;
+  doc.fontSize(13).font("Helvetica-Bold");
+  const textHeight = doc.heightOfString(text, { width: textWidth });
+  // Centrado real respecto al bloque de texto (sin recortar a 0): si el
+  // título ocupa una sola línea, el ícono es más alto que el texto, así que
+  // su borde superior queda un poco por ENCIMA de startY a propósito — así
+  // el centro del ícono coincide con el centro vertical del texto en vez de
+  // quedar más abajo (ver captura de Francisco: con el clamp a 0 el ícono se
+  // veía descolgado respecto al título).
+  const iconY = startY + (textHeight - iconSize) / 2;
+  illustration(doc, iconPath, startX, iconY, iconSize);
+  doc.fillColor(color).text(text, textX, startY, { width: textWidth });
+  doc.y = Math.max(doc.y, iconY + iconSize);
+  doc.x = PAGE_MARGIN;
+  doc.moveDown(0.2);
+  doc.font("Helvetica").fillColor(INK);
+}
+
+// Grilla de referencia rápida con los 8 íconos + nombre de cada pilar,
+// mostrados juntos en el orden canónico (4 columnas x 2 filas). Se usa en
+// la página de "Cómo leer tu perfil", antes del radar, como mapa visual de
+// las 8 dimensiones que vienen a continuación.
+function dimensionIconsGrid(doc, lang) {
+  const contentWidth = 612 - PAGE_MARGIN * 2;
+  const cols = 4;
+  const cellW = contentWidth / cols;
+  const iconSize = 34;
+  const labelGap = 6;
+  const rowHeight = 72;
+  const startY = doc.y;
+
+  DIMENSION_CODES.forEach((code, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const cellX = PAGE_MARGIN + col * cellW;
+    const cellCenterX = cellX + cellW / 2;
+    const iconY = startY + row * rowHeight;
+    illustration(doc, DIMENSION_ICON_PATH[code], cellCenterX - iconSize / 2, iconY, iconSize);
+    doc.fontSize(7.5).font("Helvetica-Bold").fillColor(INK);
+    doc.text(dimensionLabel(code, lang), cellX + 3, iconY + iconSize + labelGap, { width: cellW - 6, align: "center" });
+  });
+
+  const rows = Math.ceil(DIMENSION_CODES.length / cols);
+  doc.y = startY + rows * rowHeight + 6;
+  doc.x = PAGE_MARGIN;
   doc.font("Helvetica").fillColor(INK);
 }
 
@@ -594,6 +667,10 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
     )
   );
   doc.moveDown(0.5);
+  ensureSpace(doc, 190); // reserva espacio solo para el título + grilla de íconos
+  h2(doc, T(lang, "Tus 8 pilares", "Your 8 pillars"));
+  dimensionIconsGrid(doc, lang);
+
   ensureSpace(doc, 460); // reserva espacio solo para el bloque radar + tabla
   drawRadarChart(doc, 306, doc.y + 150, 95, scoreResult.dimensions, lang);
   doc.y += 300;
@@ -645,7 +722,7 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
     const band = scoreResult.dimensions[code].band;
     const bc = getBandContent(code, band, lang, participant.gender);
     ensureSpace(doc, 110);
-    h2(doc, `${dimensionLabel(code, lang)} — ${bc.bandLabel} (${scoreResult.dimensions[code].index}/100)`, BAND_COLOR[band]);
+    h2WithIcon(doc, DIMENSION_ICON_PATH[code], `${dimensionLabel(code, lang)} — ${bc.bandLabel} (${scoreResult.dimensions[code].index}/100)`, BAND_COLOR[band]);
     body(doc, bc.text);
     if (band === "d") bulletList(doc, bc.recommendations);
   });
