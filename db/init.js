@@ -60,4 +60,11 @@ addColumnIfMissing("phone", "phone TEXT");
 addColumnIfMissing("follow_up_status", "follow_up_status TEXT NOT NULL DEFAULT 'nuevo'");
 addColumnIfMissing("follow_up_notes", "follow_up_notes TEXT");
 
+// ── Migración: correo automático (2026-09) ────────────────────────────────
+// reminder_sent_at: cuándo se envió (si se envió) el recordatorio de 24-48h
+// a alguien que completó el test, dejó su correo, pero no compró el Informe
+// Extendido — ver services/reminderScheduler.js. NULL = todavía no se le ha
+// enviado nada.
+addColumnIfMissing("reminder_sent_at", "reminder_sent_at TEXT");
+
 module.exports = db;

@@ -7,6 +7,7 @@ const path = require("path");
 const apiRoutes = require("./routes/api");
 const adminRoutes = require("./routes/admin");
 const db = require("./db/init");
+const reminderScheduler = require("./services/reminderScheduler");
 
 const app = express();
 app.set("trust proxy", 1); // necesario en Render para que req.protocol refleje https
@@ -66,3 +67,8 @@ app.listen(PORT, () => {
   console.log(`  Admin (básico):    http://localhost:${PORT}/admin`);
   console.log(`  Panel de control:  http://localhost:${PORT}/panel-control`);
 });
+
+// Recordatorio automático de 24-48h para tests completados sin comprar (ver
+// services/reminderScheduler.js) — se activa solo si el correo automático
+// está configurado (GRAPH_* en Environment).
+reminderScheduler.start();

@@ -12,6 +12,8 @@ const { getBandContent } = require("../data/reportContent");
 const { generateExtendedReportPDF } = require("../services/pdfGenerator");
 const { generateAISections } = require("../services/aiAnalysis");
 const { preparePayment, confirmPayment, PAYPHONE_ENABLED } = require("../services/payphone");
+const { sendMail } = require("../services/graphMail");
+const { extendedReportEmail } = require("../services/emailTemplates");
 
 const CORE_ITEMS_FLAT = buildFlatCoreItems();
 const DESIRABILITY_ITEMS_FLAT = buildFlatDesirabilityItems();
@@ -274,6 +276,11 @@ router.get("/report/extended/:id", async (req, res) => {
   if (sub.payment_status === "pending") {
     return res.status(402).send("Pago requerido para el Informe Extendido.");
   }
+  // Se captura ANTES de generar/actualizar: si ya tenía fecha, esta no es la
+  // primera vez que se genera el PDF (por ejemplo, la persona lo vuelve a
+  // descargar después) — el correo de confirmación con el adjunto solo debe
+  // salir una vez, la primera.
+  const isFirstGeneration = !sub.extended_generated_at;
   try {
     const bandContentByCode = {};
     for (const code of Object.keys(sub.scoreResult.dimensions)) {
@@ -304,6 +311,31 @@ router.get("/report/extended/:id", async (req, res) => {
     });
 
     db.prepare("UPDATE submissions SET extended_generated_at = ? WHERE id = ?").run(new Date().toISOString(), sub.id);
+
+    // Correo con el informe adjunto — solo la primera vez, y solo si la
+    // persona dejó su correo. No bloquea la descarga: si Graph tarda o
+    // falla, sendMail ya registra el error por su cuenta y no lanza — la
+    // respuesta al navegador sale igual.
+    if (isFirstGeneration && sub.email) {
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const { subject, html } = extendedReportEmail({
+        name: sub.name,
+        lang: sub.lang === "en" ? "en" : "es",
+        resultsUrl: `${baseUrl}/?sid=${sub.id}`,
+      });
+      sendMail({
+        to: sub.email,
+        subject,
+        html,
+        attachments: [
+          {
+            filename: pdfFilename(sub.name, sub.lang === "en" ? "Extended Report" : "Informe Extendido"),
+            contentBytes: pdf,
+            contentType: "application/pdf",
+          },
+        ],
+      }).catch((err) => console.error("[routes/api] Error enviando correo de confirmación —", err.message));
+    }
 
     const filename = pdfFilename(sub.name, sub.lang === "en" ? "Extended Report" : "Informe Extendido");
     res.set("Content-Type", "application/pdf");
