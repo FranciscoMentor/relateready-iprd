@@ -92,6 +92,8 @@ router.post("/submit", (req, res) => {
       name,
       email,
       phone,
+      city,
+      country,
       lang,
       gender,
       relationshipContextCode,
@@ -105,6 +107,25 @@ router.post("/submit", (req, res) => {
     if (!name || typeof name !== "string" || !name.trim()) {
       return res.status(400).json({ error: "El nombre es obligatorio." });
     }
+    // email/phone/ciudad/país pasaron de opcionales a obligatorios (2026-09):
+    // el correo automático del Informe Extendido (Hueco 1) depende de que
+    // todo envío tenga un email real, y el seguimiento comercial del panel
+    // necesita también teléfono, ciudad y país.
+    if (!email || typeof email !== "string" || !email.trim()) {
+      return res.status(400).json({ error: "El correo es obligatorio." });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return res.status(400).json({ error: "El correo no es válido." });
+    }
+    if (!phone || typeof phone !== "string" || !phone.trim()) {
+      return res.status(400).json({ error: "El teléfono es obligatorio." });
+    }
+    if (!city || typeof city !== "string" || !city.trim()) {
+      return res.status(400).json({ error: "La ciudad es obligatoria." });
+    }
+    if (!country || typeof country !== "string" || !country.trim()) {
+      return res.status(400).json({ error: "El país es obligatorio." });
+    }
     if (!relationshipContextCode || !relationshipContextText || !relationshipContextText.trim()) {
       return res.status(400).json({ error: "El contexto relacional actual (selección + texto) es obligatorio." });
     }
@@ -114,25 +135,26 @@ router.post("/submit", (req, res) => {
     const scoreResult = scoreTest(coreResponses || {}, desirabilityResponses || {});
     const referral = checkReferralProtocol(scoreResult, relationshipContextText, effLang);
 
-    // email/phone son opcionales (agregados 2026-08 para el panel-control):
-    // el test sigue funcionando sin ellos, pero cuando la persona los deja,
-    // permiten darle seguimiento comercial real por persona desde el panel.
-    const cleanEmail = typeof email === "string" && email.trim() ? email.trim() : null;
-    const cleanPhone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
+    const cleanEmail = email.trim();
+    const cleanPhone = phone.trim();
+    const cleanCity = city.trim();
+    const cleanCountry = country.trim();
 
     const id = crypto.randomUUID();
     db.prepare(
       `INSERT INTO submissions
-        (id, created_at, name, email, phone, lang, gender, relationship_context_code, relationship_context_text,
+        (id, created_at, name, email, phone, city, country, lang, gender, relationship_context_code, relationship_context_text,
          core_responses, desirability_responses, vignette_responses, qualitative_answers,
          score_result, referral_triggered, payment_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')`
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')`
     ).run(
       id,
       new Date().toISOString(),
       name.trim(),
       cleanEmail,
       cleanPhone,
+      cleanCity,
+      cleanCountry,
       effLang,
       effGender,
       relationshipContextCode,

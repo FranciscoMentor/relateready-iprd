@@ -67,4 +67,12 @@ addColumnIfMissing("follow_up_notes", "follow_up_notes TEXT");
 // enviado nada.
 addColumnIfMissing("reminder_sent_at", "reminder_sent_at TEXT");
 
+// ── Migración: ciudad y país (2026-09) ────────────────────────────────────
+// Se agregan como parte del rediseño de la página de inicio: correo,
+// teléfono, ciudad y país pasan de opcionales a obligatorios (ver
+// routes/api.js + public/js/app.js), porque el correo automático del
+// Informe Extendido (Hueco 1) depende de que todo envío tenga un email.
+addColumnIfMissing("city", "city TEXT");
+addColumnIfMissing("country", "country TEXT");
+
 module.exports = db;

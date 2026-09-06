@@ -3,15 +3,23 @@
 
   const I18N = {
     es: {
-      slogan: "Listos por dentro. Listos en pareja: la preparación empieza contigo, no con la otra persona.",
-      footer: "Desarrollado por Adamantine · Índice de Desarrollo y Fortalecimiento Relacional",
+      slogan: "<em>Listos por dentro. Listos en pareja:</em><br>la preparación empieza contigo, no con la otra persona.",
+      footerBefore: "Desarrollado por",
+      footerAfter: "Índice de Desarrollo y Fortalecimiento Relacional",
       intakeTitle: "Antes de empezar",
-      intakeIntro: "RelateReady evalúa qué tan equipado/a estás — en términos de patrones emocionales y relacionales aprendidos — para sostener una relación sana en el tiempo. No predice compatibilidad con nadie en particular: mide tu propia preparación.",
-      durationNote: "Este test toma entre 10 y 15 minutos.",
+      intakeIntro1: "RelateReady es una herramienta de autoconocimiento que te ayuda a descubrir qué está favoreciendo y qué puede estar limitando tu capacidad para construir una relación de pareja sana, sólida y duradera. A través de la evaluación de tus 8 pilares relacionales, obtienes una visión clara y objetiva de tus fortalezas, tus áreas de oportunidad, y los aspectos que puedes trabajar para relacionarte mejor contigo mismo y con tu pareja.",
+      intakeIntro2: "Y no importa en qué momento de tu vida estés: puede ayudarte a fortalecer la relación que ya tienes, a prepararte para iniciar una nueva, o a avanzar después de una ruptura.",
+      intakeIntro3: "Al completar el test, recibes un resumen de tus resultados sin costo. Y si quieres profundizar en tu proceso, puedes acceder a tu Informe Extendido, que incluye un análisis detallado, un plan de acción personalizado, y una sesión de mentoría gratuita para ayudarte a transformar tus resultados en cambios reales.",
+      durationChip: "10 a 15 minutos",
+      privacyChip: "Tus datos, protegidos",
+      calloutStrong: "Para iniciar tu proceso",
+      calloutRest: " necesitamos tu nombre, correo, teléfono, ciudad y país. Los usamos únicamente para enviarte tu informe y coordinar tu sesión de mentoría gratuita — nunca para spam.",
       nameLabel: "Tu nombre",
-      emailLabel: "Tu correo (opcional)",
-      phoneLabel: "Tu teléfono (opcional)",
-      contactNote: "Solo lo usamos para enviarte tu informe y coordinar tu sesión de mentoría gratuita — nunca para spam.",
+      emailLabel: "Tu correo",
+      phoneLabel: "Tu teléfono",
+      phoneFormatHint: "Escríbelo con el código de tu país y de tu área incluidos — por ejemplo: +593 99 123 4567.",
+      cityLabel: "Tu ciudad",
+      countryLabel: "Tu país",
       genderLabel: "Género con el que te identificas",
       genderM: "Masculino",
       genderF: "Femenino",
@@ -20,7 +28,6 @@
       contextLabel: "¿En qué momento de tu vida amorosa estás?",
       contextTextLabel: "Cuéntanos en tus palabras qué te trae a hacer este test ahora",
       contextTextPlaceholder: "Escribe unas líneas...",
-      requiredNote: "Todos los campos de esta página son obligatorios.",
       startBtn: "Comenzar",
       vignetteTitle: "Antes de las preguntas",
       vignetteIntro: "Estas 3 escenas no se puntúan — solo nos ayudan a darle un tono más cercano a tu informe.",
@@ -61,20 +68,29 @@
       codeInvalid: "Ese código no es válido.",
       referralNotice: "Tus respuestas sugieren que este podría ser un buen momento para hablar con alguien de confianza o un profesional de salud mental. RelateReady no es una herramienta de diagnóstico ni de crisis.",
       errorRequired: "Por favor completa todos los campos obligatorios.",
+      errorEmailInvalid: "Por favor ingresa un correo válido.",
       progress: "Pregunta",
       of: "de",
       otherSpecify: "Especifica tu situación",
     },
     en: {
-      slogan: "Ready Within. Ready Together — readiness starts with you, not the other person.",
-      footer: "Developed by Adamantine · Relationship Development and Strengthening Index",
+      slogan: "<em>Ready Within. Ready Together —</em><br>readiness starts with you, not the other person.",
+      footerBefore: "Developed by",
+      footerAfter: "Relationship Development and Strengthening Index",
       intakeTitle: "Before you start",
-      intakeIntro: "RelateReady assesses how well-equipped you are — in terms of learned emotional and relational patterns — to sustain a healthy relationship over time. It doesn't predict compatibility with anyone in particular: it measures your own readiness.",
-      durationNote: "This test takes about 10–15 minutes.",
+      intakeIntro1: "RelateReady is a self-knowledge tool that helps you discover what's supporting — and what may be limiting — your ability to build a healthy, solid, lasting relationship. Through the evaluation of your 8 relational pillars, you get a clear, objective view of your strengths, your areas of opportunity, and the aspects you can work on to relate better with yourself and with your partner.",
+      intakeIntro2: "And no matter what point you're at in your life, it can help you: strengthen the relationship you already have, prepare to start a new one, or move forward after a breakup.",
+      intakeIntro3: "When you complete the test, you get a summary of your results at no cost. And if you want to go deeper, you can access your Extended Report, which includes a detailed analysis, a personalized action plan, and a free mentoring session to help you turn your results into real change.",
+      durationChip: "10 to 15 minutes",
+      privacyChip: "Your data, protected",
+      calloutStrong: "To start your process",
+      calloutRest: " we need your name, email, phone, city, and country. We only use this to send you your report and coordinate your free mentoring session — never for spam.",
       nameLabel: "Your name",
-      emailLabel: "Your email (optional)",
-      phoneLabel: "Your phone (optional)",
-      contactNote: "We only use this to send you your report and coordinate your free mentoring session — never for spam.",
+      emailLabel: "Your email",
+      phoneLabel: "Your phone",
+      phoneFormatHint: "Include your country code and area code — for example: +593 99 123 4567.",
+      cityLabel: "Your city",
+      countryLabel: "Your country",
       genderLabel: "Gender you identify with",
       genderM: "Male",
       genderF: "Female",
@@ -83,7 +99,6 @@
       contextLabel: "What point in your love life are you at?",
       contextTextLabel: "Tell us in your own words what brings you to take this test now",
       contextTextPlaceholder: "Write a few lines...",
-      requiredNote: "All fields on this page are required.",
       startBtn: "Start",
       vignetteTitle: "Before the questions",
       vignetteIntro: "These 3 scenes aren't scored — they just help give your report a closer tone.",
@@ -124,6 +139,7 @@
       codeInvalid: "That code isn't valid.",
       referralNotice: "Your answers suggest this might be a good time to talk with someone you trust or a mental health professional. RelateReady is not a diagnostic or crisis tool.",
       errorRequired: "Please fill in all required fields.",
+      errorEmailInvalid: "Please enter a valid email address.",
       progress: "Question",
       of: "of",
       otherSpecify: "Specify your situation",
@@ -153,6 +169,8 @@
     name: "",
     email: "",
     phone: "",
+    city: "",
+    country: "",
     gender: "",
     relationshipContextCode: "",
     relationshipContextText: "",
@@ -180,8 +198,9 @@
     state.lang = lang;
     document.getElementById("btn-es").classList.toggle("active", lang === "es");
     document.getElementById("btn-en").classList.toggle("active", lang === "en");
-    document.querySelector('[data-i18n="footer"]').textContent = t("footer");
-    document.querySelector('[data-i18n="slogan"]').textContent = t("slogan");
+    document.querySelector('[data-i18n="footerBefore"]').textContent = t("footerBefore");
+    document.querySelector('[data-i18n="footerAfter"]').textContent = t("footerAfter");
+    document.querySelector('[data-i18n="slogan"]').innerHTML = t("slogan");
     loadMeta().then(render);
   }
   document.getElementById("btn-es").addEventListener("click", () => setLang("es"));
@@ -204,8 +223,23 @@
       <img src="/assets/hero-home.jpg" alt="RelateReady" class="hero-image" />
       <div class="card">
         <h1>${t("intakeTitle")}</h1>
-        <p>${t("intakeIntro")}</p>
-        <p class="muted">${t("durationNote")}</p>
+        <p>${t("intakeIntro1")}</p>
+        <p>${t("intakeIntro2")}</p>
+        <p>${t("intakeIntro3")}</p>
+
+        <div class="chip-row">
+          <span class="chip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            ${t("durationChip")}
+          </span>
+          <span class="chip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6l7-3z"/></svg>
+            ${t("privacyChip")}
+          </span>
+        </div>
+
+        <p class="callout"><strong>${t("calloutStrong")}</strong>${t("calloutRest")}</p>
+
         <label>${t("nameLabel")}</label>
         <input type="text" id="f-name" value="${escapeAttr(state.name)}" />
 
@@ -213,8 +247,19 @@
         <input type="email" id="f-email" value="${escapeAttr(state.email)}" />
 
         <label>${t("phoneLabel")}</label>
-        <input type="tel" id="f-phone" value="${escapeAttr(state.phone)}" />
-        <p class="muted">${t("contactNote")}</p>
+        <input type="tel" id="f-phone" value="${escapeAttr(state.phone)}" placeholder="+593 99 123 4567" />
+        <p class="muted">${t("phoneFormatHint")}</p>
+
+        <div class="two-col">
+          <div>
+            <label>${t("cityLabel")}</label>
+            <input type="text" id="f-city" value="${escapeAttr(state.city)}" />
+          </div>
+          <div>
+            <label>${t("countryLabel")}</label>
+            <input type="text" id="f-country" value="${escapeAttr(state.country)}" />
+          </div>
+        </div>
 
         <label>${t("genderLabel")}</label>
         <div class="radio-group">
@@ -233,10 +278,8 @@
         <label>${t("contextTextLabel")}</label>
         <textarea id="f-context-text" placeholder="${t("contextTextPlaceholder")}">${escapeHtml(state.relationshipContextText)}</textarea>
 
-        <p class="muted">${t("requiredNote")}</p>
         <div id="intake-error" class="error"></div>
-        <div class="nav-buttons">
-          <span></span>
+        <div class="nav-buttons intake-nav">
           <button class="primary" id="btn-start">${t("startBtn")}</button>
         </div>
       </div>`;
@@ -245,16 +288,24 @@
       const name = document.getElementById("f-name").value.trim();
       const email = document.getElementById("f-email").value.trim();
       const phone = document.getElementById("f-phone").value.trim();
+      const city = document.getElementById("f-city").value.trim();
+      const country = document.getElementById("f-country").value.trim();
       const gender = (document.querySelector('input[name="gender"]:checked') || {}).value;
       const contextCode = document.getElementById("f-context-code").value;
       const contextText = document.getElementById("f-context-text").value.trim();
-      if (!name || !gender || !contextCode || !contextText) {
+      if (!name || !email || !phone || !city || !country || !gender || !contextCode || !contextText) {
         document.getElementById("intake-error").textContent = t("errorRequired");
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        document.getElementById("intake-error").textContent = t("errorEmailInvalid");
         return;
       }
       state.name = name;
       state.email = email;
       state.phone = phone;
+      state.city = city;
+      state.country = country;
       state.gender = gender;
       state.relationshipContextCode = contextCode;
       state.relationshipContextText = contextText;
@@ -446,6 +497,8 @@
             name: state.name,
             email: state.email,
             phone: state.phone,
+            city: state.city,
+            country: state.country,
             lang: state.lang,
             gender: state.gender,
             relationshipContextCode: state.relationshipContextCode,

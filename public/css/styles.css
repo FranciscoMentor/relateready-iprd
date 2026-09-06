@@ -1,5 +1,6 @@
 :root {
   --accent: #B5732A;
+  --accent-dark: #8f5920;
   --ink: #2A2A28;
   --muted: #6B6259;
   --cream: #F4F0E9;
@@ -18,31 +19,44 @@ body {
   line-height: 1.5;
 }
 .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
-header.top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+header.top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 4px; }
 header.top img.brand-logo { height: auto; width: clamp(160px, 45vw, 300px); max-width: 100%; }
-.slogan { color: var(--muted); font-size: 14px; font-style: italic; margin: -8px 0 24px; }
+.slogan-wrap { text-align: center; margin: 18px 0 26px; }
+.slogan-rule { width: 46px; height: 3px; background: var(--accent); margin: 0 auto 14px; border-radius: 2px; }
+.slogan { margin: 0 auto; font-size: 21px; font-weight: 600; letter-spacing: 0.01em; color: var(--ink); max-width: 480px; }
+.slogan em { font-style: normal; color: var(--accent); font-weight: 700; }
 .scale-note { color: var(--accent); font-size: 16px; font-weight: 700; margin: 4px 0 18px; }
 .lang-toggle { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.lang-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.lang-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; font-weight: 700; }
 .lang-buttons { display: flex; gap: 6px; }
 .lang-toggle button {
   background: none; border: 1px solid var(--border); border-radius: 6px;
   padding: 6px 12px; cursor: pointer; font-size: 13px; color: var(--muted);
 }
 .lang-toggle button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-.card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 20px; }
-.hero-image { width: 100%; height: auto; display: block; border-radius: 12px; margin-bottom: 20px; }
+.card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 32px; margin-bottom: 20px; box-shadow: 0 4px 18px rgba(42,42,40,0.06); }
+.hero-image { width: 100%; height: auto; display: block; border-radius: 14px; margin-bottom: 20px; box-shadow: 0 8px 24px rgba(42,42,40,0.12); }
 .hero-image-small { width: 100%; max-width: 260px; height: auto; display: block; border-radius: 10px; margin-bottom: 16px; }
+.chip-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 22px 0 18px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; background: var(--light); color: var(--ink); font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px; }
+.chip svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--accent); }
+.callout { background: #FFF7E8; border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; padding: 14px 18px; margin: 0 0 22px; font-size: 14.5px; color: var(--ink); }
+.callout strong { color: var(--accent-dark); }
+.two-col { display: flex; gap: 16px; }
+.two-col > div { flex: 1; }
 h1 { color: var(--accent); font-size: 26px; margin: 0 0 8px; }
 h2 { color: var(--ink); font-size: 19px; margin: 0 0 12px; }
 p { color: var(--ink); }
 .muted { color: var(--muted); font-size: 14px; }
 label { display: block; font-weight: 600; margin: 16px 0 6px; }
-input[type="text"], select, textarea {
+input[type="text"], input[type="email"], input[type="tel"], select, textarea {
   width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
   font-size: 15px; font-family: inherit; background: #fff; color: var(--ink);
 }
 textarea { min-height: 80px; resize: vertical; }
+input[type="text"]:focus, input[type="email"]:focus, input[type="tel"]:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(181,115,42,0.15);
+}
 .radio-group label, .likert label {
   font-weight: 400; display: flex; align-items: center; gap: 8px; margin: 6px 0; cursor: pointer;
 }
@@ -59,15 +73,19 @@ textarea { min-height: 80px; resize: vertical; }
 .progress { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 20px; }
 .progress > div { height: 100%; background: var(--accent); transition: width .3s; }
 button.primary, a.primary {
-  background: var(--accent); color: #fff; border: none; border-radius: 8px;
-  padding: 12px 22px; font-size: 15px; cursor: pointer; font-weight: 600;
+  background: var(--accent); color: #fff; border: none; border-radius: 10px;
+  padding: 13px 24px; font-size: 15px; cursor: pointer; font-weight: 700;
+  box-shadow: 0 6px 16px rgba(181,115,42,0.3);
 }
-button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+button.primary:hover { background: var(--accent-dark); }
+button.primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 button.secondary, a.secondary {
   background: #fff; color: var(--accent); border: 1px solid var(--accent); border-radius: 8px;
   padding: 12px 22px; font-size: 15px; cursor: pointer; font-weight: 600; margin-right: 10px;
 }
 .nav-buttons { display: flex; justify-content: space-between; margin-top: 24px; }
+.nav-buttons.intake-nav { justify-content: center; margin-top: 26px; }
+.nav-buttons.intake-nav button.primary { width: 100%; max-width: 340px; padding: 15px 28px; font-size: 16px; }
 .dim-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
 .dim-table th, .dim-table td { border: 1px solid var(--border); padding: 8px 10px; font-size: 14px; text-align: left; }
 .dim-table th { background: var(--accent); color: #fff; }
@@ -100,4 +118,5 @@ button.secondary, a.secondary {
 .vignette-option { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 8px 0; cursor: pointer; }
 .vignette-option:hover { border-color: var(--accent); }
 .vignette-option.selected { border-color: var(--accent); background: var(--light); }
-footer.foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 40px; }
+footer.foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 44px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+footer.foot img.adamantine-full-logo { height: 40px; width: auto; margin: 2px 0; }
