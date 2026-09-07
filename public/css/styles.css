@@ -99,6 +99,9 @@ button.secondary, a.secondary {
   padding: 12px 14px; margin: 4px 0 18px; font-size: 14px; color: var(--ink);
 }
 .session-block { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border); }
+.referral-block { background: var(--light); border-color: var(--light); text-align: center; }
+.referral-block h2 { margin-bottom: 8px; }
+.referral-block p { margin: 0 0 18px; font-size: 14.5px; }
 .book-teaser {
   background: var(--light); border-color: var(--light);
   display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap;

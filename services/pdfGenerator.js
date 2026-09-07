@@ -91,6 +91,27 @@ const BOOK_COVER_PATH = {
   es: path.join(__dirname, "..", "public", "assets", "tu-primero-cover-es.jpg"),
   en: path.join(__dirname, "..", "public", "assets", "you-first-cover-en.jpg"),
 };
+
+// Programa de referidos (Hueco 2) — mismo link de Microsoft Forms usado en
+// la pantalla de resultados (public/js/app.js, REFERRAL_FORM_LINK). Si
+// cambia, actualizar en ambos lugares. Nombrado "FRIEND_REFERRAL" (no
+// "REFERRAL" a secas) para no confundirse con REFERRAL_MESSAGE/referralClosePage
+// más abajo, que es la nota de derivación a salud mental — un concepto
+// totalmente distinto que ya existía en este archivo.
+const FRIEND_REFERRAL_FORM_LINK =
+  "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=AMDBNKKQqUCiLShlpDoGbHhxKWqJvslMjZ6UbkxnfPVUQTBDOFJJVkxaQTE5TDJGSVA2Nk1IT05KQy4u";
+const FRIEND_REFERRAL_COPY = {
+  es: {
+    title: "¿Conoces a alguien a quien esto pueda ayudarle?",
+    body: "Si crees que este proceso puede ser valioso para alguien que conoces — tu pareja, un amigo, un familiar — te invitamos a compartírselo. Solo te toma un minuto, y podría ser justo lo que esa persona necesita en este momento.",
+    btn: "Recomienda RelateReady a un amigo/a",
+  },
+  en: {
+    title: "Know someone this could help?",
+    body: "If you think this process could be valuable for someone you know — your partner, a friend, a family member — we invite you to share it with them. It only takes a minute, and it might be exactly what that person needs right now.",
+    btn: "Refer RelateReady to a friend",
+  },
+};
 // Relación alto/ancho real de ambas portadas (1024×1536 y 843×1264 — ambas
 // ~1.5). doc.image() con x/y absolutos no actualiza doc.y solo, así que la
 // usamos para calcular a mano cuánto avanzar el cursor después de dibujarla.
@@ -355,6 +376,20 @@ function bookTeaserBlock(doc, lang) {
   doc.y = Math.max(doc.y, rowY + imgHeight) + 10;
   doc.x = PAGE_MARGIN;
   doc.font("Helvetica").fillColor(INK);
+}
+
+// Bloque de invitación al programa de referidos (Hueco 2): copy breve +
+// botón que abre el formulario de Microsoft Forms. Se coloca al final del
+// informe, después del bloque del libro gratuito — el lector ya recibió todo
+// el valor del Informe Extendido en ese punto, que es el mejor momento para
+// invitarlo a compartir RelateReady. Sin incentivo económico, solo la
+// invitación (ver decisión del dueño del proyecto).
+function friendReferralBlock(doc, lang) {
+  const copy = FRIEND_REFERRAL_COPY[lang] || FRIEND_REFERRAL_COPY.es;
+  ensureSpace(doc, 100);
+  h2(doc, copy.title);
+  body(doc, copy.body);
+  linkButton(doc, copy.btn, FRIEND_REFERRAL_FORM_LINK);
 }
 
 // Lista de viñetas con el punto en color de acento (en vez del carácter "•"
@@ -743,6 +778,7 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
   );
   linkButton(doc, T(lang, "Agendar mi sesión gratuita", "Schedule my free session"), BOOKING_LINKS[lang] || BOOKING_LINKS.es);
   bookTeaserBlock(doc, lang);
+  friendReferralBlock(doc, lang);
 
   if (referral.triggered) {
     referralClosePage(doc, lang);

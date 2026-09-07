@@ -72,6 +72,9 @@
       progress: "Pregunta",
       of: "de",
       otherSpecify: "Especifica tu situación",
+      referralTitle: "¿Conoces a alguien a quien esto pueda ayudarle?",
+      referralBody: "Si crees que este proceso puede ser valioso para alguien que conoces — tu pareja, un amigo, un familiar — te invitamos a compartírselo. Solo te toma un minuto, y podría ser justo lo que esa persona necesita en este momento.",
+      referralBtn: "Recomienda RelateReady a un amigo/a",
     },
     en: {
       slogan: "<em>Ready Within. Ready Together —</em><br>readiness starts with you, not the other person.",
@@ -143,6 +146,9 @@
       progress: "Question",
       of: "of",
       otherSpecify: "Specify your situation",
+      referralTitle: "Know someone this could help?",
+      referralBody: "If you think this process could be valuable for someone you know — your partner, a friend, a family member — we invite you to share it with them. It only takes a minute, and it might be exactly what that person needs right now.",
+      referralBtn: "Refer RelateReady to a friend",
     },
   };
 
@@ -161,6 +167,13 @@
     es: "/assets/tu-primero-cover-es.jpg",
     en: "/assets/you-first-cover-en.jpg",
   };
+
+  // Link del formulario de Microsoft Forms para el programa de referidos
+  // (Hueco 2) — mismo link para ambos idiomas (el formulario en sí está solo
+  // en español por ahora). Se muestra únicamente en la pantalla de resultados
+  // YA PAGADA (ver payAreaHtml en renderResults), no antes de comprar.
+  const REFERRAL_FORM_LINK =
+    "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=AMDBNKKQqUCiLShlpDoGbHhxKWqJvslMjZ6UbkxnfPVUQTBDOFJJVkxaQTE5TDJGSVA2Nk1IT05KQy4u";
 
   const state = {
     lang: "es",
@@ -616,6 +629,16 @@
         <a class="primary" style="text-decoration:none;display:inline-block" href="${BOOKING_LINKS[state.lang] || BOOKING_LINKS.es}" target="_blank">${t("scheduleSessionBtn")}</a>
       </div>`;
 
+    // Invitación a referir un amigo — solo aparece una vez pagado/liberado el
+    // Informe Extendido (ver payAreaHtml). Enlaza al formulario de Microsoft
+    // Forms del programa de referidos (Hueco 2, sin incentivo económico).
+    const referralBlockHtml = `
+      <div class="card referral-block">
+        <h2>${t("referralTitle")}</h2>
+        <p>${t("referralBody")}</p>
+        <a class="primary" style="text-decoration:none;display:inline-block" href="${REFERRAL_FORM_LINK}" target="_blank">${t("referralBtn")}</a>
+      </div>`;
+
     // El área de pago tiene 3 estados posibles: ya pagado (mostrar descarga
     // + agendamiento de la sesión gratuita), Payphone real activo (botón de
     // pago real + verificación manual de respaldo), o modo simulado (sin
@@ -650,6 +673,7 @@
         ${!state.paid ? `<p class="bonus-note">${t("freeSessionNote")}</p>` : ""}
         <div id="pay-area">${payAreaHtml}</div>
       </div>
+      ${state.paid ? referralBlockHtml : ""}
       ${
         !state.paid
           ? `<div class="card book-teaser">
