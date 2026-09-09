@@ -108,6 +108,7 @@
   <nav>
     <button class="navlink active" data-nav="inicio">Inicio</button>
     <button class="navlink" data-nav="resultados">Resultados</button>
+    <button class="navlink" data-nav="referidos">Referidos</button>
     <button class="navlink" data-nav="calendario">Calendario</button>
     <a href="/admin" class="exit" style="text-decoration:none;">Admin básico</a>
     <a href="/admin/logout" class="exit">Cerrar sesión</a>
@@ -156,6 +157,22 @@
         <thead><tr><th>Persona</th><th>Idioma</th><th>Promedio</th><th>Pago</th><th>Derivación</th><th>Seguimiento</th><th>Fecha</th></tr></thead>
         <tbody id="resultsBody"><tr><td colspan="7" style="text-align:center;color:#999;padding:30px;">Cargando…</td></tr></tbody>
       </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ REFERIDOS (Hueco 2) ═══════════════════ -->
+  <section class="section" id="sec-referidos">
+    <div class="card" id="referralsNotice" style="display:none;"></div>
+    <div class="card">
+      <h2 style="margin:0 0 4px;font-size:15px;">Referidos del programa "Recomienda RelateReady"</h2>
+      <p class="muted" style="margin:0 0 14px;">Leído en vivo desde tu archivo de Excel de referidos (RelateReady - Referidos.xlsx) vía Microsoft Graph — RelateReady nunca escribe ahí, solo lo lee. El flujo de Power Automate sigue siendo quien agrega cada fila nueva.</p>
+      <button class="btn ghost small" id="btnRefreshReferrals" style="margin-bottom:14px;">↻ Actualizar</button>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Fecha</th><th>Quien refiere</th><th>Referido/a</th><th>Mensaje</th><th>Estado</th></tr></thead>
+          <tbody id="referralsBody"><tr><td colspan="5" style="text-align:center;color:#999;padding:30px;">Cargando…</td></tr></tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -240,16 +257,30 @@
   const STATUS_COLOR = { pending:"#999", simulated:"#9C6B14", paid:"#3F6B4F", free:"#B5732A" };
   const FOLLOWUP_LABEL = { nuevo:"Nuevo", contactado:"Contactado", sesion_agendada:"Sesión agendada", sesion_realizada:"Sesión realizada", cliente_mentoring:"Cliente de mentoría", sin_interes:"Sin interés" };
   const FOLLOWUP_COLOR = { nuevo:"#B5732A", contactado:"#6B6259", sesion_agendada:"#2E7D32", sesion_realizada:"#1565C0", cliente_mentoring:"#2A2A28", sin_interes:"#999" };
+  // Estado real del correo de confirmación del Informe Extendido (con el PDF
+  // adjunto) — ver extended_email_status en db/init.js y services/extendedReport.js.
+  const EMAIL_STATUS_LABEL = { sent:"Correo enviado ✓", failed:"Error al enviar", disabled:"Correo automático desactivado" };
+  const EMAIL_STATUS_COLOR = { sent:"#3F6B4F", failed:"#9C3B2E", disabled:"#999" };
+  // Estado de conversión de un referido (Hueco 2), calculado en el backend
+  // cruzando el correo del referido contra la tabla submissions — ver
+  // GET /admin/api/referrals en routes/admin.js.
+  const REFERRAL_CONVERSION_LABEL = { sin_test:"Aún no ha hecho el test", test_completado:"Hizo el test (sin comprar)", informe_pagado:"Compró el Informe Extendido" };
+  const REFERRAL_CONVERSION_COLOR = { sin_test:"#999", test_completado:"#9C6B14", informe_pagado:"#3F6B4F" };
 
   function esc(s){ return (s===null||s===undefined) ? "" : String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
   // ── Navegación entre secciones ──
+  let referralsLoadedOnce = false;
   document.querySelectorAll(".navlink").forEach(link=>{
     link.addEventListener("click", ()=>{
       document.querySelectorAll(".navlink").forEach(l=>l.classList.remove("active"));
       link.classList.add("active");
       document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
       document.getElementById("sec-"+link.dataset.nav).classList.add("active");
+      if (link.dataset.nav === "referidos" && !referralsLoadedOnce) {
+        referralsLoadedOnce = true;
+        loadReferrals();
+      }
     });
   });
 
@@ -281,6 +312,41 @@
       document.getElementById("resultsBody").innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:30px;">No se pudieron cargar los resultados.</td></tr>';
     }
   }
+
+  // ── Referidos (Hueco 2) ──
+  async function loadReferrals() {
+    const tbody = document.getElementById("referralsBody");
+    const notice = document.getElementById("referralsNotice");
+    notice.style.display = "none";
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:30px;">Cargando…</td></tr>';
+    try {
+      const res = await fetch("/admin/api/referrals");
+      const data = await res.json();
+      if (!res.ok) {
+        notice.style.display = "block";
+        notice.innerHTML = `<p style="margin:0;font-size:13px;color:var(--bad);">${esc(data.error || "No se pudo cargar la lista de referidos.")}</p>`;
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:30px;">—</td></tr>';
+        return;
+      }
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:30px;">Todavía no hay referidos registrados.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.map(ref => `
+        <tr>
+          <td>${esc(ref.date)}</td>
+          <td><strong>${esc(ref.referrerName)}</strong><br><span class="muted">${esc(ref.referrerEmail)}</span></td>
+          <td><strong>${esc(ref.referredName)}</strong><br><span class="muted">${esc(ref.referredEmail)}</span></td>
+          <td style="max-width:260px;">${esc(ref.personalMessage) || "—"}</td>
+          <td><span class="badge" style="background:${REFERRAL_CONVERSION_COLOR[ref.conversionStatus]||'#999'}">${REFERRAL_CONVERSION_LABEL[ref.conversionStatus]||ref.conversionStatus}</span>${ref.matchedSubmissionId ? `<br><span class="link-btn" style="cursor:pointer;" onclick="openDetailModal('${ref.matchedSubmissionId}')">Ver resultado</span>` : ""}</td>
+        </tr>`).join("");
+    } catch (e) {
+      notice.style.display = "block";
+      notice.innerHTML = '<p style="margin:0;font-size:13px;color:var(--bad);">No se pudo cargar la lista de referidos.</p>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:30px;">—</td></tr>';
+    }
+  }
+  document.getElementById("btnRefreshReferrals").addEventListener("click", loadReferrals);
 
   function filteredResults() {
     const search = (document.getElementById("fSearch").value || "").toLowerCase();
@@ -403,6 +469,13 @@
       <p style="font-size:13px;margin:0 0 6px;"><strong>Protocolo de derivación:</strong> ${r.referral_triggered ? '<span style="color:#9C3B2E;font-weight:700;">Sí, activado</span>' : "No"}</p>
       <p style="font-size:13px;margin:0 0 10px;"><strong>Link de resultados:</strong> <button class="link-btn" id="d-copy-link">Copiar link</button></p>
       ${r.payment_status !== "pending" ? `<p style="font-size:13px;"><a href="/api/report/extended/${r.id}" target="_blank" class="link-btn" style="text-decoration:none;">Ver / descargar informe extendido (PDF)</a></p>` : `<button class="btn small" id="d-mark-paid">Marcar como pagado</button>`}
+      ${r.payment_status !== "pending" ? `
+      <p style="font-size:13px;margin:0 0 6px;"><strong>Correo del informe:</strong>
+        ${r.extended_email_status ? `<span class="badge" style="background:${EMAIL_STATUS_COLOR[r.extended_email_status]||'#999'}">${EMAIL_STATUS_LABEL[r.extended_email_status]||r.extended_email_status}</span>` : `<span class="muted">Aún no se ha generado/enviado</span>`}
+        ${r.extended_email_status === "failed" && r.extended_email_error ? `<br><span class="muted">${esc(r.extended_email_error)}</span>` : ""}
+      </p>
+      <button class="btn small ghost" id="d-resend-email" style="margin-bottom:10px;">${r.extended_email_status === "sent" ? "Reenviar de todas formas" : "Reenviar correo"}</button>
+      ` : ""}
 
       <h2 style="margin-top:16px;">Seguimiento comercial</h2>
       <div class="form-field"><label>Estado</label>
@@ -438,6 +511,22 @@
       const data = await res.json();
       await loadResults();
       if (data.submission) renderDetailModal(data.submission);
+    });
+    const resendEmailBtn = document.getElementById("d-resend-email");
+    if (resendEmailBtn) resendEmailBtn.addEventListener("click", async ()=>{
+      resendEmailBtn.disabled = true;
+      resendEmailBtn.textContent = "Enviando…";
+      try {
+        const res = await fetch(`/admin/api/results/${r.id}/resend-extended-email`, { method:"POST" });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || "No se pudo reenviar el correo."); }
+        await loadResults();
+        if (data.submission) renderDetailModal(data.submission);
+      } catch (e) {
+        alert("No se pudo reenviar el correo.");
+        resendEmailBtn.disabled = false;
+        resendEmailBtn.textContent = "Reenviar correo";
+      }
     });
   }
   function closeDetailModal(){ document.getElementById("detailModalOverlay").style.display = "none"; }

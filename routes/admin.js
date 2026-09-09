@@ -11,6 +11,8 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db/init");
 const { DIMENSIONS } = require("../data/dimensions");
+const { generatePdfForSubmission, sendExtendedReportEmail } = require("../services/extendedReport");
+const { listReferrals, GRAPH_REFERRALS_ENABLED } = require("../services/graphExcel");
 
 const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Number(process.env.EXTENDED_PRICE_CENTS) : 2499;
 
@@ -124,6 +126,21 @@ const statusColor = {
   free: BRAND.accent,
 };
 
+// Estado real del correo de confirmación del Informe Extendido (con el PDF
+// adjunto) — ver extended_email_status en db/init.js y
+// services/extendedReport.js. NULL/undefined = todavía no se ha intentado
+// enviar (por ejemplo, no ha pagado todavía).
+const emailStatusLabel = {
+  sent: "Correo enviado ✓",
+  failed: "Error al enviar",
+  disabled: "Correo automático desactivado",
+};
+const emailStatusColor = {
+  sent: BRAND.green,
+  failed: BRAND.clay,
+  disabled: "#999",
+};
+
 const followUpLabel = {
   nuevo: "Nuevo",
   contactado: "Contactado",
@@ -224,6 +241,23 @@ function scoreAverage(scoreResultJson) {
   }
 }
 
+/**
+ * Carga un envío completo con scoreResult/qualitativeAnswers ya parseados —
+ * mismo shape que loadSubmission() en routes/api.js — porque
+ * generatePdfForSubmission()/sendExtendedReportEmail() (services/extendedReport.js)
+ * lo esperan así. Las demás consultas de este archivo (dashboard, CSV, API
+ * JSON de /panel-control) no lo necesitan parseado, por eso viven separadas.
+ */
+function loadFullSubmission(id) {
+  const row = db.prepare("SELECT * FROM submissions WHERE id = ?").get(id);
+  if (!row) return null;
+  return {
+    ...row,
+    scoreResult: JSON.parse(row.score_result),
+    qualitativeAnswers: JSON.parse(row.qualitative_answers || "[]"),
+  };
+}
+
 /** Dashboard básico: tabla de envíos + filtros + chips de seguimiento + KPIs. */
 router.get("/", (req, res) => {
   const { status, search, followup } = req.query;
@@ -254,6 +288,11 @@ router.get("/", (req, res) => {
         </form>`;
     } else {
       paymentCell += `<br><button type="button" class="link-btn" onclick="copyResultLink('${r.id}', this)">Copiar link de resultados</button>`;
+      if (r.extended_email_status) {
+        paymentCell += `<br><span class="badge" style="background:${emailStatusColor[r.extended_email_status] || "#999"};margin-top:4px;">${emailStatusLabel[r.extended_email_status] || r.extended_email_status}</span>`;
+      } else {
+        paymentCell += `<br><span class="muted">Correo: aún no enviado</span>`;
+      }
     }
     return `
     <tr>
@@ -414,6 +453,13 @@ router.get("/submission/:id", (req, res) => {
           <div class="info-row"><span class="label">Protocolo de derivación</span><span>${r.referral_triggered ? `<strong style="color:${BRAND.clay};">Sí, activado</strong>` : "No"}</span></div>
           <div class="info-row"><span class="label">Link de resultados</span><span><button type="button" class="link-btn" onclick="navigator.clipboard.writeText('${resultUrl}').then(()=>{this.textContent='Copiado ✓';setTimeout(()=>this.textContent='Copiar link',1500);})">Copiar link</button></span></div>
           ${r.payment_status !== "pending" ? `<div class="info-row"><span class="label">Informe extendido</span><span><a href="/api/report/extended/${r.id}" target="_blank" class="link-btn" style="text-decoration:none;">Ver / descargar PDF</a></span></div>` : ""}
+          ${r.payment_status !== "pending" ? `<div class="info-row"><span class="label">Correo del informe</span><span>
+            ${r.extended_email_status ? `<span class="badge" style="background:${emailStatusColor[r.extended_email_status] || "#999"}">${emailStatusLabel[r.extended_email_status] || r.extended_email_status}</span>` : `<span class="muted">Aún no se ha generado/enviado</span>`}
+            ${r.extended_email_status === "failed" && r.extended_email_error ? `<br><span class="muted" style="display:block;max-width:260px;">${esc(r.extended_email_error)}</span>` : ""}
+            <form method="POST" action="/admin/submission/${r.id}/resend-extended-email" class="inline-form">
+              <button type="submit" class="link-btn">${r.extended_email_status === "sent" ? "Reenviar de todas formas" : "Reenviar correo"}</button>
+            </form>
+          </span></div>` : ""}
           ${r.payment_status === "pending" ? `
           <form method="POST" action="/admin/submission/${r.id}/mark-paid" style="margin-top:12px;" onsubmit="return confirm('¿Confirmas que viste este pago real?');">
             <button type="submit" class="btn small">Marcar como pagado</button>
@@ -487,6 +533,32 @@ router.post("/submission/:id/mark-paid", (req, res) => {
   res.redirect(backTo);
 });
 
+/**
+ * Reenvía (o envía por primera vez) el correo de confirmación del Informe
+ * Extendido con el PDF adjunto — para cuando el intento automático falló
+ * (ver extended_email_status/error) y Francisco quiere reintentar sin
+ * esperar a que el cliente vuelva a descargar el informe. Genera el PDF de
+ * nuevo (no se guarda en disco entre descargas) y guarda el resultado real
+ * del intento en la base de datos — ver services/extendedReport.js.
+ */
+router.post("/submission/:id/resend-extended-email", async (req, res) => {
+  const sub = loadFullSubmission(req.params.id);
+  const backTo = req.get("Referer") && req.get("Referer").includes(`/submission/${req.params.id}`)
+    ? `/admin/submission/${req.params.id}`
+    : "/admin";
+  if (!sub) return res.redirect(backTo);
+  if (sub.payment_status === "pending") return res.redirect(backTo);
+  if (!sub.email) return res.redirect(backTo);
+  try {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const pdf = await generatePdfForSubmission(sub);
+    await sendExtendedReportEmail(sub, pdf, baseUrl);
+  } catch (err) {
+    console.error(`[admin] Error reenviando correo del Informe Extendido (${req.params.id}) —`, err.message);
+  }
+  res.redirect(backTo);
+});
+
 /** Exporta todos los envíos (o los que coincidan con el filtro) como CSV. */
 router.get("/export.csv", (req, res) => {
   const { status, followup } = req.query;
@@ -546,6 +618,8 @@ function serializeSubmission(r) {
     payment_status: r.payment_status,
     payment_reference: r.payment_reference,
     extended_generated_at: r.extended_generated_at,
+    extended_email_status: r.extended_email_status,
+    extended_email_error: r.extended_email_error,
     follow_up_status: r.follow_up_status,
     follow_up_notes: r.follow_up_notes,
     created_at: r.created_at,
@@ -599,6 +673,65 @@ router.post("/api/results/:id/mark-paid", (req, res) => {
     db.prepare("UPDATE submissions SET payment_status = 'paid', payment_reference = 'CONFIRMADO_MANUAL_ADMIN' WHERE id = ?").run(req.params.id);
   }
   res.json({ ok: true, submission: serializeSubmission(db.prepare("SELECT * FROM submissions WHERE id = ?").get(req.params.id)) });
+});
+
+/** Versión JSON del reenvío de correo (botón del panel-control, vía fetch). */
+router.post("/api/results/:id/resend-extended-email", async (req, res) => {
+  const sub = loadFullSubmission(req.params.id);
+  if (!sub) return res.status(404).json({ error: "Registro no encontrado." });
+  if (sub.payment_status === "pending") {
+    return res.status(400).json({ error: "Este envío todavía no ha pagado el Informe Extendido." });
+  }
+  if (!sub.email) {
+    return res.status(400).json({ error: "Este envío no tiene un correo registrado." });
+  }
+  try {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const pdf = await generatePdfForSubmission(sub);
+    await sendExtendedReportEmail(sub, pdf, baseUrl);
+  } catch (err) {
+    console.error(`[admin] Error reenviando correo del Informe Extendido (${req.params.id}) —`, err.message);
+    return res.status(500).json({ error: "No se pudo generar/enviar el correo: " + err.message });
+  }
+  res.json({ ok: true, submission: serializeSubmission(db.prepare("SELECT * FROM submissions WHERE id = ?").get(req.params.id)) });
+});
+
+/**
+ * Lista los referidos del programa Hueco 2, leídos en vivo desde el archivo
+ * de Excel vía Microsoft Graph (ver services/graphExcel.js — RelateReady
+ * nunca escribe ahí, solo lee). Cada fila se cruza contra la tabla
+ * submissions por el correo del referido, para mostrar en el panel si esa
+ * persona ya llegó a hacer el test y/o a pagar el Informe Extendido.
+ */
+router.get("/api/referrals", async (req, res) => {
+  if (!GRAPH_REFERRALS_ENABLED) {
+    return res.status(400).json({
+      error:
+        "La lectura de referidos no está configurada todavía (falta GRAPH_REFERRALS_OWNER/GRAPH_SENDER_MAILBOX, o el permiso Files.Read.All en la app de Azure).",
+      enabled: false,
+    });
+  }
+  try {
+    const referrals = await listReferrals();
+    const byEmailStmt = db.prepare(
+      "SELECT payment_status, created_at, id FROM submissions WHERE email = ? ORDER BY created_at DESC LIMIT 1"
+    );
+    const enriched = referrals.map((ref) => {
+      const match = ref.referredEmail ? byEmailStmt.get(ref.referredEmail) : null;
+      let conversionStatus = "sin_test"; // el referido todavía no ha hecho el test
+      if (match) {
+        conversionStatus =
+          match.payment_status === "paid" || match.payment_status === "simulated" || match.payment_status === "free"
+            ? "informe_pagado"
+            : "test_completado";
+      }
+      return { ...ref, conversionStatus, matchedSubmissionId: match ? match.id : null };
+    });
+    res.json(enriched);
+  } catch (err) {
+    console.error("[admin] Error leyendo referidos vía Graph —", err.message);
+    res.status(502).json({ error: "No se pudo leer la tabla de referidos: " + err.message, enabled: true });
+  }
 });
 
 // El panel de control completo (/panel-control, ver server.js) reutiliza

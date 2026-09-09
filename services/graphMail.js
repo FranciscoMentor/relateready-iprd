@@ -23,48 +23,17 @@
 // — mismo patrón que ANTHROPIC_API_KEY y Payphone (ver README.md), para que
 // el resto de la app siga funcionando igual mientras no esté configurado.
 
-const TENANT_ID = process.env.GRAPH_TENANT_ID;
-const CLIENT_ID = process.env.GRAPH_CLIENT_ID;
-const CLIENT_SECRET = process.env.GRAPH_CLIENT_SECRET;
+const { getAccessToken, GRAPH_AUTH_CONFIGURED } = require("./graphAuth");
+
 const SENDER_MAILBOX = process.env.GRAPH_SENDER_MAILBOX;
 
-const GRAPH_MAIL_ENABLED = Boolean(TENANT_ID && CLIENT_ID && CLIENT_SECRET && SENDER_MAILBOX);
+const GRAPH_MAIL_ENABLED = Boolean(GRAPH_AUTH_CONFIGURED && SENDER_MAILBOX);
 
 if (!GRAPH_MAIL_ENABLED) {
   console.log(
     "[graphMail] GRAPH_TENANT_ID/GRAPH_CLIENT_ID/GRAPH_CLIENT_SECRET/GRAPH_SENDER_MAILBOX no están " +
       "configurados todavía — el correo automático queda deshabilitado (no rompe nada más)."
   );
-}
-
-let cachedToken = null; // { accessToken, expiresAt }
-
-async function getAccessToken() {
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
-    return cachedToken.accessToken;
-  }
-  const url = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
-  const body = new URLSearchParams({
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET,
-    scope: "https://graph.microsoft.com/.default",
-    grant_type: "client_credentials",
-  });
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`No se pudo obtener token de Microsoft Graph (${resp.status}): ${text}`);
-  }
-  const data = await resp.json();
-  cachedToken = {
-    accessToken: data.access_token,
-    expiresAt: Date.now() + (data.expires_in || 3600) * 1000,
-  };
-  return cachedToken.accessToken;
 }
 
 // sendMail({ to, subject, html, attachments })

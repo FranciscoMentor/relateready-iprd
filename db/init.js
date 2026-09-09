@@ -75,4 +75,17 @@ addColumnIfMissing("reminder_sent_at", "reminder_sent_at TEXT");
 addColumnIfMissing("city", "city TEXT");
 addColumnIfMissing("country", "country TEXT");
 
+// ── Migración: confirmación real de envío del correo del Informe Extendido (2026-09) ──
+// Antes el envío del correo con el PDF adjunto era "dispara y olvida": si
+// fallaba (como pasó con el client secret de Graph mal copiado), solo
+// quedaba un log en Render que nadie veía, y el panel no tenía forma de
+// saberlo. Ahora se guarda el resultado real de cada intento — ver
+// services/extendedReport.js.
+//  - extended_email_status: 'sent' | 'failed' | 'disabled' | NULL (NULL =
+//    todavía no se ha intentado enviar, por ejemplo porque no ha pagado).
+//  - extended_email_error: mensaje de error del intento más reciente (NULL
+//    si el último intento fue exitoso o si nunca se ha intentado).
+addColumnIfMissing("extended_email_status", "extended_email_status TEXT");
+addColumnIfMissing("extended_email_error", "extended_email_error TEXT");
+
 module.exports = db;

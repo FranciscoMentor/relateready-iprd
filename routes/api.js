@@ -8,12 +8,8 @@ const { VIGNETTES } = require("../data/vignettes");
 const { RELATIONSHIP_CONTEXTS } = require("../data/relationshipContexts");
 const { buildFlatCoreItems, buildFlatDesirabilityItems, buildFlatQualitativeItems } = require("../data/items");
 const { scoreTest, checkReferralProtocol } = require("../services/scoring");
-const { getBandContent } = require("../data/reportContent");
-const { generateExtendedReportPDF } = require("../services/pdfGenerator");
-const { generateAISections } = require("../services/aiAnalysis");
 const { preparePayment, confirmPayment, PAYPHONE_ENABLED } = require("../services/payphone");
-const { sendMail } = require("../services/graphMail");
-const { extendedReportEmail } = require("../services/emailTemplates");
+const { generatePdfForSubmission, sendExtendedReportEmail, pdfFilename } = require("../services/extendedReport");
 
 const CORE_ITEMS_FLAT = buildFlatCoreItems();
 const DESIRABILITY_ITEMS_FLAT = buildFlatDesirabilityItems();
@@ -63,18 +59,6 @@ router.get("/meta", (req, res) => {
 function mapGender(value) {
   if (value === "M" || value === "F") return value;
   return "N";
-}
-
-// Nombre de archivo para los PDF descargados: "RelateReady - <Nombre> -
-// <Tipo>.pdf" en vez del id/UUID interno, para que el cliente pueda
-// identificar y guardar el archivo fácilmente. Quita caracteres que no son
-// seguros en un nombre de archivo, conservando acentos y espacios.
-function pdfFilename(clientName, label) {
-  const safeName = String(clientName || "")
-    .replace(/[\\/:*?"<>|]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return `RelateReady - ${safeName || "Informe"} - ${label}.pdf`;
 }
 
 // Header Content-Disposition con soporte para nombres con acentos: incluye
@@ -304,59 +288,22 @@ router.get("/report/extended/:id", async (req, res) => {
   // salir una vez, la primera.
   const isFirstGeneration = !sub.extended_generated_at;
   try {
-    const bandContentByCode = {};
-    for (const code of Object.keys(sub.scoreResult.dimensions)) {
-      const band = sub.scoreResult.dimensions[code].band;
-      bandContentByCode[code] = getBandContent(code, band, sub.lang, sub.gender);
-    }
-    const contextLabel =
-      (RELATIONSHIP_CONTEXTS.find((c) => c.code === sub.relationship_context_code) || {})[sub.lang] ||
-      sub.relationship_context_code;
-
-    const aiSections = await generateAISections({
-      name: sub.name,
-      lang: sub.lang,
-      gender: sub.gender,
-      relationshipContextLabel: contextLabel,
-      relationshipContextText: sub.relationship_context_text,
-      scoreResult: sub.scoreResult,
-      bandContentByCode,
-      qualitativeAnswers: sub.qualitativeAnswers,
-    });
-
-    const pdf = await generateExtendedReportPDF({
-      participant: { name: sub.name, lang: sub.lang, gender: sub.gender },
-      scoreResult: sub.scoreResult,
-      referral: { triggered: !!sub.referral_triggered },
-      aiSections,
-      qualitativeAnswers: sub.qualitativeAnswers,
-    });
+    const pdf = await generatePdfForSubmission(sub);
 
     db.prepare("UPDATE submissions SET extended_generated_at = ? WHERE id = ?").run(new Date().toISOString(), sub.id);
 
     // Correo con el informe adjunto — solo la primera vez, y solo si la
-    // persona dejó su correo. No bloquea la descarga: si Graph tarda o
-    // falla, sendMail ya registra el error por su cuenta y no lanza — la
-    // respuesta al navegador sale igual.
+    // persona dejó su correo. No bloquea la descarga: la respuesta al
+    // navegador sale igual aunque Graph tarde o falle; el resultado real
+    // (enviado/error/deshabilitado) queda guardado en
+    // extended_email_status/extended_email_error — ver
+    // services/extendedReport.js — para que el panel lo pueda mostrar y,
+    // si falló, reintentar con un clic.
     if (isFirstGeneration && sub.email) {
       const baseUrl = `${req.protocol}://${req.get("host")}`;
-      const { subject, html } = extendedReportEmail({
-        name: sub.name,
-        lang: sub.lang === "en" ? "en" : "es",
-        resultsUrl: `${baseUrl}/?sid=${sub.id}`,
-      });
-      sendMail({
-        to: sub.email,
-        subject,
-        html,
-        attachments: [
-          {
-            filename: pdfFilename(sub.name, sub.lang === "en" ? "Extended Report" : "Informe Extendido"),
-            contentBytes: pdf,
-            contentType: "application/pdf",
-          },
-        ],
-      }).catch((err) => console.error("[routes/api] Error enviando correo de confirmación —", err.message));
+      sendExtendedReportEmail(sub, pdf, baseUrl).catch((err) =>
+        console.error("[routes/api] Error inesperado enviando correo de confirmación —", err.message)
+      );
     }
 
     const filename = pdfFilename(sub.name, sub.lang === "en" ? "Extended Report" : "Informe Extendido");
