@@ -9,7 +9,7 @@ const { RELATIONSHIP_CONTEXTS } = require("../data/relationshipContexts");
 const { buildFlatCoreItems, buildFlatDesirabilityItems, buildFlatQualitativeItems } = require("../data/items");
 const { scoreTest, checkReferralProtocol } = require("../services/scoring");
 const { preparePayment, confirmPayment, PAYPHONE_ENABLED } = require("../services/payphone");
-const { generatePdfForSubmission, sendExtendedReportEmail, pdfFilename } = require("../services/extendedReport");
+const { generatePdfForSubmission, sendExtendedReportEmail, triggerExtendedReportEmailOnce, pdfFilename } = require("../services/extendedReport");
 
 const CORE_ITEMS_FLAT = buildFlatCoreItems();
 const DESIRABILITY_ITEMS_FLAT = buildFlatDesirabilityItems();
@@ -189,6 +189,13 @@ router.post("/payment/simulate/:id", async (req, res) => {
     result.reference || null,
     sub.id
   );
+  // Dispara el PDF + correo de inmediato — no depende de que la persona
+  // haga clic en "Descargar" (ver triggerExtendedReportEmailOnce en
+  // services/extendedReport.js).
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  triggerExtendedReportEmailOnce(sub.id, baseUrl).catch((err) =>
+    console.error("[routes/api] Error generando/enviando el Informe Extendido tras pago simulado —", err.message)
+  );
   res.json({ ok: true, simulated: result.simulated, reference: result.reference });
 });
 
@@ -224,6 +231,14 @@ router.post("/payment/redeem/:id", (req, res) => {
     "free",
     `CODE:${code}`,
     sub.id
+  );
+  // Dispara el PDF + correo de inmediato — no depende de que la persona
+  // haga clic en "Descargar" (ver triggerExtendedReportEmailOnce en
+  // services/extendedReport.js — antes, si nunca hacía clic, el correo no
+  // se enviaba nunca, ni con error visible en el panel).
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  triggerExtendedReportEmailOnce(sub.id, baseUrl).catch((err) =>
+    console.error("[routes/api] Error generando/enviando el Informe Extendido tras canjear código —", err.message)
   );
   res.json({ ok: true });
 });
@@ -266,6 +281,13 @@ router.get("/payment/confirm/:id", async (req, res) => {
         "paid",
         result.reference || clientTransactionId,
         sub.id
+      );
+      // Dispara el PDF + correo de inmediato — no depende de que la persona
+      // haga clic en "Descargar" (ver triggerExtendedReportEmailOnce en
+      // services/extendedReport.js).
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      triggerExtendedReportEmailOnce(sub.id, baseUrl).catch((err) =>
+        console.error("[routes/api] Error generando/enviando el Informe Extendido tras pago con Payphone —", err.message)
       );
     }
     res.json({ ok: true, approved: result.approved });

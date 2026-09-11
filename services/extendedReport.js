@@ -2,14 +2,26 @@
 //
 // Lógica compartida para generar el PDF del Informe Extendido y enviar (o
 // reenviar) el correo de confirmación con el PDF adjunto. Extraído de
-// routes/api.js para que la misma lógica la puedan usar dos lugares sin
+// routes/api.js para que la misma lógica la puedan usar varios lugares sin
 // duplicarla:
-//   - routes/api.js   → GET /api/report/extended/:id (descarga normal, la
-//     primera vez dispara el correo de confirmación).
-//   - routes/admin.js → botón "Reenviar correo" del panel, para cuando el
-//     primer intento falló (ver extended_email_status/error en la base de
-//     datos) y Francisco quiere reintentar sin esperar a que el cliente
-//     vuelva a descargar el informe.
+//   - routes/api.js   → los 4 puntos donde payment_status deja de ser
+//     'pending' (redeem de código, pago simulado, confirmación real de
+//     Payphone) llaman a triggerExtendedReportEmailOnce() de inmediato, y
+//     GET /api/report/extended/:id (descarga manual) sigue generando el PDF
+//     bajo demanda para servirlo al navegador.
+//   - routes/admin.js → "marcar como pagado" manual llama también a
+//     triggerExtendedReportEmailOnce(), y el botón "Reenviar correo" llama a
+//     generatePdfForSubmission()/sendExtendedReportEmail() directamente
+//     (sin pasar por el chequeo de "primera vez", porque ahí la intención es
+//     forzar un reintento aunque ya se haya intentado antes).
+//
+// Antes (hasta 2026-09-10) el correo SOLO se disparaba cuando la persona
+// hacía clic en "Descargar mi Informe Extendido (PDF)" en la pantalla de
+// resultados — si pagaba (o canjeaba un código) y nunca llegaba a hacer ese
+// clic, el correo no se enviaba nunca, sin dejar ni siquiera un error
+// visible en el panel (caso real: Inés Rivera, código de cortesía,
+// 2026-09-10). triggerExtendedReportEmailOnce() existe para que el envío no
+// dependa de esa acción del cliente.
 
 const db = require("../db/init");
 const { RELATIONSHIP_CONTEXTS } = require("../data/relationshipContexts");
@@ -96,4 +108,42 @@ async function sendExtendedReportEmail(sub, pdf, baseUrl) {
   return { status, error: errorText };
 }
 
-module.exports = { generatePdfForSubmission, sendExtendedReportEmail, pdfFilename };
+/**
+ * Genera el PDF y envía el correo de confirmación la PRIMERA vez que un
+ * envío queda pagado (o recibe un código de cortesía) — sin esperar a que
+ * la persona haga clic en "Descargar". Idempotente: si extended_generated_at
+ * ya tiene valor (ya se generó antes, desde aquí o desde la descarga
+ * manual), no hace nada y devuelve null. Si el envío no dejó correo,
+ * tampoco hace nada (no hay a quién enviarle).
+ *
+ * Nunca lanza — cualquier error (generando el PDF o enviando el correo)
+ * queda guardado en extended_email_status/extended_email_error, igual que
+ * sendExtendedReportEmail(), para que el panel lo muestre y se pueda
+ * reintentar con el botón "Reenviar correo".
+ */
+async function triggerExtendedReportEmailOnce(subId, baseUrl) {
+  const row = db.prepare("SELECT * FROM submissions WHERE id = ?").get(subId);
+  if (!row || row.extended_generated_at || !row.email) return null;
+
+  const sub = {
+    ...row,
+    scoreResult: JSON.parse(row.score_result),
+    qualitativeAnswers: JSON.parse(row.qualitative_answers || "[]"),
+  };
+
+  try {
+    const pdf = await generatePdfForSubmission(sub);
+    db.prepare("UPDATE submissions SET extended_generated_at = ? WHERE id = ?").run(new Date().toISOString(), sub.id);
+    return await sendExtendedReportEmail(sub, pdf, baseUrl);
+  } catch (err) {
+    console.error(`[extendedReport] Error generando/enviando el Informe Extendido al confirmar pago (${subId}) —`, err.message);
+    db.prepare("UPDATE submissions SET extended_email_status = ?, extended_email_error = ? WHERE id = ?").run(
+      "failed",
+      "No se pudo generar el PDF: " + err.message,
+      subId
+    );
+    return { status: "failed", error: "No se pudo generar el PDF: " + err.message };
+  }
+}
+
+module.exports = { generatePdfForSubmission, sendExtendedReportEmail, triggerExtendedReportEmailOnce, pdfFilename };

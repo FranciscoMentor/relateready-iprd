@@ -11,7 +11,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db/init");
 const { DIMENSIONS } = require("../data/dimensions");
-const { generatePdfForSubmission, sendExtendedReportEmail } = require("../services/extendedReport");
+const { generatePdfForSubmission, sendExtendedReportEmail, triggerExtendedReportEmailOnce } = require("../services/extendedReport");
 const { listReferrals, GRAPH_REFERRALS_ENABLED } = require("../services/graphExcel");
 
 const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Number(process.env.EXTENDED_PRICE_CENTS) : 2499;
@@ -526,6 +526,12 @@ router.post("/submission/:id/mark-paid", (req, res) => {
   const sub = db.prepare("SELECT payment_status FROM submissions WHERE id = ?").get(req.params.id);
   if (sub && sub.payment_status === "pending") {
     db.prepare("UPDATE submissions SET payment_status = 'paid', payment_reference = 'CONFIRMADO_MANUAL_ADMIN' WHERE id = ?").run(req.params.id);
+    // Dispara el PDF + correo de inmediato, igual que los otros 3 caminos de
+    // pago — ver triggerExtendedReportEmailOnce en services/extendedReport.js.
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    triggerExtendedReportEmailOnce(req.params.id, baseUrl).catch((err) =>
+      console.error(`[admin] Error generando/enviando el Informe Extendido tras marcar como pagado (${req.params.id}) —`, err.message)
+    );
   }
   const backTo = req.get("Referer") && req.get("Referer").includes(`/submission/${req.params.id}`)
     ? `/admin/submission/${req.params.id}`
@@ -671,6 +677,12 @@ router.post("/api/results/:id/mark-paid", (req, res) => {
   if (!existing) return res.status(404).json({ error: "Registro no encontrado." });
   if (existing.payment_status === "pending") {
     db.prepare("UPDATE submissions SET payment_status = 'paid', payment_reference = 'CONFIRMADO_MANUAL_ADMIN' WHERE id = ?").run(req.params.id);
+    // Dispara el PDF + correo de inmediato, igual que los otros 3 caminos de
+    // pago — ver triggerExtendedReportEmailOnce en services/extendedReport.js.
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    triggerExtendedReportEmailOnce(req.params.id, baseUrl).catch((err) =>
+      console.error(`[admin] Error generando/enviando el Informe Extendido tras marcar como pagado (${req.params.id}) —`, err.message)
+    );
   }
   res.json({ ok: true, submission: serializeSubmission(db.prepare("SELECT * FROM submissions WHERE id = ?").get(req.params.id)) });
 });
