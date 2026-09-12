@@ -211,6 +211,10 @@ function h1(doc, text) {
   doc.moveTo(doc.x, doc.y + 2).lineTo(612 - PAGE_MARGIN, doc.y + 2).strokeColor(ACCENT).lineWidth(1).stroke();
   doc.moveDown(0.5);
   doc.font("Helvetica").fillColor(INK);
+  // Recordado para que aiBlock() pueda quitar un encabezado inicial
+  // redundante, si el texto generado por IA repite el título de la sección
+  // como su propio "# ..." (pasa seguido con actionPlanNarrative).
+  doc._lastH1Text = text;
 }
 
 function h2(doc, text, color = INK) {
@@ -412,25 +416,132 @@ function bulletList(doc, items, opts = {}) {
   doc.moveDown(0.3);
 }
 
-function aiBlock(doc, text) {
+// Quita marcado inline de markdown (**negrita**, *cursiva*) que a veces
+// trae el texto generado por IA, dejando solo el texto — pdfkit no
+// interpreta markdown, así que sin esto los asteriscos salían literales en
+// el PDF. No se intenta reproducir la negrita/cursiva real (requeriría
+// cortar el texto en tramos y alternar de fuente a mitad de línea); con que
+// desaparezca la sintaxis cruda ya se ve profesional.
+function stripInlineMarkdown(s) {
+  return String(s || "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/(^|\s)\*(\S(?:.*?\S)?)\*(?=\s|$)/g, "$1$2")
+    .trim();
+}
+
+// Convierte el texto generado por IA en una lista de bloques (encabezado /
+// separador / párrafo) en vez de imprimirlo tal cual — Claude a veces
+// devuelve sintaxis de markdown (## Semana 1, --- como separador) aunque el
+// prompt no la pida explícitamente, y pdfkit no la interpreta: sin este
+// parseo, esos caracteres salían literales en el PDF (ver caso reportado:
+// "Tu plan de acción a 3 semanas", 2026-09-12).
+function parseAiTextBlocks(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const blocks = [];
+  let paragraphLines = [];
+  const flushParagraph = () => {
+    const joined = stripInlineMarkdown(paragraphLines.join(" ").replace(/\s+/g, " "));
+    if (joined) blocks.push({ type: "p", text: joined });
+    paragraphLines = [];
+  };
+  lines.forEach((rawLine) => {
+    const line = rawLine.trim();
+    if (!line) { flushParagraph(); return; }
+    const headingMatch = line.match(/^#{1,6}\s+(.*)$/);
+    if (headingMatch) {
+      flushParagraph();
+      const headingText = stripInlineMarkdown(headingMatch[1]);
+      if (headingText) blocks.push({ type: "heading", text: headingText });
+      return;
+    }
+    if (/^(-{3,}|_{3,}|\*{3,})$/.test(line)) {
+      flushParagraph();
+      blocks.push({ type: "hr" });
+      return;
+    }
+    paragraphLines.push(line);
+  });
+  flushParagraph();
+  return blocks;
+}
+
+// Tamaños/fuentes de cada tipo de bloque — se usan tanto para medir la
+// altura total (antes de dibujar el rectángulo de fondo) como para dibujar
+// de verdad, así que viven en un solo lugar para que nunca queden
+// desincronizados entre medición y dibujo.
+function aiBlockLayout(doc, block, width) {
+  if (block.type === "heading") {
+    doc.fontSize(11).font("Helvetica-Bold");
+    return { height: doc.heightOfString(block.text, { width, lineGap: 2 }) };
+  }
+  if (block.type === "hr") {
+    return { height: 9 };
+  }
   doc.fontSize(10.5).font("Helvetica-Oblique");
-  // Importante: el lineGap aquí debe coincidir con el que se usa más abajo en
-  // el doc.text() real — si no, heightOfString() subestima la altura (no
-  // cuenta el interlineado extra) y el rectángulo de fondo queda más corto
-  // que el texto, cortando visualmente el último párrafo fuera de la caja.
-  const textHeight = doc.heightOfString(text, { width: 612 - PAGE_MARGIN * 2 - 14, lineGap: 3 });
+  return { height: doc.heightOfString(block.text, { width, lineGap: 3 }) };
+}
+
+// Compara texto ignorando mayúsculas, acentos y espacios extra — para
+// detectar cuándo el primer encabezado del texto de IA es, en el fondo, el
+// mismo título que ya imprimió el h1() de la sección justo arriba.
+function normalizeForCompare(s) {
+  return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function aiBlock(doc, text) {
+  const width = 612 - PAGE_MARGIN * 2 - 14;
+  let blocks = parseAiTextBlocks(text);
+  if (
+    blocks.length &&
+    blocks[0].type === "heading" &&
+    doc._lastH1Text &&
+    normalizeForCompare(blocks[0].text) === normalizeForCompare(doc._lastH1Text)
+  ) {
+    blocks = blocks.slice(1);
+  }
+  if (!blocks.length) return;
+
+  // Primera pasada: solo mide, para saber cuánto ocupará todo el bloque
+  // (necesario para el rectángulo de fondo y para decidir si hace falta
+  // una página nueva) — con los mismos tamaños de fuente que la segunda
+  // pasada, que es la que realmente dibuja.
+  let totalHeight = 0;
+  blocks.forEach((block, i) => {
+    totalHeight += aiBlockLayout(doc, block, width).height;
+    if (i < blocks.length - 1) totalHeight += block.type === "hr" ? 4 : 7;
+  });
+
   // Protección de desborde: si este bloque (texto generado por IA, de
   // longitud variable) no cabe en lo que queda de página, empieza una
   // página nueva en vez de dejar que se corte contra el pie de página.
-  if (doc.y + textHeight + 16 > CONTENT_BOTTOM) {
+  if (doc.y + totalHeight + 16 > CONTENT_BOTTOM) {
     doc.addPage();
   }
+
   const startX = doc.x;
   const startY = doc.y;
-  doc.rect(startX - 8, startY - 4, 612 - PAGE_MARGIN * 2 + 8, textHeight + 16).fill(CREAM);
-  doc.fillColor(INK).text(text, startX, startY + 4, { width: 612 - PAGE_MARGIN * 2 - 14, lineGap: 3 });
+  doc.rect(startX - 8, startY - 4, 612 - PAGE_MARGIN * 2 + 8, totalHeight + 16).fill(CREAM);
+
+  let cursorY = startY + 4;
+  blocks.forEach((block, i) => {
+    if (block.type === "hr") {
+      const ruleY = cursorY + 4;
+      doc.moveTo(startX, ruleY).lineTo(startX + width, ruleY).strokeColor(LIGHT).lineWidth(1).stroke();
+      cursorY += 9;
+    } else if (block.type === "heading") {
+      doc.fontSize(11).font("Helvetica-Bold").fillColor(INK).text(block.text, startX, cursorY, { width, lineGap: 2 });
+      cursorY = doc.y;
+    } else {
+      doc.fontSize(10.5).font("Helvetica-Oblique").fillColor(INK).text(block.text, startX, cursorY, { width, lineGap: 3 });
+      cursorY = doc.y;
+    }
+    if (i < blocks.length - 1) cursorY += block.type === "hr" ? 4 : 7;
+  });
+
+  doc.x = startX;
+  doc.y = cursorY;
   doc.moveDown(0.6);
-  doc.font("Helvetica");
+  doc.font("Helvetica").fillColor(INK);
 }
 
 // --- Radar chart de las 8 dimensiones, dibujado a mano (sin librería de charts) ---
