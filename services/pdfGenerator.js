@@ -873,21 +873,30 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
     if (band === "d") bulletList(doc, bc.recommendations);
   });
 
-  // Plan de acción a 3 semanas + invitación a la sesión de mentoría gratuita
-  ensureSpace(doc, 320);
-  h1(doc, T(lang, "Tu plan de acción a 3 semanas", "Your 3-week action plan"));
-  aiBlock(doc, aiSections.actionPlanNarrative);
-  ensureSpace(doc, 90);
-  h2(doc, T(lang, "Tu sesión de mentoría indagatoria gratuita", "Your free intake mentoring session"));
+  // Invitación a la sesión de mentoría gratuita — sección propia, ANTES del
+  // plan de acción (a pedido de Francisco, 2026-09-12): antes vivía como
+  // subtítulo (h2) pegado justo debajo del plan de acción, y visualmente se
+  // veía como si fuera parte de ese mismo bloque en vez de su propia
+  // sección. Ahora se presenta como la recomendación de revisar el informe
+  // completo con un mentor — el plan de acción de 3 semanas que sigue es
+  // uno de los temas que se revisan ahí, no al revés.
+  ensureSpace(doc, 160);
+  h1(doc, T(lang, "Tu sesión de mentoría indagatoria gratuita", "Your free intake mentoring session"));
   body(
     doc,
     T(
       lang,
-      `Como parte de tu Informe Extendido, tienes una sesión de mentoría indagatoria GRATUITA de 60 minutos con ${MENTOR_NAME.es} para revisar juntos este plan y tus resultados.`,
-      `As part of your Extended Report, you have a FREE 60-minute intake mentoring session with ${MENTOR_NAME.en} to review this plan and your results together.`
+      `Como parte de tu Informe Extendido, tienes una sesión de mentoría indagatoria GRATUITA de 60 minutos con ${MENTOR_NAME.es}. Te recomendamos agendarla para revisar juntos este informe completo —incluyendo el plan de acción de las próximas 3 semanas que encontrarás a continuación— y diseñar tus siguientes pasos.`,
+      `As part of your Extended Report, you have a FREE 60-minute intake mentoring session with ${MENTOR_NAME.en}. We recommend scheduling it to review this full report together —including the 3-week action plan you'll find next— and design your next steps.`
     )
   );
   linkButton(doc, T(lang, "Agendar mi sesión gratuita", "Schedule my free session"), BOOKING_LINKS[lang] || BOOKING_LINKS.es);
+
+  // Plan de acción a 3 semanas
+  ensureSpace(doc, 320);
+  h1(doc, T(lang, "Tu plan de acción a 3 semanas", "Your 3-week action plan"));
+  aiBlock(doc, aiSections.actionPlanNarrative);
+
   bookTeaserBlock(doc, lang);
   friendReferralBlock(doc, lang);
 
