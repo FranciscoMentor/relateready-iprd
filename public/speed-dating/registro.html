@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Registro · Speed Dating RelateReady</title>
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="stylesheet" href="/speed-dating/speed-dating.css">
+</head>
+<body class="sd-body">
+  <div class="sd-wrap">
+    <div class="sd-brand-row">
+      <img src="/assets/relateready-logo-crop.png" alt="RelateReady">
+      <span class="sd-code-chip">Registro</span>
+    </div>
+
+    <div id="loading-block">
+      <p class="sd-subtext">Cargando evento…</p>
+    </div>
+
+    <div id="error-block" class="sd-hidden">
+      <div class="sd-error-banner" id="error-text"></div>
+    </div>
+
+    <form id="registro-form" class="sd-hidden">
+      <p class="sd-prompt" id="evento-nombre" style="font-size:19px;"></p>
+      <p class="sd-subtext">Completa tus datos para asignarte tu mesa (si eres mujer) o tu ronda de citas (si eres hombre).</p>
+
+      <div class="field">
+        <label>Nombre completo</label>
+        <input type="text" id="f-name" required>
+      </div>
+      <div class="field">
+        <label>Teléfono (WhatsApp)</label>
+        <input type="tel" id="f-phone" placeholder="+593 99 123 4567" required>
+      </div>
+      <div class="field">
+        <label>Correo</label>
+        <input type="email" id="f-email" required>
+      </div>
+      <div class="field">
+        <label>Género</label>
+        <div class="sd-seg-toggle" id="gender-toggle">
+          <button type="button" data-value="F" class="sel">Mujer</button>
+          <button type="button" data-value="M">Hombre</button>
+        </div>
+      </div>
+
+      <div class="sd-consent-box">
+        <p><strong>¿Autorizas compartir tu WhatsApp con tus matches?</strong><br>Si ambos dicen que sí, tu match recibirá tu número para escribirte y preguntar si puede llamarte. Es opcional — puedes decir que no.</p>
+        <div class="sd-seg-toggle" id="consent-toggle">
+          <button type="button" data-value="1" class="sel">Sí, autorizo</button>
+          <button type="button" data-value="0">No, prefiero que no</button>
+        </div>
+      </div>
+
+      <div id="form-error" class="sd-error-banner sd-hidden"></div>
+
+      <button type="submit" class="sd-cta-primary" id="submit-btn">Confirmar registro</button>
+    </form>
+
+    <div id="success-block" class="sd-center-col sd-hidden">
+      <div class="sd-big-icon lg">
+        <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M50 88 C50 88 10 60 10 33 C10 17 22 7 36 7 C44 7 50 12 50 21 C50 12 56 7 64 7 C78 7 90 17 90 33 C90 60 50 88 50 88 Z"/>
+          <path d="M65 71 L72 78 L86 62" stroke-width="8"/>
+        </svg>
+      </div>
+      <h2>¡Listo, quedaste registrada!</h2>
+      <p id="success-text">Guarda este link — es tu acceso personal durante todo el evento.</p>
+      <button class="sd-cta-primary" id="go-btn" style="margin-top:14px;">Ir a mi pantalla</button>
+    </div>
+  </div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const eventId = params.get('evento');
+  const loadingBlock = document.getElementById('loading-block');
+  const errorBlock = document.getElementById('error-block');
+  const errorText = document.getElementById('error-text');
+  const form = document.getElementById('registro-form');
+
+  let gender = 'F';
+  let consent = 1;
+
+  function selectToggle(containerId, value, setter) {
+    const container = document.getElementById(containerId);
+    container.querySelectorAll('button').forEach((b) => b.classList.toggle('sel', b.dataset.value === value));
+    setter(value);
+  }
+  document.getElementById('gender-toggle').addEventListener('click', (e) => {
+    if (e.target.tagName !== 'BUTTON') return;
+    selectToggle('gender-toggle', e.target.dataset.value, (v) => gender = v);
+  });
+  document.getElementById('consent-toggle').addEventListener('click', (e) => {
+    if (e.target.tagName !== 'BUTTON') return;
+    selectToggle('consent-toggle', e.target.dataset.value, (v) => consent = Number(v));
+  });
+
+  async function init() {
+    if (!eventId) {
+      loadingBlock.classList.add('sd-hidden');
+      errorBlock.classList.remove('sd-hidden');
+      errorText.textContent = 'Este link no incluye el evento — pide de nuevo el link de registro.';
+      return;
+    }
+    try {
+      const resp = await fetch(`/api/speed-dating/events/${eventId}/meta`);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'No se pudo cargar el evento.');
+      loadingBlock.classList.add('sd-hidden');
+      if (data.status !== 'registro') {
+        errorBlock.classList.remove('sd-hidden');
+        errorText.textContent = 'El registro para este evento ya está cerrado.';
+        return;
+      }
+      if (data.cuposDisponibles <= 0) {
+        errorBlock.classList.remove('sd-hidden');
+        errorText.textContent = 'Este evento ya alcanzó su aforo máximo.';
+        return;
+      }
+      document.getElementById('evento-nombre').textContent = `Bienvenida a ${data.name}`;
+      form.classList.remove('sd-hidden');
+    } catch (err) {
+      loadingBlock.classList.add('sd-hidden');
+      errorBlock.classList.remove('sd-hidden');
+      errorText.textContent = err.message;
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submitBtn = document.getElementById('submit-btn');
+    const formError = document.getElementById('form-error');
+    formError.classList.add('sd-hidden');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Registrando…';
+    try {
+      const resp = await fetch(`/api/speed-dating/events/${eventId}/registro`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('f-name').value,
+          phone: document.getElementById('f-phone').value,
+          email: document.getElementById('f-email').value,
+          gender,
+          sharePhoneConsent: consent === 1,
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'No se pudo completar el registro.');
+
+      form.classList.add('sd-hidden');
+      const successBlock = document.getElementById('success-block');
+      successBlock.classList.remove('sd-hidden');
+      const asistenteUrl = `/speed-dating/asistente.html?token=${data.voteToken}`;
+      document.getElementById('success-text').textContent = data.gender === 'F' && data.tableNumber
+        ? `Tu mesa es la número ${data.tableNumber} — no te muevas de ahí en toda la noche.`
+        : 'Guarda este link — es tu acceso personal durante todo el evento.';
+      document.getElementById('go-btn').addEventListener('click', () => { location.href = asistenteUrl; });
+      setTimeout(() => { location.href = asistenteUrl; }, 1800);
+    } catch (err) {
+      formError.textContent = err.message;
+      formError.classList.remove('sd-hidden');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Confirmar registro';
+    }
+  });
+
+  init();
+</script>
+</body>
+</html>

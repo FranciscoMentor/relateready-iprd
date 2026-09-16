@@ -88,4 +88,94 @@ addColumnIfMissing("country", "country TEXT");
 addColumnIfMissing("extended_email_status", "extended_email_status TEXT");
 addColumnIfMissing("extended_email_error", "extended_email_error TEXT");
 
+
+// ═══════════════════════════════════════════════════════════════════════
+// Speed Dating (piloto Mila Rooftop, 2026-09) ─ tablas nuevas, propias del
+// feature (no comparten filas con "submissions"). Se crean con CREATE TABLE
+// IF NOT EXISTS, mismo criterio no-destructivo que el resto de este archivo,
+// aunque al ser tablas nuevas (no columnas agregadas a una tabla existente)
+// no hace falta el helper addColumnIfMissing.
+//
+// Modelo (ver propuesta técnica v2 y adenda v3 en /docs del proyecto):
+//  - sd_events: un evento (ej. "Mila Rooftop — 20 sep"). Controla el estado
+//    en vivo de las rondas (current_round_number / round_state) — el
+//    servidor es la única fuente de verdad, no el reloj de cada celular.
+//  - sd_attendees: cada persona registrada. Las mujeres reciben table_number
+//    fijo al registrarse (nunca cambia); los hombres reciben seat_index
+//    (su posición en la rotación) y su mesa se calcula por ronda.
+//  - sd_pairings: el cruce mujer/hombre/mesa de cada ronda, precalculado de
+//    una sola vez cuando el organizador cierra el registro e inicia el
+//    evento (ver services/speedDatingMatch.js — fórmula CICLO=máx(M,W)).
+//    man_id NULL = esa mesa descansa esa ronda (aforo desigual).
+//  - sd_votes: un voto sí/no por persona por pairing (cada quien vota solo
+//    su propia opinión sobre la otra persona de su mesa esa ronda).
+//  - sd_matches: los cruces mutuos (ambos votaron "sí"), calculados al
+//    finalizar el evento — es lo que alimenta tanto el informe inmediato
+//    del organizador como el correo automático de resultados a las 48h.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sd_events (
+    id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    name TEXT NOT NULL,
+    event_date TEXT,
+    capacity INTEGER NOT NULL DEFAULT 24,
+    status TEXT NOT NULL DEFAULT 'registro',
+    round_state TEXT NOT NULL DEFAULT 'esperando_inicio',
+    current_round_number INTEGER NOT NULL DEFAULT 0,
+    total_rounds INTEGER,
+    finalized_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS sd_attendees (
+    id TEXT PRIMARY KEY,
+    event_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    gender TEXT NOT NULL,
+    share_phone_consent INTEGER NOT NULL DEFAULT 0,
+    table_number INTEGER,
+    seat_index INTEGER NOT NULL,
+    vote_token TEXT NOT NULL UNIQUE,
+    match_email_status TEXT,
+    match_email_error TEXT,
+    match_email_sent_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS sd_pairings (
+    id TEXT PRIMARY KEY,
+    event_id TEXT NOT NULL,
+    round_number INTEGER NOT NULL,
+    table_number INTEGER NOT NULL,
+    woman_id TEXT NOT NULL,
+    man_id TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS sd_votes (
+    id TEXT PRIMARY KEY,
+    pairing_id TEXT NOT NULL,
+    voter_attendee_id TEXT NOT NULL,
+    vote TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(pairing_id, voter_attendee_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS sd_matches (
+    id TEXT PRIMARY KEY,
+    event_id TEXT NOT NULL,
+    woman_id TEXT NOT NULL,
+    man_id TEXT NOT NULL,
+    table_number INTEGER,
+    round_number INTEGER,
+    created_at TEXT NOT NULL,
+    UNIQUE(event_id, woman_id, man_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_sd_attendees_event ON sd_attendees(event_id);
+  CREATE INDEX IF NOT EXISTS idx_sd_pairings_event_round ON sd_pairings(event_id, round_number);
+  CREATE INDEX IF NOT EXISTS idx_sd_votes_pairing ON sd_votes(pairing_id);
+  CREATE INDEX IF NOT EXISTS idx_sd_matches_event ON sd_matches(event_id);
+`);
+
 module.exports = db;

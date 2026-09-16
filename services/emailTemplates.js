@@ -140,4 +140,88 @@ function pendingReportReminderEmail({ name, lang, resultsUrl }) {
   };
 }
 
-module.exports = { extendedReportEmail, pendingReportReminderEmail };
+// ── Speed Dating (piloto Mila Rooftop, 2026-09) ────────────────────────────
+// Correo de resultados enviado 48h después de finalizar el evento (ver
+// services/speedDatingScheduler.js). "matches" es un array (normalmente 0
+// o 1, pero el correo soporta varios) de { partnerName, partnerPhone }.
+// partnerPhone es null cuando esa otra persona NO autorizó compartir su
+// WhatsApp al registrarse (share_phone_consent) — nunca se expone sin
+// permiso explícito, sin importar que haya sido un match mutuo.
+function speedDatingMatchEmail({ name, lang, eventName, matches }) {
+  const firstName = firstNameOf(name, lang);
+  const hasMatches = Array.isArray(matches) && matches.length > 0;
+
+  const matchBlocksEs = hasMatches
+    ? matches
+        .map(
+          (m) => `
+        <div style="border:1px solid #E7DFD2;border-radius:10px;padding:14px 16px;margin:0 0 12px;">
+          <p style="margin:0 0 4px;font-weight:700;font-size:15px;">${m.partnerName}</p>
+          ${
+            m.partnerPhone
+              ? `<p style="margin:0;font-size:14px;">Escríbele por WhatsApp para preguntarle si puede llamarte: <strong>${m.partnerPhone}</strong></p>`
+              : `<p style="margin:0;font-size:13.5px;color:${MUTED};">Esta persona no autorizó compartir su WhatsApp todavía — cuando ambos lo autoricen, se los enviaremos.</p>`
+          }
+        </div>`
+        )
+        .join("")
+    : "";
+
+  const matchBlocksEn = hasMatches
+    ? matches
+        .map(
+          (m) => `
+        <div style="border:1px solid #E7DFD2;border-radius:10px;padding:14px 16px;margin:0 0 12px;">
+          <p style="margin:0 0 4px;font-weight:700;font-size:15px;">${m.partnerName}</p>
+          ${
+            m.partnerPhone
+              ? `<p style="margin:0;font-size:14px;">Message them on WhatsApp to ask if you can call: <strong>${m.partnerPhone}</strong></p>`
+              : `<p style="margin:0;font-size:13.5px;color:${MUTED};">This person hasn't authorized sharing their WhatsApp yet — we'll send it as soon as both of you do.</p>`
+          }
+        </div>`
+        )
+        .join("")
+    : "";
+
+  if (lang === "en") {
+    return {
+      subject: hasMatches ? `You have a match from ${eventName}! 💛` : `Your results from ${eventName}`,
+      html: shell({
+        lang,
+        bodyHtml: hasMatches
+          ? `
+          <p style="font-size:16px;margin:0 0 16px;">Hi ${firstName},</p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">Great news — ${eventName} had ${matches.length === 1 ? "a match" : matches.length + " matches"} for you. Here's who:</p>
+          ${matchBlocksEn}
+          <p style="font-size:13px;line-height:1.6;margin:20px 0 0;color:${MUTED};">This contact info was shared only because it was a mutual match and both of you authorized it at registration.</p>
+        `
+          : `
+          <p style="font-size:16px;margin:0 0 16px;">Hi ${firstName},</p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thanks for joining ${eventName}. This time there wasn't a mutual match — sometimes the timing just isn't right, and that's completely normal in speed dating.</p>
+          <p style="font-size:15px;line-height:1.6;margin:0;">We hope to see you at the next RelateReady event!</p>
+        `,
+      }),
+    };
+  }
+  return {
+    subject: hasMatches ? `¡Tienes un match de ${eventName}! 💛` : `Tus resultados de ${eventName}`,
+    html: shell({
+      lang,
+      bodyHtml: hasMatches
+        ? `
+        <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">Buenas noticias — ${eventName} tuvo ${matches.length === 1 ? "un match" : matches.length + " matches"} para ti. Aquí puedes escribirle directo:</p>
+        ${matchBlocksEs}
+        <p style="font-size:13px;line-height:1.6;margin:20px 0 0;color:${MUTED};">Este contacto se comparte solo porque fue un match mutuo y ambos autorizaron compartirlo al registrarse.</p>
+      `
+        : `
+        <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Gracias por participar en ${eventName}. Esta vez no hubo un match mutuo — a veces simplemente no coincide el momento, y es completamente normal en el speed dating.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0;">¡Esperamos verte en el próximo evento de RelateReady!</p>
+      `,
+    }),
+  };
+}
+
+module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail };
+

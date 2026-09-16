@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tu mesa · Speed Dating RelateReady</title>
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="stylesheet" href="/speed-dating/speed-dating.css">
+</head>
+<body class="sd-body">
+  <div class="sd-wrap">
+    <div class="sd-brand-row">
+      <img src="/assets/relateready-logo-crop.png" alt="RelateReady">
+      <span class="sd-code-chip" id="code-chip">—</span>
+    </div>
+
+    <div id="loading-block"><p class="sd-subtext">Cargando tu evento…</p></div>
+    <div id="error-block" class="sd-error-banner sd-hidden"></div>
+
+    <div id="app" class="sd-hidden" style="display:flex;flex-direction:column;flex:1;"></div>
+  </div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const token = params.get('token');
+  const loadingBlock = document.getElementById('loading-block');
+  const errorBlock = document.getElementById('error-block');
+  const app = document.getElementById('app');
+  const codeChip = document.getElementById('code-chip');
+
+  const ICONS = {
+    checkHeart: `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M50 88 C50 88 10 60 10 33 C10 17 22 7 36 7 C44 7 50 12 50 21 C50 12 56 7 64 7 C78 7 90 17 90 33 C90 60 50 88 50 88 Z"/><path d="M65 71 L72 78 L86 62" stroke-width="8"/></svg>`,
+    rotate: `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M78 33 A32 32 0 1 0 83 54"/><path d="M78 15 L78 33 L60 33"/></svg>`,
+    flag: `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M28 90 L28 12"/><path d="M28 16 L82 32 L28 48 Z" fill="currentColor" opacity="0.15"/><path d="M28 16 L82 32 L28 48"/><circle cx="66" cy="14" r="2.5" fill="currentColor" stroke="none"/><circle cx="76" cy="20" r="2" fill="currentColor" stroke="none"/><circle cx="70" cy="10" r="1.5" fill="currentColor" stroke="none"/></svg>`,
+    leaf: `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 85 C20 45 45 15 85 15 C85 55 60 85 20 85 Z"/><path d="M22 83 C45 60 60 45 83 18"/></svg>`,
+    hearts: `<svg viewBox="0 0 100 100" fill="none"><defs><path id="hshape" d="M50 88 C50 88 10 60 10 33 C10 17 22 7 36 7 C44 7 50 12 50 21 C50 12 56 7 64 7 C78 7 90 17 90 33 C90 60 50 88 50 88 Z"/></defs><use href="#hshape" fill="currentColor" opacity="0.55" transform="translate(-8,-4) scale(0.72)"/><use href="#hshape" fill="currentColor" transform="translate(14,10) scale(0.72)"/></svg>`,
+  };
+
+  let pollTimer = null;
+  let voting = false;
+
+  function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+
+  function render(estado) {
+    codeChip.textContent = estado.mi_genero === 'F' ? 'Mujer · mesa fija' : 'Hombre · rota';
+
+    if (estado.evento_estado === 'esperando_inicio') {
+      app.innerHTML = `
+        <div class="sd-center-col">
+          <div class="sd-big-icon accent">${ICONS.rotate}</div>
+          <h2>Ya estás dentro</h2>
+          <p>${estado.mi_mesa ? `Tu mesa fija es la <strong>${estado.mi_mesa}</strong>. ` : ''}Espera a que el organizador inicie el evento — esta pantalla se actualiza sola.</p>
+        </div>`;
+      return;
+    }
+
+    if (estado.evento_estado === 'finalizado') {
+      const matches = estado.matches || [];
+      if (matches.length) {
+        app.innerHTML = `
+          <div style="flex:1;">
+            <div class="sd-center-col" style="padding-bottom:6px;">
+              <div class="sd-big-icon">${ICONS.hearts}</div>
+              <h2>¡Tuviste ${matches.length === 1 ? 'un match' : matches.length + ' matches'}!</h2>
+              <p>Aquí puedes escribirles directo.</p>
+            </div>
+            <div class="sd-match-list">
+              ${matches.map((m) => `
+                <div class="sd-match-card">
+                  <div class="top-row">
+                    <div class="sd-match-avatar">${esc((m.nombre || '?').charAt(0))}</div>
+                    <div><div class="name">${esc(m.nombre)}</div><div class="meta">Match mutuo</div></div>
+                  </div>
+                  ${m.telefono
+                    ? `<a class="sd-whatsapp-btn" target="_blank" href="https://wa.me/${esc(String(m.telefono).replace(/[^0-9]/g, ''))}">Escribir por WhatsApp</a>`
+                    : `<p class="sd-no-phone-note">Todavía no autorizó compartir su WhatsApp — te avisaremos si lo hace.</p>`}
+                </div>`).join('')}
+            </div>
+          </div>`;
+      } else {
+        app.innerHTML = `
+          <div class="sd-center-col">
+            <div class="sd-big-icon">${ICONS.leaf}</div>
+            <h2>Esta vez no hubo match mutuo</h2>
+            <p>A veces simplemente no coincide el momento — es completamente normal en el speed dating. ¡Gracias por participar!</p>
+          </div>`;
+      }
+      return;
+    }
+
+    // en_curso
+    if (estado.evento_estado === 'cambio_de_mesa') {
+      if (estado.cierre_inminente) {
+        app.innerHTML = `
+          <div class="sd-center-col">
+            <div class="sd-big-icon accent">${ICONS.flag}</div>
+            <h2>Eso fue todo por hoy</h2>
+            <p>Completaste tus rondas. Te escribimos por correo en 48 horas con tus matches, si los hay.</p>
+          </div>`;
+        return;
+      }
+      const mesaBlock = estado.descansa
+        ? `<div class="sd-big-icon" style="margin:0 auto 10px;">${ICONS.leaf}</div><p class="sd-subtext" style="text-align:center;">Esta ronda descansas.</p>`
+        : `<div class="sd-table-badge" style="margin-top:6px;"><div class="num">${estado.mi_mesa ?? '—'}</div><div class="label">Tu próxima mesa</div></div>`;
+      app.innerHTML = `
+        <div class="sd-center-col">
+          <div class="sd-big-icon accent">${ICONS.rotate}</div>
+          <h2>Cambio de mesa</h2>
+          <p>La ronda ${estado.ronda_actual} cerró. Ve a tu próxima mesa antes de que el organizador abra la ronda ${estado.ronda_actual + 1}.</p>
+          ${mesaBlock}
+        </div>`;
+      return;
+    }
+
+    // ronda_activa
+    const roundPill = `<span class="sd-round-pill"><span class="dot"></span>Ronda ${estado.ronda_actual} de ${estado.total_rondas}</span>`;
+
+    if (estado.descansa) {
+      app.innerHTML = `
+        ${roundPill}
+        <div class="sd-center-col">
+          <div class="sd-big-icon">${ICONS.leaf}</div>
+          <h2>Esta ronda descansas</h2>
+          <p>No te toca mesa esta ronda — vuelve a la siguiente.</p>
+        </div>`;
+      return;
+    }
+
+    const tableLabel = estado.mi_genero === 'F' ? 'Tu mesa' : 'Tu mesa esta ronda';
+
+    if (estado.ya_vote) {
+      app.innerHTML = `
+        ${roundPill}
+        <div class="sd-table-badge"><div class="num">${estado.mi_mesa ?? '—'}</div><div class="label">${tableLabel}</div></div>
+        <div class="sd-center-col">
+          <div class="sd-big-icon lg">${ICONS.checkHeart}</div>
+          <h2>Guardamos tu respuesta</h2>
+          <p>Mesa ${estado.mi_mesa ?? '—'} · Ronda ${estado.ronda_actual} de ${estado.total_rondas}. Puedes cambiarla si te arrepientes, hasta que cierre la ronda.</p>
+          <button class="sd-link-btn" id="change-vote-btn">Cambiar mi respuesta</button>
+        </div>`;
+      document.getElementById('change-vote-btn').addEventListener('click', () => renderVoteForm(estado));
+      return;
+    }
+
+    renderVoteForm(estado, roundPill, tableLabel);
+  }
+
+  function renderVoteForm(estado, roundPill, tableLabel) {
+    roundPill = roundPill || `<span class="sd-round-pill"><span class="dot"></span>Ronda ${estado.ronda_actual} de ${estado.total_rondas}</span>`;
+    tableLabel = tableLabel || (estado.mi_genero === 'F' ? 'Tu mesa' : 'Tu mesa esta ronda');
+    app.innerHTML = `
+      ${roundPill}
+      <div class="sd-table-badge"><div class="num">${estado.mi_mesa ?? '—'}</div><div class="label">${tableLabel}</div></div>
+      <p class="sd-prompt">¿Te gustaría un <strong>match</strong> con la persona de tu mesa?</p>
+      <p class="sd-subtext">Responde antes de que termine la ronda. Puedes cambiar tu respuesta hasta entonces.</p>
+      <div class="sd-vote-row">
+        <button class="sd-vote-btn no" data-vote="no"><span class="icon">✕</span>No</button>
+        <button class="sd-vote-btn yes" data-vote="si"><span class="icon">♥</span>Sí</button>
+      </div>
+      <div class="sd-privacy-note"><span>🔒</span><span>Tu respuesta es privada. Nadie —ni la otra persona, ni el staff del venue— la ve. Solo se revela si ambos dicen que sí.</span></div>
+    `;
+    app.querySelectorAll('.sd-vote-btn').forEach((btn) => {
+      btn.addEventListener('click', () => castVote(btn.dataset.vote));
+    });
+  }
+
+  async function castVote(vote) {
+    if (voting) return;
+    voting = true;
+    try {
+      const resp = await fetch(`/api/speed-dating/attendee/${token}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vote }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'No se pudo guardar tu voto.');
+      await poll();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      voting = false;
+    }
+  }
+
+  async function poll() {
+    try {
+      const resp = await fetch(`/api/speed-dating/attendee/${token}/estado`);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'No se pudo cargar tu estado.');
+      loadingBlock.classList.add('sd-hidden');
+      errorBlock.classList.add('sd-hidden');
+      app.classList.remove('sd-hidden');
+      render(data);
+    } catch (err) {
+      loadingBlock.classList.add('sd-hidden');
+      app.classList.add('sd-hidden');
+      errorBlock.classList.remove('sd-hidden');
+      errorBlock.textContent = err.message;
+    }
+  }
+
+  function init() {
+    if (!token) {
+      loadingBlock.classList.add('sd-hidden');
+      errorBlock.classList.remove('sd-hidden');
+      errorBlock.textContent = 'Este link no incluye tu código de acceso — pide de nuevo tu link personal.';
+      return;
+    }
+    poll();
+    pollTimer = setInterval(poll, 5000);
+  }
+
+  init();
+</script>
+</body>
+</html>

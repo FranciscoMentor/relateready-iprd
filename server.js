@@ -6,8 +6,11 @@ const path = require("path");
 
 const apiRoutes = require("./routes/api");
 const adminRoutes = require("./routes/admin");
+const speedDatingAdminRoutes = require("./routes/speedDatingAdmin");
+const speedDatingPublicRoutes = require("./routes/speedDatingPublic");
 const db = require("./db/init");
 const reminderScheduler = require("./services/reminderScheduler");
+const speedDatingScheduler = require("./services/speedDatingScheduler");
 
 const app = express();
 app.set("trust proxy", 1); // necesario en Render para que req.protocol refleje https
@@ -46,6 +49,23 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 app.use("/api", apiRoutes);
 app.use("/admin", adminRoutes);
 
+// Piloto de speed dating (Mila Rooftop, 2026-09) — panel del organizador
+// bajo /admin/speed-dating (misma sesión de administrador que el resto del
+// panel, ver routes/admin.js) y endpoints públicos del celular de cada
+// asistente bajo /api/speed-dating (sin login, protegidos por el
+// vote_token de cada persona en vez de una cuenta — ver routes/speedDatingPublic.js).
+app.use("/admin/speed-dating", adminRoutes.requireAuth, speedDatingAdminRoutes);
+app.use("/api/speed-dating", speedDatingPublicRoutes);
+
+// Link corto y fácil de compartir para el registro de un evento —
+// redirige a la página de registro real en /public con el id del evento
+// como query param. Así el link que copia el organizador (ver panel,
+// /admin/speed-dating/:id) es "…/evento/<id>" en vez de la ruta interna del
+// archivo estático.
+app.get("/evento/:eventId", (req, res) => {
+  res.redirect(`/speed-dating/registro.html?evento=${encodeURIComponent(req.params.eventId)}`);
+});
+
 // Panel de control completo (KPIs, resultados con detalle por persona,
 // calendario de Microsoft 365) en su propia URL de nivel superior — a
 // propósito NO anidada bajo /admin, mismo patrón que el panel de referencia
@@ -72,3 +92,8 @@ app.listen(PORT, () => {
 // services/reminderScheduler.js) — se activa solo si el correo automático
 // está configurado (GRAPH_* en Environment).
 reminderScheduler.start();
+
+// Correo de resultados a las 48h de finalizar un evento de speed dating
+// (ver services/speedDatingScheduler.js) — mismo criterio: solo se activa
+// si el correo automático está configurado.
+speedDatingScheduler.start();
