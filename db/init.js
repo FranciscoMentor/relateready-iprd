@@ -178,4 +178,25 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_sd_matches_event ON sd_matches(event_id);
 `);
 
+// ── Migración: lugar del evento y aforo editable (2026-09) ───────────────
+// venue_name / venue_address: Francisco organiza eventos en distintos
+// lugares, ciudades y países, así que cada evento necesita su propio lugar
+// (antes no existía este dato). La tabla sd_events ya existe en producción
+// (creada arriba con CREATE TABLE IF NOT EXISTS), así que estas columnas se
+// agregan con el mismo patrón addColumnIfMissing que usa el resto de este
+// archivo — un CREATE TABLE IF NOT EXISTS no modifica una tabla que ya
+// existe. El aforo (capacity) no es una columna nueva: ya existía y ahora
+// se puede editar en cualquier momento vía POST /admin/speed-dating/:id/editar
+// (routes/speedDatingAdmin.js), incluso a último momento antes de iniciar
+// el evento.
+const sdEventsColumns = db.prepare("PRAGMA table_info(sd_events)").all().map((c) => c.name);
+function addSdEventsColumnIfMissing(name, ddl) {
+  if (!sdEventsColumns.includes(name)) {
+    db.exec(`ALTER TABLE sd_events ADD COLUMN ${ddl}`);
+    sdEventsColumns.push(name);
+  }
+}
+addSdEventsColumnIfMissing("venue_name", "venue_name TEXT");
+addSdEventsColumnIfMissing("venue_address", "venue_address TEXT");
+
 module.exports = db;

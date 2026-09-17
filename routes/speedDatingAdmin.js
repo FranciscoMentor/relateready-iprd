@@ -133,7 +133,7 @@ router.get("/", (req, res) => {
       const w = counts.find((c) => c.gender === "F");
       const m = counts.find((c) => c.gender === "M");
       return `<tr>
-        <td><a href="/admin/speed-dating/${e.id}" style="color:${BRAND.ink};font-weight:700;text-decoration:none;">${esc(e.name)}</a><br><span class="muted">${esc(e.event_date) || "sin fecha"}</span></td>
+        <td><a href="/admin/speed-dating/${e.id}" style="color:${BRAND.ink};font-weight:700;text-decoration:none;">${esc(e.name)}</a><br><span class="muted">${esc(e.event_date) || "sin fecha"}${e.venue_name ? " · " + esc(e.venue_name) : ""}</span></td>
         <td><span class="badge" style="background:${STATUS_COLOR[e.status] || "#999"}">${STATUS_LABEL[e.status] || e.status}</span></td>
         <td>${w ? w.n : 0} mujeres · ${m ? m.n : 0} hombres</td>
         <td>${esc((e.created_at || "").slice(0, 16).replace("T", " "))}</td>
@@ -159,6 +159,8 @@ router.get("/", (req, res) => {
         <div><label class="muted" style="display:block;margin-bottom:4px;">Nombre</label><input type="text" name="name" placeholder="Ej. Mila Rooftop — 20 sep" required></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Fecha</label><input type="date" name="event_date"></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Aforo máximo</label><input type="number" name="capacity" value="24" min="2" max="60" style="width:90px;"></div>
+        <div><label class="muted" style="display:block;margin-bottom:4px;">Lugar</label><input type="text" name="venue_name" placeholder="Ej. Mila Rooftop"></div>
+        <div><label class="muted" style="display:block;margin-bottom:4px;">Dirección</label><input type="text" name="venue_address" placeholder="Ciudad, dirección" style="min-width:220px;"></div>
         <button type="submit" class="btn">Crear evento</button>
       </form>
     </div>
@@ -179,9 +181,17 @@ router.post("/", express.urlencoded({ extended: true }), (req, res) => {
   const capacity = Number(req.body.capacity) > 0 ? Number(req.body.capacity) : 24;
   const id = crypto.randomUUID();
   db.prepare(
-    `INSERT INTO sd_events (id, created_at, name, event_date, capacity, status, round_state, current_round_number)
-     VALUES (?, ?, ?, ?, ?, 'registro', 'esperando_inicio', 0)`
-  ).run(id, new Date().toISOString(), name, (req.body.event_date || "").trim() || null, capacity);
+    `INSERT INTO sd_events (id, created_at, name, event_date, capacity, status, round_state, current_round_number, venue_name, venue_address)
+     VALUES (?, ?, ?, ?, ?, 'registro', 'esperando_inicio', 0, ?, ?)`
+  ).run(
+    id,
+    new Date().toISOString(),
+    name,
+    (req.body.event_date || "").trim() || null,
+    capacity,
+    (req.body.venue_name || "").trim() || null,
+    (req.body.venue_address || "").trim() || null
+  );
   res.redirect(`/admin/speed-dating/${id}`);
 });
 
@@ -234,7 +244,7 @@ router.get("/:eventId", (req, res) => {
     <div class="page-head">
       <span class="eyebrow">${eyebrowLabel}</span>
       <h1>${esc(event.name)}</h1>
-      <p class="lede">${esc(event.event_date) || "Sin fecha"} · Aforo máximo ${event.capacity} asistentes · <span class="accent-word" style="font-weight:700;">${ROUND_STATE_LABEL[event.round_state] || STATUS_LABEL[event.status]}</span></p>
+      <p class="lede">${esc(event.event_date) || "Sin fecha"}${event.venue_name ? " · " + esc(event.venue_name) : ""}${event.venue_address ? " (" + esc(event.venue_address) + ")" : ""} · Aforo máximo ${event.capacity} asistentes · <span class="accent-word" style="font-weight:700;">${ROUND_STATE_LABEL[event.round_state] || STATUS_LABEL[event.status]}</span></p>
     </div>
 
     <div class="stats">
@@ -242,6 +252,21 @@ router.get("/:eventId", (req, res) => {
       <div class="stat-card"><div class="stat-num">${men.length}</div><div class="stat-label">Hombres registrados</div></div>
       <div class="stat-card"><div class="stat-num">${event.total_rounds || "—"}</div><div class="stat-label">Rondas totales</div></div>
       <div class="stat-card"><div class="stat-num">${event.current_round_number}</div><div class="stat-label">Ronda actual</div></div>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary style="cursor:pointer;font-size:15px;font-weight:700;color:${BRAND.ink};">✎ Editar evento</summary>
+        <form method="POST" action="/admin/speed-dating/${event.id}/editar" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px;">
+          <div><label class="muted" style="display:block;margin-bottom:4px;">Nombre</label><input type="text" name="name" value="${esc(event.name)}" required></div>
+          <div><label class="muted" style="display:block;margin-bottom:4px;">Fecha</label><input type="date" name="event_date" value="${esc(event.event_date || "")}"></div>
+          <div><label class="muted" style="display:block;margin-bottom:4px;">Aforo máximo</label><input type="number" name="capacity" value="${event.capacity}" min="2" max="500" style="width:90px;"></div>
+          <div><label class="muted" style="display:block;margin-bottom:4px;">Lugar</label><input type="text" name="venue_name" value="${esc(event.venue_name || "")}" placeholder="Ej. Mila Rooftop"></div>
+          <div><label class="muted" style="display:block;margin-bottom:4px;">Dirección</label><input type="text" name="venue_address" value="${esc(event.venue_address || "")}" placeholder="Ciudad, dirección" style="min-width:220px;"></div>
+          <button type="submit" class="btn">Guardar cambios</button>
+        </form>
+        <p class="muted" style="margin:12px 0 0;">Puedes cambiar el aforo en cualquier momento, incluso justo antes de iniciar el evento — por ejemplo si el lugar confirma más o menos espacio del esperado.</p>
+      </details>
     </div>
 
     <div class="card">
@@ -286,6 +311,27 @@ router.get("/:eventId", (req, res) => {
     </div>
   </div>
 </body></html>`);
+});
+
+// ── Editar evento: nombre, fecha, aforo y lugar. Disponible en cualquier
+// momento (registro abierto, evento en curso, incluso ya finalizado) —
+// en particular el aforo puede necesitar ajustarse a último momento, justo
+// antes de iniciar el evento, tras varios días de promoción. ────────────
+router.post("/:eventId/editar", express.urlencoded({ extended: true }), (req, res) => {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
+  if (!event) return res.status(404).send("Evento no encontrado.");
+
+  const name = (req.body.name || "").trim() || event.name;
+  const eventDate = (req.body.event_date || "").trim() || null;
+  const capacity = Number(req.body.capacity) > 0 ? Number(req.body.capacity) : event.capacity;
+  const venueName = (req.body.venue_name || "").trim() || null;
+  const venueAddress = (req.body.venue_address || "").trim() || null;
+
+  db.prepare(
+    `UPDATE sd_events SET name = ?, event_date = ?, capacity = ?, venue_name = ?, venue_address = ? WHERE id = ?`
+  ).run(name, eventDate, capacity, venueName, venueAddress, event.id);
+
+  res.redirect(`/admin/speed-dating/${event.id}`);
 });
 
 // ── Iniciar evento: cierra registro y genera el calendario de rondas ────

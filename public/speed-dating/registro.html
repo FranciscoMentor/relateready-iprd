@@ -24,6 +24,7 @@
 
     <form id="registro-form" class="sd-hidden">
       <p class="sd-prompt" id="evento-nombre" style="font-size:19px;"></p>
+      <p class="sd-subtext" id="evento-lugar" style="display:none;"></p>
       <p class="sd-subtext">Completa tus datos para asignarte tu mesa (si eres mujer) o tu ronda de citas (si eres hombre).</p>
 
       <div class="field">
@@ -120,6 +121,11 @@
         return;
       }
       document.getElementById('evento-nombre').textContent = `Bienvenida a ${data.name}`;
+      if (data.venueName || data.venueAddress) {
+        const lugarEl = document.getElementById('evento-lugar');
+        lugarEl.textContent = [data.venueName, data.venueAddress].filter(Boolean).join(' — ');
+        lugarEl.style.display = '';
+      }
       form.classList.remove('sd-hidden');
     } catch (err) {
       loadingBlock.classList.add('sd-hidden');

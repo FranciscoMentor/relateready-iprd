@@ -30,6 +30,8 @@ router.get("/events/:eventId/meta", (req, res) => {
     capacity: event.capacity,
     registered,
     cuposDisponibles: Math.max(0, event.capacity - registered),
+    venueName: event.venue_name || null,
+    venueAddress: event.venue_address || null,
   });
 });
 
