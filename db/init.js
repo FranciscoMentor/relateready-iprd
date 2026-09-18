@@ -199,4 +199,16 @@ function addSdEventsColumnIfMissing(name, ddl) {
 addSdEventsColumnIfMissing("venue_name", "venue_name TEXT");
 addSdEventsColumnIfMissing("venue_address", "venue_address TEXT");
 
+// ── Migración: preguntas de conversación por ronda (2026-09) ─────────────
+// round_questions: Francisco escribe, al crear cada evento, una pregunta de
+// conversación por ronda (basadas en el test RelateReady y el libro "Tú
+// Primero") — se guardan como texto plano, una por línea, en orden (línea 1
+// = Ronda 1, línea 2 = Ronda 2, etc). No se generan automáticamente ni
+// salen del test de cada asistente — es contenido que el organizador
+// redacta a mano, distinto en cada evento. Se entregan en vivo al celular
+// de cada asistente durante la ronda activa (ver GET
+// /api/speed-dating/attendee/:token/estado en routes/speedDatingPublic.js)
+// — la misma pregunta para todas las mesas esa ronda.
+addSdEventsColumnIfMissing("round_questions", "round_questions TEXT");
+
 module.exports = db;

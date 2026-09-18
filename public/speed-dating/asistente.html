@@ -102,12 +102,16 @@
       const mesaBlock = estado.descansa
         ? `<div class="sd-big-icon" style="margin:0 auto 10px;">${ICONS.leaf}</div><p class="sd-subtext" style="text-align:center;">Esta ronda descansas.</p>`
         : `<div class="sd-table-badge" style="margin-top:6px;"><div class="num">${estado.mi_mesa ?? '—'}</div><div class="label">Tu próxima mesa</div></div>`;
+      const questionPreview = estado.pregunta_siguiente
+        ? `<div class="sd-question-box preview" style="margin-top:16px;width:100%;"><p class="sd-question-label">Pregunta para tu próxima mesa</p><p class="sd-question-text">${esc(estado.pregunta_siguiente)}</p></div>`
+        : '';
       app.innerHTML = `
         <div class="sd-center-col">
           <div class="sd-big-icon accent">${ICONS.rotate}</div>
           <h2>Cambio de mesa</h2>
           <p>La ronda ${estado.ronda_actual} cerró. Ve a tu próxima mesa antes de que el organizador abra la ronda ${estado.ronda_actual + 1}.</p>
           ${mesaBlock}
+          ${questionPreview}
         </div>`;
       return;
     }
@@ -129,9 +133,13 @@
     const tableLabel = estado.mi_genero === 'F' ? 'Tu mesa' : 'Tu mesa esta ronda';
 
     if (estado.ya_vote) {
+      const questionBlock = estado.pregunta_ronda
+        ? `<div class="sd-question-box"><p class="sd-question-label">Pregunta para esta ronda</p><p class="sd-question-text">${esc(estado.pregunta_ronda)}</p></div>`
+        : '';
       app.innerHTML = `
         ${roundPill}
         <div class="sd-table-badge"><div class="num">${estado.mi_mesa ?? '—'}</div><div class="label">${tableLabel}</div></div>
+        ${questionBlock}
         <div class="sd-center-col">
           <div class="sd-big-icon lg">${ICONS.checkHeart}</div>
           <h2>Guardamos tu respuesta</h2>
@@ -148,9 +156,13 @@
   function renderVoteForm(estado, roundPill, tableLabel) {
     roundPill = roundPill || `<span class="sd-round-pill"><span class="dot"></span>Ronda ${estado.ronda_actual} de ${estado.total_rondas}</span>`;
     tableLabel = tableLabel || (estado.mi_genero === 'F' ? 'Tu mesa' : 'Tu mesa esta ronda');
+    const questionBlock = estado.pregunta_ronda
+      ? `<div class="sd-question-box"><p class="sd-question-label">Pregunta para esta ronda</p><p class="sd-question-text">${esc(estado.pregunta_ronda)}</p></div>`
+      : '';
     app.innerHTML = `
       ${roundPill}
       <div class="sd-table-badge"><div class="num">${estado.mi_mesa ?? '—'}</div><div class="label">${tableLabel}</div></div>
+      ${questionBlock}
       <p class="sd-prompt">¿Te gustaría un <strong>match</strong> con la persona de tu mesa?</p>
       <p class="sd-subtext">Responde antes de que termine la ronda. Puedes cambiar tu respuesta hasta entonces.</p>
       <div class="sd-vote-row">

@@ -97,6 +97,21 @@ function loadAttendeeByToken(token) {
   return db.prepare("SELECT * FROM sd_attendees WHERE vote_token = ?").get(token);
 }
 
+// Pregunta de conversación de una ronda dada (1-indexed) — Francisco la
+// escribe al crear/editar el evento (sd_events.round_questions, una por
+// línea, ver routes/speedDatingAdmin.js). La misma pregunta se entrega a
+// todas las mesas esa ronda; si el organizador escribió menos preguntas
+// que rondas terminó teniendo el evento, las rondas sin pregunta propia
+// simplemente no muestran ninguna (no se inventa ni se repite nada).
+function roundQuestion(event, roundNumber) {
+  if (!event.round_questions || !roundNumber || roundNumber < 1) return null;
+  const list = event.round_questions
+    .split("\n")
+    .map((q) => q.trim())
+    .filter(Boolean);
+  return list[roundNumber - 1] || null;
+}
+
 // Busca el pairing (mesa+pareja) de un asistente para una ronda dada.
 // Para mujeres siempre existe una fila (su mesa es fija); para hombres, si
 // no hay fila es que esa ronda descansan (aforo desigual) — ver
@@ -190,6 +205,8 @@ router.get("/attendee/:token/estado", (req, res) => {
     descansa,
     ya_vote: yaVote,
     pairing_id: event.round_state === "ronda_activa" ? (votingPairing ? votingPairing.id : null) : null,
+    pregunta_ronda: event.round_state === "ronda_activa" ? roundQuestion(event, event.current_round_number) : null,
+    pregunta_siguiente: isTransition ? roundQuestion(event, event.current_round_number + 1) : null,
   });
 });
 

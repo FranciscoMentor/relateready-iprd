@@ -40,6 +40,19 @@ function esc(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// Convierte el texto plano guardado en sd_events.round_questions (una
+// pregunta por línea) en un arreglo ordenado — índice 0 = Ronda 1. Se
+// reutiliza tanto para renderizar el panel del organizador como, en
+// routes/speedDatingPublic.js, para entregarla al celular de cada
+// asistente durante la ronda activa.
+function parseRoundQuestions(text) {
+  if (!text) return [];
+  return text
+    .split("\n")
+    .map((q) => q.trim())
+    .filter(Boolean);
+}
+
 function baseStyles() {
   return `
     *{box-sizing:border-box;font-family:Arial,"Helvetica Neue",Helvetica,"Segoe UI",sans-serif;}
@@ -161,6 +174,10 @@ router.get("/", (req, res) => {
         <div><label class="muted" style="display:block;margin-bottom:4px;">Aforo máximo</label><input type="number" name="capacity" value="24" min="2" max="60" style="width:90px;"></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Lugar</label><input type="text" name="venue_name" placeholder="Ej. Mila Rooftop"></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Dirección</label><input type="text" name="venue_address" placeholder="Ciudad, dirección" style="min-width:220px;"></div>
+        <div style="flex-basis:100%;">
+          <label class="muted" style="display:block;margin-bottom:4px;">Preguntas de conversación por ronda (opcional)</label>
+          <textarea name="round_questions" rows="4" style="width:100%;padding:9px 12px;border:1px solid ${BRAND.border};border-radius:8px;font-size:13px;font-family:inherit;" placeholder="Una pregunta por línea, en orden: la primera línea es la Ronda 1, la segunda la Ronda 2, etc. Básalas en el test y en el libro Tú Primero."></textarea>
+        </div>
         <button type="submit" class="btn">Crear evento</button>
       </form>
     </div>
@@ -181,8 +198,8 @@ router.post("/", express.urlencoded({ extended: true }), (req, res) => {
   const capacity = Number(req.body.capacity) > 0 ? Number(req.body.capacity) : 24;
   const id = crypto.randomUUID();
   db.prepare(
-    `INSERT INTO sd_events (id, created_at, name, event_date, capacity, status, round_state, current_round_number, venue_name, venue_address)
-     VALUES (?, ?, ?, ?, ?, 'registro', 'esperando_inicio', 0, ?, ?)`
+    `INSERT INTO sd_events (id, created_at, name, event_date, capacity, status, round_state, current_round_number, venue_name, venue_address, round_questions)
+     VALUES (?, ?, ?, ?, ?, 'registro', 'esperando_inicio', 0, ?, ?, ?)`
   ).run(
     id,
     new Date().toISOString(),
@@ -190,7 +207,8 @@ router.post("/", express.urlencoded({ extended: true }), (req, res) => {
     (req.body.event_date || "").trim() || null,
     capacity,
     (req.body.venue_name || "").trim() || null,
-    (req.body.venue_address || "").trim() || null
+    (req.body.venue_address || "").trim() || null,
+    (req.body.round_questions || "").replace(/\r\n/g, "\n").trim() || null
   );
   res.redirect(`/admin/speed-dating/${id}`);
 });
@@ -231,6 +249,7 @@ router.get("/:eventId", (req, res) => {
   const canSiguienteRonda = event.status === "en_curso" && (event.round_state === "esperando_inicio" || event.round_state === "cambio_de_mesa");
   const canFinalizar = event.status === "en_curso";
   const isLastTransition = event.round_state === "cambio_de_mesa" && event.current_round_number >= (event.total_rounds || 0);
+  const roundQuestionsList = parseRoundQuestions(event.round_questions);
 
   const eyebrowLabel = event.status === "en_curso" ? "Evento en vivo" : event.status === "finalizado" ? "Evento finalizado" : "Registro abierto";
 
@@ -263,6 +282,10 @@ router.get("/:eventId", (req, res) => {
           <div><label class="muted" style="display:block;margin-bottom:4px;">Aforo máximo</label><input type="number" name="capacity" value="${event.capacity}" min="2" max="500" style="width:90px;"></div>
           <div><label class="muted" style="display:block;margin-bottom:4px;">Lugar</label><input type="text" name="venue_name" value="${esc(event.venue_name || "")}" placeholder="Ej. Mila Rooftop"></div>
           <div><label class="muted" style="display:block;margin-bottom:4px;">Dirección</label><input type="text" name="venue_address" value="${esc(event.venue_address || "")}" placeholder="Ciudad, dirección" style="min-width:220px;"></div>
+          <div style="flex-basis:100%;">
+            <label class="muted" style="display:block;margin-bottom:4px;">Preguntas de conversación por ronda (opcional)</label>
+            <textarea name="round_questions" rows="4" style="width:100%;padding:9px 12px;border:1px solid ${BRAND.border};border-radius:8px;font-size:13px;font-family:inherit;" placeholder="Una pregunta por línea, en orden: la primera línea es la Ronda 1, la segunda la Ronda 2, etc.">${esc(event.round_questions || "")}</textarea>
+          </div>
           <button type="submit" class="btn">Guardar cambios</button>
         </form>
         <p class="muted" style="margin:12px 0 0;">Puedes cambiar el aforo en cualquier momento, incluso justo antes de iniciar el evento — por ejemplo si el lugar confirma más o menos espacio del esperado.</p>
@@ -296,6 +319,19 @@ router.get("/:eventId", (req, res) => {
       ${event.status === "registro" ? '<p class="muted" style="margin-top:12px;">El registro sigue abierto — cuando todos hayan llegado, cierra el registro para calcular las mesas y las rondas.</p>' : ""}
     </div>
 
+    ${roundQuestionsList.length ? `
+    <div class="card">
+      <h2 style="margin:0 0 6px;font-size:15px;">Preguntas de conversación por ronda</h2>
+      <p class="muted" style="margin:0 0 14px;">La misma pregunta aparece en el celular de todas las mesas durante esa ronda.</p>
+      <ol style="margin:0;padding-left:20px;">
+        ${roundQuestionsList.map((q, i) => {
+          const roundNum = i + 1;
+          const isCurrent = event.status === "en_curso" && event.round_state === "ronda_activa" && event.current_round_number === roundNum;
+          return `<li style="margin-bottom:8px;${isCurrent ? `font-weight:700;color:${BRAND.accentDark};` : ""}">${isCurrent ? `<span class="badge" style="background:${BRAND.green};margin-right:6px;">En vivo</span>` : ""}${esc(q)}</li>`;
+        }).join("")}
+      </ol>
+    </div>` : ""}
+
     <div class="card">
       <h2 style="margin:0 0 12px;font-size:15px;">Informe de matching inmediato</h2>
       <p class="muted" style="margin:0 0 12px;">Disponible en cualquier momento, incluso a mitad del evento — no depende del correo automático de 48h.</p>
@@ -326,10 +362,11 @@ router.post("/:eventId/editar", express.urlencoded({ extended: true }), (req, re
   const capacity = Number(req.body.capacity) > 0 ? Number(req.body.capacity) : event.capacity;
   const venueName = (req.body.venue_name || "").trim() || null;
   const venueAddress = (req.body.venue_address || "").trim() || null;
+  const roundQuestions = (req.body.round_questions || "").replace(/\r\n/g, "\n").trim() || null;
 
   db.prepare(
-    `UPDATE sd_events SET name = ?, event_date = ?, capacity = ?, venue_name = ?, venue_address = ? WHERE id = ?`
-  ).run(name, eventDate, capacity, venueName, venueAddress, event.id);
+    `UPDATE sd_events SET name = ?, event_date = ?, capacity = ?, venue_name = ?, venue_address = ?, round_questions = ? WHERE id = ?`
+  ).run(name, eventDate, capacity, venueName, venueAddress, roundQuestions, event.id);
 
   res.redirect(`/admin/speed-dating/${event.id}`);
 });
