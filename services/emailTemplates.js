@@ -223,5 +223,74 @@ function speedDatingMatchEmail({ name, lang, eventName, matches }) {
   };
 }
 
-module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail };
+// Se envía automáticamente en el momento en que alguien completa su
+// registro a un evento de speed dating — ver POST
+// /api/speed-dating/events/:eventId/registro en routes/speedDatingPublic.js.
+// No bloquea la respuesta del registro: si el correo falla, el registro
+// igual queda guardado (el error solo se registra en consola).
+function speedDatingWelcomeEmail({ name, lang, gender, eventName, eventDate, venueName, venueAddress, minAge, maxAge, tableNumber, asistenteUrl }) {
+  const firstName = firstNameOf(name, lang);
+
+  const formattedDate = eventDate
+    ? new Date(`${eventDate}T00:00:00`).toLocaleDateString(lang === "en" ? "en-US" : "es-EC", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      })
+    : null;
+
+  const ageRangeLabel =
+    minAge && maxAge
+      ? (lang === "en" ? `Ages ${minAge}–${maxAge}` : `Personas de ${minAge} a ${maxAge} años`)
+      : minAge
+      ? (lang === "en" ? `Ages ${minAge}+` : `Personas de ${minAge} años en adelante`)
+      : maxAge
+      ? (lang === "en" ? `Up to age ${maxAge}` : `Personas de hasta ${maxAge} años`)
+      : null;
+
+  const detailRowsEs = `
+    ${formattedDate ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Fecha:</strong> ${formattedDate}</p>` : ""}
+    ${venueName ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Lugar:</strong> ${venueName}${venueAddress ? ` — ${venueAddress}` : ""}</p>` : ""}
+    ${ageRangeLabel ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Este evento es para:</strong> ${ageRangeLabel}</p>` : ""}
+    ${tableNumber ? `<p style="margin:0;font-size:14px;"><strong>Tu mesa fija:</strong> Mesa ${tableNumber} — no te muevas de ahí en toda la noche.</p>` : ""}
+  `;
+  const detailRowsEn = `
+    ${formattedDate ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Date:</strong> ${formattedDate}</p>` : ""}
+    ${venueName ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Venue:</strong> ${venueName}${venueAddress ? ` — ${venueAddress}` : ""}</p>` : ""}
+    ${ageRangeLabel ? `<p style="margin:0 0 8px;font-size:14px;"><strong>This event is for:</strong> ${ageRangeLabel}</p>` : ""}
+    ${tableNumber ? `<p style="margin:0;font-size:14px;"><strong>Your fixed table:</strong> Table ${tableNumber} — you'll stay there all night.</p>` : ""}
+  `;
+
+  if (lang === "en") {
+    return {
+      subject: `You're in! Your spot for ${eventName}`,
+      html: shell({
+        lang,
+        bodyHtml: `
+          <p style="font-size:16px;margin:0 0 16px;">Hi ${firstName},</p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">You're registered for <strong>${eventName}</strong>! Save this email — the link below is your personal access for the night.</p>
+          <div style="border:1px solid #E7DFD2;border-radius:10px;padding:16px 18px;margin:0 0 20px;">${detailRowsEn}</div>
+          <p style="margin:0 0 12px;">${button(asistenteUrl, "View my event screen")}</p>
+          <p style="font-size:12.5px;line-height:1.5;margin:16px 0 0;color:${MUTED};">Save this link — you'll need it the night of the event to see your table, vote, and get your results.</p>
+        `,
+      }),
+    };
+  }
+  const registradoWord = gender === "F" ? "registrada" : "registrado";
+  return {
+    subject: `¡Ya estás dentro! Tu registro para ${eventName}`,
+    html: shell({
+      lang,
+      bodyHtml: `
+        <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">¡Ya quedaste ${registradoWord} para <strong>${eventName}</strong>! Guarda este correo — el link de abajo es tu acceso personal durante toda la noche.</p>
+        <div style="border:1px solid #E7DFD2;border-radius:10px;padding:16px 18px;margin:0 0 20px;">${detailRowsEs}</div>
+        <p style="margin:0 0 12px;">${button(asistenteUrl, "Ver mi pantalla del evento")}</p>
+        <p style="font-size:12.5px;line-height:1.5;margin:16px 0 0;color:${MUTED};">Guarda este link — lo vas a necesitar la noche del evento para ver tu mesa, votar y conocer tus resultados.</p>
+      `,
+    }),
+  };
+}
+
+module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail };
 

@@ -25,6 +25,7 @@
     <form id="registro-form" class="sd-hidden">
       <p class="sd-prompt" id="evento-nombre" style="font-size:19px;"></p>
       <p class="sd-subtext" id="evento-lugar" style="display:none;"></p>
+      <p class="sd-subtext" id="evento-edad" style="display:none;"></p>
       <p class="sd-subtext">Completa tus datos para asignarte tu mesa (si eres mujer) o tu ronda de citas (si eres hombre).</p>
 
       <div class="field">
@@ -38,6 +39,10 @@
       <div class="field">
         <label>Correo</label>
         <input type="email" id="f-email" required>
+      </div>
+      <div class="field">
+        <label>Edad</label>
+        <input type="number" id="f-age" min="1" max="120" required>
       </div>
       <div class="field">
         <label>Género</label>
@@ -126,6 +131,15 @@
         lugarEl.textContent = [data.venueName, data.venueAddress].filter(Boolean).join(' — ');
         lugarEl.style.display = '';
       }
+      if (data.minAge || data.maxAge) {
+        const edadEl = document.getElementById('evento-edad');
+        edadEl.textContent = data.minAge && data.maxAge
+          ? `Este evento es para personas de ${data.minAge} a ${data.maxAge} años.`
+          : data.minAge
+          ? `Este evento es para personas de ${data.minAge} años en adelante.`
+          : `Este evento es para personas de hasta ${data.maxAge} años.`;
+        edadEl.style.display = '';
+      }
       form.classList.remove('sd-hidden');
     } catch (err) {
       loadingBlock.classList.add('sd-hidden');
@@ -149,6 +163,7 @@
           name: document.getElementById('f-name').value,
           phone: document.getElementById('f-phone').value,
           email: document.getElementById('f-email').value,
+          age: Number(document.getElementById('f-age').value),
           gender,
           sharePhoneConsent: consent === 1,
         }),

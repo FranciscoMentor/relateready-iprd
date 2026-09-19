@@ -211,4 +211,28 @@ addSdEventsColumnIfMissing("venue_address", "venue_address TEXT");
 // — la misma pregunta para todas las mesas esa ronda.
 addSdEventsColumnIfMissing("round_questions", "round_questions TEXT");
 
+// ── Migración: rango de edad obligatorio del evento (2026-09) ────────────
+// min_age / max_age: cada evento debe dirigirse a un rango de edad (ej. 25
+// a 40 años) — se define al crear o editar el evento (routes/
+// speedDatingAdmin.js) y se hace cumplir en el registro público (routes/
+// speedDatingPublic.js): quien esté fuera del rango no puede registrarse.
+// Un evento sin rango configurado (NULL) no bloquea ninguna edad — así los
+// eventos creados antes de este cambio siguen funcionando igual que antes.
+addSdEventsColumnIfMissing("min_age", "min_age INTEGER");
+addSdEventsColumnIfMissing("max_age", "max_age INTEGER");
+
+// ── Migración: edad de cada asistente (2026-09) ───────────────────────────
+// age: la edad que la persona declaró al registrarse — se usa para hacer
+// cumplir min_age/max_age (arriba) y queda guardada para que el organizador
+// la vea en el panel. sd_attendees ya existe en producción, así que se
+// agrega con el mismo patrón addColumnIfMissing, esta vez sobre esa tabla.
+const sdAttendeesColumns = db.prepare("PRAGMA table_info(sd_attendees)").all().map((c) => c.name);
+function addSdAttendeesColumnIfMissing(name, ddl) {
+  if (!sdAttendeesColumns.includes(name)) {
+    db.exec(`ALTER TABLE sd_attendees ADD COLUMN ${ddl}`);
+    sdAttendeesColumns.push(name);
+  }
+}
+addSdAttendeesColumnIfMissing("age", "age INTEGER");
+
 module.exports = db;

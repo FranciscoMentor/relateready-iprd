@@ -11,6 +11,8 @@ const express = require("express");
 const crypto = require("crypto");
 const router = express.Router();
 const db = require("../db/init");
+const { sendMail } = require("../services/graphMail");
+const { speedDatingWelcomeEmail } = require("../services/emailTemplates");
 
 router.use(express.json());
 
@@ -32,6 +34,8 @@ router.get("/events/:eventId/meta", (req, res) => {
     cuposDisponibles: Math.max(0, event.capacity - registered),
     venueName: event.venue_name || null,
     venueAddress: event.venue_address || null,
+    minAge: event.min_age || null,
+    maxAge: event.max_age || null,
   });
 });
 
@@ -58,6 +62,24 @@ router.post("/events/:eventId/registro", (req, res) => {
     return res.status(400).json({ error: "Selecciona tu género para poder asignarte una mesa." });
   }
 
+  // Edad obligatoria y, si el evento tiene un rango configurado (sd_events
+  // .min_age / .max_age — ver routes/speedDatingAdmin.js), se hace cumplir
+  // aquí. Un evento sin rango configurado (ambos NULL) no bloquea a nadie
+  // por edad — así los eventos creados antes de este cambio no se rompen.
+  const age = Number(req.body && req.body.age);
+  if (!Number.isInteger(age) || age < 1 || age > 120) {
+    return res.status(400).json({ error: "La edad es obligatoria." });
+  }
+  if ((event.min_age && age < event.min_age) || (event.max_age && age > event.max_age)) {
+    const rangeLabel =
+      event.min_age && event.max_age
+        ? `de ${event.min_age} a ${event.max_age} años`
+        : event.min_age
+        ? `de ${event.min_age} años en adelante`
+        : `hasta ${event.max_age} años`;
+    return res.status(400).json({ error: `Este evento es para personas ${rangeLabel}.` });
+  }
+
   const registered = db.prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ?").get(event.id).n;
   if (registered >= event.capacity) {
     return res.status(400).json({ error: "Este evento ya alcanzó su aforo máximo." });
@@ -74,8 +96,8 @@ router.post("/events/:eventId/registro", (req, res) => {
 
   db.prepare(
     `INSERT INTO sd_attendees
-      (id, event_id, created_at, name, email, phone, gender, share_phone_consent, table_number, seat_index, vote_token)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      (id, event_id, created_at, name, email, phone, gender, share_phone_consent, table_number, seat_index, vote_token, age)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     event.id,
@@ -87,8 +109,36 @@ router.post("/events/:eventId/registro", (req, res) => {
     sharePhoneConsent ? 1 : 0,
     tableNumber,
     seatIndex,
-    voteToken
+    voteToken,
+    age
   );
+
+  // Correo de bienvenida automático — no bloquea la respuesta del registro
+  // (si falla el envío, el registro ya quedó guardado igual; el error solo
+  // se registra en consola, sin reintento automático como sí tiene el
+  // correo de resultados de 48h).
+  try {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const asistenteUrl = `${baseUrl}/speed-dating/asistente.html?token=${voteToken}`;
+    const { subject, html } = speedDatingWelcomeEmail({
+      name: name.trim(),
+      lang: "es",
+      gender,
+      eventName: event.name,
+      eventDate: event.event_date,
+      venueName: event.venue_name,
+      venueAddress: event.venue_address,
+      minAge: event.min_age,
+      maxAge: event.max_age,
+      tableNumber,
+      asistenteUrl,
+    });
+    sendMail({ to: email.trim(), subject, html }).catch((err) => {
+      console.error("[speedDatingPublic] Error enviando correo de bienvenida —", err.message);
+    });
+  } catch (err) {
+    console.error("[speedDatingPublic] Error preparando correo de bienvenida —", err.message);
+  }
 
   res.json({ ok: true, voteToken, tableNumber, gender });
 });
