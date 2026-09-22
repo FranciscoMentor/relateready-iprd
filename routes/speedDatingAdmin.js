@@ -40,6 +40,27 @@ function esc(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// Reasigna table_number (solo mujeres — su mesa fija) y seat_index (ambos
+// géneros — su posición en la rotación) en orden de registro (created_at),
+// cerrando los huecos que deja borrar o cambiar de género a un asistente.
+// Solo se usa mientras el evento sigue en "registro": una vez que se genera
+// el calendario de rondas (routes/speedDatingAdmin.js, POST /iniciar), la
+// numeración de mesas ya quedó fija en sd_pairings y no depende más de
+// estas columnas.
+function renumberGender(eventId, gender) {
+  const rows = db
+    .prepare("SELECT id FROM sd_attendees WHERE event_id = ? AND gender = ? ORDER BY created_at ASC")
+    .all(eventId, gender);
+  const update = db.prepare("UPDATE sd_attendees SET table_number = ?, seat_index = ? WHERE id = ?");
+  const tx = db.transaction((list) => {
+    list.forEach((row, i) => {
+      const tableNumber = gender === "F" ? i + 1 : null;
+      update.run(tableNumber, i, row.id);
+    });
+  });
+  tx(rows);
+}
+
 // Convierte el texto plano guardado en sd_events.round_questions (una
 // pregunta por línea) en un arreglo ordenado — índice 0 = Ronda 1. Se
 // reutiliza tanto para renderizar el panel del organizador como, en
@@ -116,6 +137,52 @@ function topbar() {
 
 function baseUrlOf(req) {
   return `${req.protocol}://${req.get("host")}`;
+}
+
+// Página independiente para editar (o revisar antes de borrar) un asistente
+// puntual — separada del tablero del evento para no llenar la tabla de
+// formularios inline cuando puede haber más de veinte filas.
+function renderAttendeeEditPage({ event, attendee, values, error }) {
+  const canChangeGender = event.status === "registro";
+  return `<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editar asistente · ${esc(event.name)}</title>
+<style>${baseStyles()}</style></head>
+<body>
+  ${topbar()}
+  <div class="container" style="max-width:560px;">
+    <div class="page-head">
+      <span class="eyebrow">Editar asistente</span>
+      <h1>${esc(values.name || attendee.name)}</h1>
+      <p class="lede">${esc(event.name)}</p>
+    </div>
+    <div class="card">
+      ${error ? `<p style="color:${BRAND.clay};font-weight:700;margin:0 0 16px;">${esc(error)}</p>` : ""}
+      <form method="POST" action="/admin/speed-dating/${event.id}/attendees/${attendee.id}/editar" style="display:flex;flex-direction:column;gap:16px;">
+        <label>Nombre<br><input type="text" name="name" value="${esc(values.name)}" style="width:100%;margin-top:4px;" required></label>
+        <label>Correo<br><input type="text" name="email" value="${esc(values.email)}" style="width:100%;margin-top:4px;" required></label>
+        <label>Teléfono/WhatsApp<br><input type="text" name="phone" value="${esc(values.phone)}" style="width:100%;margin-top:4px;" required></label>
+        <label>Edad<br><input type="number" name="age" value="${esc(values.age)}" min="1" max="120" style="width:100%;margin-top:4px;" required></label>
+        <label>Género<br>
+          <select name="gender" ${canChangeGender ? "" : "disabled"} style="width:100%;margin-top:4px;padding:9px 12px;border:1px solid ${BRAND.border};border-radius:8px;font-size:13px;">
+            <option value="F" ${values.gender === "F" ? "selected" : ""}>Mujer</option>
+            <option value="M" ${values.gender === "M" ? "selected" : ""}>Hombre</option>
+          </select>
+          ${canChangeGender ? "" : `<span class="muted">El evento ya inició — el género ya no se puede cambiar porque las mesas ya están asignadas.</span>`}
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" name="share_phone_consent" value="1" ${values.share_phone_consent ? "checked" : ""}>
+          Autorizó compartir su WhatsApp si hay match
+        </label>
+        <div style="display:flex;gap:10px;margin-top:6px;">
+          <button type="submit" class="btn">Guardar cambios</button>
+          <a href="/admin/speed-dating/${event.id}" class="btn ghost">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</body></html>`;
 }
 
 const ROUND_STATE_LABEL = {
@@ -288,7 +355,13 @@ router.get("/:eventId", (req, res) => {
         <td>${a.match_email_status ? `<span class="badge" style="background:${a.match_email_status === "sent" ? BRAND.green : BRAND.clay}">${a.match_email_status}</span>` : '<span class="muted">—</span>'}
           ${event.status === "finalizado" ? `<form class="inline" method="POST" action="/admin/speed-dating/${event.id}/attendees/${a.id}/reenviar-correo"><button type="submit" class="btn small ghost" style="margin-top:4px;">Reenviar correo</button></form>` : ""}
         </td>
-        <td><button type="button" class="btn small ghost" onclick="navigator.clipboard.writeText('${asistenteUrl}').then(()=>{this.textContent='Copiado ✓';setTimeout(()=>this.textContent='Copiar link',1200);})">Copiar link</button></td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+            <button type="button" class="btn small ghost" onclick="navigator.clipboard.writeText('${asistenteUrl}').then(()=>{this.textContent='Copiado ✓';setTimeout(()=>this.textContent='Copiar link',1200);})">Copiar link</button>
+            <a href="/admin/speed-dating/${event.id}/attendees/${a.id}/editar" class="btn small ghost">Editar</a>
+            ${event.status === "registro" ? `<form class="inline" method="POST" action="/admin/speed-dating/${event.id}/attendees/${a.id}/eliminar" onsubmit="return confirm('¿Eliminar a ${esc(a.name).replace(/'/g, "\\'")} de este evento? Esta acción no se puede deshacer.');"><button type="submit" class="btn small danger">Eliminar</button></form>` : ""}
+          </div>
+        </td>
       </tr>`;
     })
     .join("");
@@ -426,6 +499,104 @@ router.post("/:eventId/editar", express.urlencoded({ extended: true }), (req, re
   db.prepare(
     `UPDATE sd_events SET name = ?, event_date = ?, capacity = ?, venue_name = ?, venue_address = ?, round_questions = ?, min_age = ?, max_age = ? WHERE id = ?`
   ).run(name, eventDate, capacity, venueName, venueAddress, roundQuestions, minAge, maxAge, event.id);
+
+  res.redirect(`/admin/speed-dating/${event.id}`);
+});
+
+// ── Editar asistente: corrige datos de contacto, edad o género de un
+// registro puntual (por ejemplo, uno de prueba, o un dato mal escrito). El
+// género solo se puede cambiar mientras el evento sigue en "registro" —
+// una vez iniciado, las mesas ya están asignadas en sd_pairings. ────────
+router.get("/:eventId/attendees/:attendeeId/editar", (req, res) => {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
+  if (!event) return res.status(404).send("Evento no encontrado.");
+  const attendee = db.prepare("SELECT * FROM sd_attendees WHERE id = ? AND event_id = ?").get(req.params.attendeeId, event.id);
+  if (!attendee) return res.status(404).send("Asistente no encontrado.");
+
+  res.send(
+    renderAttendeeEditPage({
+      event,
+      attendee,
+      values: {
+        name: attendee.name,
+        email: attendee.email,
+        phone: attendee.phone,
+        age: attendee.age,
+        gender: attendee.gender,
+        share_phone_consent: attendee.share_phone_consent,
+      },
+      error: null,
+    })
+  );
+});
+
+router.post("/:eventId/attendees/:attendeeId/editar", express.urlencoded({ extended: true }), (req, res) => {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
+  if (!event) return res.status(404).send("Evento no encontrado.");
+  const attendee = db.prepare("SELECT * FROM sd_attendees WHERE id = ? AND event_id = ?").get(req.params.attendeeId, event.id);
+  if (!attendee) return res.status(404).send("Asistente no encontrado.");
+
+  const canChangeGender = event.status === "registro";
+  const values = {
+    name: (req.body.name || "").trim(),
+    email: (req.body.email || "").trim(),
+    phone: (req.body.phone || "").trim(),
+    age: req.body.age,
+    gender: canChangeGender ? req.body.gender : attendee.gender,
+    share_phone_consent: req.body.share_phone_consent ? 1 : 0,
+  };
+
+  const rerender = (error) => res.send(renderAttendeeEditPage({ event, attendee, values, error }));
+
+  if (!values.name) return rerender("El nombre es obligatorio.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) return rerender("El correo no es válido.");
+  if (!values.phone) return rerender("El teléfono/WhatsApp es obligatorio.");
+  if (values.gender !== "M" && values.gender !== "F") return rerender("Selecciona un género válido.");
+
+  const age = Number(values.age);
+  if (!Number.isInteger(age) || age < 1 || age > 120) return rerender("La edad debe ser un número válido.");
+  if ((event.min_age && age < event.min_age) || (event.max_age && age > event.max_age)) {
+    const rangeLabel =
+      event.min_age && event.max_age
+        ? `de ${event.min_age} a ${event.max_age} años`
+        : event.min_age
+        ? `de ${event.min_age} años en adelante`
+        : `hasta ${event.max_age} años`;
+    return rerender(`Este evento es para personas ${rangeLabel}.`);
+  }
+
+  const previousGender = attendee.gender;
+  const genderChanged = values.gender !== previousGender;
+
+  db.prepare(
+    `UPDATE sd_attendees SET name = ?, email = ?, phone = ?, age = ?, gender = ?, share_phone_consent = ? WHERE id = ?`
+  ).run(values.name, values.email, values.phone, age, values.gender, values.share_phone_consent, attendee.id);
+
+  if (genderChanged) {
+    // Cambia de grupo: hay que recalcular la mesa/posición de ambos géneros
+    // para que no quede ni un hueco ni un número repetido.
+    renumberGender(event.id, previousGender);
+    renumberGender(event.id, values.gender);
+  }
+
+  res.redirect(`/admin/speed-dating/${event.id}`);
+});
+
+// ── Eliminar asistente: solo mientras el evento sigue en "registro" — una
+// vez que se generó el calendario de rondas (sd_pairings ya referencia a
+// cada asistente), borrarlo rompería las rondas armadas y el informe de
+// matching, así que la solicitud simplemente se ignora en ese caso. ─────
+router.post("/:eventId/attendees/:attendeeId/eliminar", (req, res) => {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
+  if (!event) return res.status(404).send("Evento no encontrado.");
+  if (event.status !== "registro") {
+    return res.redirect(`/admin/speed-dating/${event.id}`);
+  }
+  const attendee = db.prepare("SELECT * FROM sd_attendees WHERE id = ? AND event_id = ?").get(req.params.attendeeId, event.id);
+  if (!attendee) return res.status(404).send("Asistente no encontrado.");
+
+  db.prepare("DELETE FROM sd_attendees WHERE id = ?").run(attendee.id);
+  renumberGender(event.id, attendee.gender);
 
   res.redirect(`/admin/speed-dating/${event.id}`);
 });
