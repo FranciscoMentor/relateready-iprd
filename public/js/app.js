@@ -524,6 +524,7 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Error");
+        if (typeof fbq === "function") fbq("track", "CompleteRegistration");
         state.submissionId = data.id;
         state.scoreSummary = data.scoreSummary;
         state.referralTriggered = data.referralTriggered;
