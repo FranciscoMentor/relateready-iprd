@@ -38,19 +38,90 @@
 
   let pollTimer = null;
   let voting = false;
+  let lastEstado = null;
 
   function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
 
-  function render(estado) {
-    codeChip.textContent = estado.mi_genero === 'F' ? 'Mujer · mesa fija' : 'Hombre · rota';
+  function firstNameOf(fullName) {
+    return (fullName || '').trim().split(/\s+/)[0] || fullName || '';
+  }
 
-    if (estado.evento_estado === 'esperando_inicio') {
+  function formatDateEs(isoDateStr) {
+    if (!isoDateStr) return null;
+    try {
+      return new Date(`${isoDateStr}T00:00:00`).toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long' });
+    } catch (e) {
+      return isoDateStr;
+    }
+  }
+
+  // Cuántos días faltan para la fecha del evento, contando desde hoy en el
+  // huso horario del celular de la persona. null si el evento no tiene
+  // fecha configurada (eventos viejos). 0 = es hoy. Negativo no debería
+  // pasar (el evento ya se habría cerrado), pero por si acaso se trata
+  // igual que "hoy".
+  function daysUntilEvent(isoDateStr) {
+    if (!isoDateStr) return null;
+    const eventDate = new Date(`${isoDateStr}T00:00:00`);
+    if (Number.isNaN(eventDate.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((eventDate - today) / 86400000);
+  }
+
+  function cancelLinkHtml() {
+    return `<button class="sd-link-btn" id="cancel-link" type="button">¿No podrás asistir? Cancela tu participación</button>`;
+  }
+
+  function attachCancelHandler() {
+    const btn = document.getElementById('cancel-link');
+    if (btn) btn.addEventListener('click', showCancelForm);
+  }
+
+  function render(estado) {
+    lastEstado = estado;
+    codeChip.textContent = estado.evento_estado === 'cancelado'
+      ? 'Cancelaste tu cupo'
+      : (estado.mi_genero === 'F' ? 'Mujer · mesa fija' : 'Hombre · rota');
+
+    if (estado.evento_estado === 'cancelado') {
+      const firstName = firstNameOf(estado.mi_nombre);
       app.innerHTML = `
         <div class="sd-center-col">
-          <div class="sd-big-icon accent">${ICONS.rotate}</div>
-          <h2>Ya estás dentro</h2>
-          <p>${estado.mi_mesa ? `Tu mesa fija es la <strong>${estado.mi_mesa}</strong>. ` : ''}Espera a que el organizador inicie el evento — esta pantalla se actualiza sola.</p>
+          <div class="sd-big-icon">${ICONS.leaf}</div>
+          <h2>Cancelaste tu participación</h2>
+          <p>Listo, ${esc(firstName)} — quedó registrado que no podrás venir a <strong>${esc(estado.evento_nombre)}</strong>.${estado.motivo ? ` Motivo: "${esc(estado.motivo)}".` : ''} Gracias por avisarnos con tiempo, así le damos tu cupo a alguien más.</p>
+          <p class="sd-subtext">Si cambias de opinión y el evento todavía no ha comenzado, escríbele directo al organizador para reactivar tu cupo.</p>
         </div>`;
+      return;
+    }
+
+    if (estado.evento_estado === 'esperando_inicio') {
+      const firstName = firstNameOf(estado.mi_nombre);
+      const mesaLine = estado.mi_mesa ? `Ya tienes tu mesa fija asignada: <strong>Mesa ${estado.mi_mesa}</strong>. ` : '';
+      const days = daysUntilEvent(estado.evento_fecha);
+      const dateVenueBits = [estado.evento_fecha ? formatDateEs(estado.evento_fecha) : null, estado.evento_lugar].filter(Boolean).join(' · ');
+
+      if (days !== null && days > 0) {
+        const daysWord = days === 1 ? 'Falta 1 día' : `Faltan ${days} días`;
+        app.innerHTML = `
+          <div class="sd-center-col">
+            <div class="sd-big-icon accent">${ICONS.checkHeart}</div>
+            <h2>¡Ya estás dentro, ${esc(firstName)}! 🎉</h2>
+            <p>Tu lugar en <strong>${esc(estado.evento_nombre)}</strong> está confirmado${dateVenueBits ? ` para el ${esc(dateVenueBits)}` : ''}. ${mesaLine}Guarda este link — es tu acceso personal para esa noche.</p>
+            <p class="sd-subtext" style="margin-top:2px;">${daysWord} — ¡te esperamos, va a estar buenísimo!</p>
+            ${cancelLinkHtml()}
+          </div>`;
+      } else {
+        app.innerHTML = `
+          <div class="sd-center-col">
+            <div class="sd-big-icon accent">${ICONS.rotate}</div>
+            <h2>Ya estás dentro, ${esc(firstName)}</h2>
+            <p>${mesaLine}Espera a que el organizador inicie el evento — esta pantalla se actualiza sola.</p>
+            ${cancelLinkHtml()}
+          </div>`;
+      }
+      attachCancelHandler();
       return;
     }
 
@@ -174,6 +245,53 @@
     app.querySelectorAll('.sd-vote-btn').forEach((btn) => {
       btn.addEventListener('click', () => castVote(btn.dataset.vote));
     });
+  }
+
+  function showCancelForm() {
+    const estado = lastEstado || {};
+    app.innerHTML = `
+      <div class="sd-center-col" style="align-items:stretch;text-align:left;">
+        <h2 style="text-align:center;">¿Seguro que quieres cancelar?</h2>
+        <p style="text-align:center;">Lamentamos que no puedas venir a <strong>${esc(estado.evento_nombre)}</strong>. Cuéntanos brevemente el motivo — nos ayuda a mejorar, y liberamos tu cupo para alguien más.</p>
+        <textarea id="cancel-reason" rows="3" placeholder="Ej. Se me cruzó un compromiso de trabajo" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid var(--border, #E7DFD2);font-family:inherit;font-size:14px;margin:14px 0 8px;resize:vertical;"></textarea>
+        <div id="cancel-error" class="sd-error-banner sd-hidden" style="margin-bottom:10px;"></div>
+        <div style="display:flex;gap:10px;">
+          <button class="sd-cta-ghost" id="cancel-back-btn" type="button" style="flex:1;">Volver</button>
+          <button class="sd-cta-primary" id="cancel-confirm-btn" type="button" style="flex:1;">Confirmar cancelación</button>
+        </div>
+      </div>`;
+    document.getElementById('cancel-back-btn').addEventListener('click', () => render(lastEstado));
+    document.getElementById('cancel-confirm-btn').addEventListener('click', submitCancel);
+  }
+
+  async function submitCancel() {
+    const reasonEl = document.getElementById('cancel-reason');
+    const reason = (reasonEl.value || '').trim();
+    const errEl = document.getElementById('cancel-error');
+    errEl.classList.add('sd-hidden');
+    if (!reason) {
+      errEl.textContent = 'Cuéntanos brevemente el motivo para poder cancelar.';
+      errEl.classList.remove('sd-hidden');
+      return;
+    }
+    const btn = document.getElementById('cancel-confirm-btn');
+    btn.disabled = true;
+    btn.textContent = 'Cancelando…';
+    try {
+      const resp = await fetch(`/api/speed-dating/attendee/${token}/cancelar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'No se pudo cancelar tu participación.');
+      await poll();
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Confirmar cancelación';
+      errEl.textContent = err.message;
+      errEl.classList.remove('sd-hidden');
+    }
   }
 
   async function castVote(vote) {

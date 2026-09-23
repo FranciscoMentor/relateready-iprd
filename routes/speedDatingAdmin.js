@@ -13,6 +13,7 @@ const crypto = require("crypto");
 const router = express.Router();
 const db = require("../db/init");
 const { generateSchedule, computeMutualMatches, persistMatches } = require("../services/speedDatingMatch");
+const { renumberGender } = require("../services/speedDatingAttendees");
 const { sendMail } = require("../services/graphMail");
 const { speedDatingMatchEmail } = require("../services/emailTemplates");
 
@@ -40,26 +41,10 @@ function esc(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-// Reasigna table_number (solo mujeres — su mesa fija) y seat_index (ambos
-// géneros — su posición en la rotación) en orden de registro (created_at),
-// cerrando los huecos que deja borrar o cambiar de género a un asistente.
-// Solo se usa mientras el evento sigue en "registro": una vez que se genera
-// el calendario de rondas (routes/speedDatingAdmin.js, POST /iniciar), la
-// numeración de mesas ya quedó fija en sd_pairings y no depende más de
-// estas columnas.
-function renumberGender(eventId, gender) {
-  const rows = db
-    .prepare("SELECT id FROM sd_attendees WHERE event_id = ? AND gender = ? ORDER BY created_at ASC")
-    .all(eventId, gender);
-  const update = db.prepare("UPDATE sd_attendees SET table_number = ?, seat_index = ? WHERE id = ?");
-  const tx = db.transaction((list) => {
-    list.forEach((row, i) => {
-      const tableNumber = gender === "F" ? i + 1 : null;
-      update.run(tableNumber, i, row.id);
-    });
-  });
-  tx(rows);
-}
+// renumberGender ahora vive en services/speedDatingAttendees.js — se
+// comparte con el flujo público de cancelación (routes/
+// speedDatingPublic.js), que también necesita renumerar mesas al liberar
+// el cupo de alguien que cancela.
 
 // Convierte el texto plano guardado en sd_events.round_questions (una
 // pregunta por línea) en un arreglo ordenado — índice 0 = Ronda 1. Se
@@ -137,6 +122,44 @@ function topbar() {
 
 function baseUrlOf(req) {
   return `${req.protocol}://${req.get("host")}`;
+}
+
+// Normaliza el teléfono guardado (la gente lo escribe con o sin +593, con o
+// sin el 0 inicial, con espacios) al formato que espera el enlace público
+// de WhatsApp (wa.me/<código de país><número, sin 0 inicial>). Asume Ecuador
+// (593) porque es el único mercado de estos eventos por ahora — si el
+// número ya trae 593 lo deja igual.
+function waPhoneDigits(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("593")) return digits;
+  if (digits.startsWith("0")) return "593" + digits.slice(1);
+  return "593" + digits;
+}
+
+function formatEventDateEs(eventDate) {
+  if (!eventDate) return null;
+  return new Date(`${eventDate}T00:00:00`).toLocaleDateString("es-EC", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
+
+// Mensaje que se manda por WhatsApp al hacer clic en "Enviar por WhatsApp"
+// en el panel — lleva la misma información que ya recibió por correo al
+// registrarse (evento, fecha, lugar, mesa si ya la tiene, y su link
+// personal), para que sirva igual si perdió el correo o no tiene la
+// página abierta en su celular.
+function buildWhatsappMessage({ attendee, event, asistenteUrl }) {
+  const firstName = (attendee.name || "").trim().split(/\s+/)[0] || attendee.name;
+  const formattedDate = formatEventDateEs(event.event_date);
+  const lines = [`Hola ${firstName} 👋 Soy del equipo de RelateReady.`, "", `Aquí está tu acceso a *${event.name}*:`];
+  if (formattedDate) lines.push(`📅 ${formattedDate}`);
+  if (event.venue_name) lines.push(`📍 ${event.venue_name}${event.venue_address ? " — " + event.venue_address : ""}`);
+  if (attendee.gender === "F" && attendee.table_number) lines.push(`🪩 Tu mesa fija: Mesa ${attendee.table_number}`);
+  lines.push("", "Tu link personal para el evento (guárdalo, lo vas a necesitar esa noche):", asistenteUrl, "", "¡Te esperamos! 💛");
+  return lines.join("\n");
 }
 
 // Página independiente para editar (o revisar antes de borrar) un asistente
@@ -244,7 +267,7 @@ function sendEventsListPage(res, { values, error } = {}) {
   const rows = events
     .map((e) => {
       const counts = db
-        .prepare("SELECT gender, COUNT(*) AS n FROM sd_attendees WHERE event_id = ? GROUP BY gender")
+        .prepare("SELECT gender, COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND cancelled_at IS NULL GROUP BY gender")
         .all(e.id);
       const w = counts.find((c) => c.gender === "F");
       const m = counts.find((c) => c.gender === "M");
@@ -337,18 +360,28 @@ router.get("/:eventId", (req, res) => {
   const attendees = db
     .prepare("SELECT * FROM sd_attendees WHERE event_id = ? ORDER BY gender DESC, seat_index ASC")
     .all(event.id);
-  const women = attendees.filter((a) => a.gender === "F");
-  const men = attendees.filter((a) => a.gender === "M");
+  // activeAttendees excluye a quienes cancelaron su participación (ver
+  // services/speedDatingAttendees.js) — siguen apareciendo en la tabla de
+  // abajo para que quede el registro, pero no cuentan para el aforo ni
+  // para decidir si ya se puede iniciar el evento.
+  const activeAttendees = attendees.filter((a) => !a.cancelled_at);
+  const women = activeAttendees.filter((a) => a.gender === "F");
+  const men = activeAttendees.filter((a) => a.gender === "M");
 
   const baseUrl = baseUrlOf(req);
   const registroUrl = `${baseUrl}/evento/${event.id}`;
 
   const attendeeRows = attendees
     .map((a) => {
-      const mesa = a.gender === "F" ? `Mesa fija ${a.table_number}` : `Posición de rotación ${a.seat_index + 1}`;
+      const mesa = a.cancelled_at ? "—" : (a.gender === "F" ? `Mesa fija ${a.table_number}` : `Posición de rotación ${a.seat_index + 1}`);
       const asistenteUrl = `${baseUrl}/speed-dating/asistente.html?token=${a.vote_token}`;
+      const waDigits = waPhoneDigits(a.phone);
+      const waUrl = waDigits ? `https://wa.me/${waDigits}?text=${encodeURIComponent(buildWhatsappMessage({ attendee: a, event, asistenteUrl }))}` : null;
+      const cancelBadge = a.cancelled_at
+        ? `<br><span class="badge" style="background:${BRAND.clay};margin-top:4px;">Canceló</span>${a.cancellation_reason ? ` <span class="muted">${esc(a.cancellation_reason)}</span>` : ""}`
+        : "";
       return `<tr>
-        <td>${esc(a.name)}<br><span class="muted">${esc(a.email) || "—"}${a.phone ? " · " + esc(a.phone) : ""}</span></td>
+        <td>${esc(a.name)}<br><span class="muted">${esc(a.email) || "—"}${a.phone ? " · " + esc(a.phone) : ""}</span>${cancelBadge}</td>
         <td>${a.gender === "F" ? "Mujer" : "Hombre"}${a.age ? ", " + a.age + " años" : ""}</td>
         <td>${mesa}</td>
         <td>${a.share_phone_consent ? "Sí" : "No"}</td>
@@ -358,6 +391,7 @@ router.get("/:eventId", (req, res) => {
         <td>
           <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
             <button type="button" class="btn small ghost" onclick="navigator.clipboard.writeText('${asistenteUrl}').then(()=>{this.textContent='Copiado ✓';setTimeout(()=>this.textContent='Copiar link',1200);})">Copiar link</button>
+            ${waUrl ? `<a href="${waUrl}" target="_blank" rel="noopener" class="btn small ghost">Enviar por WhatsApp</a>` : ""}
             <a href="/admin/speed-dating/${event.id}/attendees/${a.id}/editar" class="btn small ghost">Editar</a>
             ${event.status === "registro" ? `<form class="inline" method="POST" action="/admin/speed-dating/${event.id}/attendees/${a.id}/eliminar" onsubmit="return confirm('¿Eliminar a ${esc(a.name).replace(/'/g, "\\'")} de este evento? Esta acción no se puede deshacer.');"><button type="submit" class="btn small danger">Eliminar</button></form>` : ""}
           </div>
@@ -366,7 +400,7 @@ router.get("/:eventId", (req, res) => {
     })
     .join("");
 
-  const canIniciar = event.status === "registro" && attendees.length > 0;
+  const canIniciar = event.status === "registro" && activeAttendees.length > 0;
   const canCerrarRonda = event.status === "en_curso" && event.round_state === "ronda_activa";
   const canSiguienteRonda = event.status === "en_curso" && (event.round_state === "esperando_inicio" || event.round_state === "cambio_de_mesa");
   const canFinalizar = event.status === "en_curso";
@@ -463,7 +497,7 @@ router.get("/:eventId", (req, res) => {
     </div>
 
     <div class="card">
-      <h2 style="margin:0 0 14px;font-size:15px;">Asistentes (${attendees.length})</h2>
+      <h2 style="margin:0 0 14px;font-size:15px;">Asistentes (${activeAttendees.length}${attendees.length !== activeAttendees.length ? ` · ${attendees.length - activeAttendees.length} canceló su cupo` : ""})</h2>
       <table>
         <thead><tr><th>Persona</th><th>Género</th><th>Mesa</th><th>Autorizó WhatsApp</th><th>Correo de resultados</th><th></th></tr></thead>
         <tbody>${attendeeRows || '<tr><td colspan="6" style="text-align:center;color:#999;padding:24px;">Todavía no hay nadie registrado.</td></tr>'}</tbody>
@@ -607,7 +641,7 @@ router.post("/:eventId/iniciar", (req, res) => {
   if (!event || event.status !== "registro") return res.redirect(`/admin/speed-dating/${req.params.eventId}`);
 
   const attendees = db
-    .prepare("SELECT * FROM sd_attendees WHERE event_id = ? ORDER BY seat_index ASC")
+    .prepare("SELECT * FROM sd_attendees WHERE event_id = ? AND cancelled_at IS NULL ORDER BY seat_index ASC")
     .all(event.id);
   const women = attendees.filter((a) => a.gender === "F");
   const men = attendees.filter((a) => a.gender === "M");

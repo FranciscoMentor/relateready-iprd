@@ -235,4 +235,20 @@ function addSdAttendeesColumnIfMissing(name, ddl) {
 }
 addSdAttendeesColumnIfMissing("age", "age INTEGER");
 
+// ── Migración: cancelación de participación por el propio asistente (2026-09) ─
+// cancelled_at / cancellation_reason: cualquiera que se registre puede,
+// desde su propia pantalla (public/speed-dating/asistente.html), cancelar
+// su participación y decir por qué — útil porque mucha gente se registra
+// varios días antes del evento y a veces no puede llegar. No se borra la
+// fila (a diferencia de "Eliminar" en el panel del organizador): se
+// conserva el registro con el motivo para que quede el historial, pero se
+// excluye de la numeración de mesas (ver services/speedDatingAttendees.js)
+// y del cupo disponible (routes/speedDatingPublic.js) — como si nunca
+// hubiera ocupado un lugar. Solo se puede cancelar mientras el evento
+// sigue en "registro" (routes/speedDatingPublic.js, POST
+// /attendee/:token/cancelar); una vez iniciado el evento las mesas y
+// rondas ya quedaron fijas en sd_pairings.
+addSdAttendeesColumnIfMissing("cancelled_at", "cancelled_at TEXT");
+addSdAttendeesColumnIfMissing("cancellation_reason", "cancellation_reason TEXT");
+
 module.exports = db;

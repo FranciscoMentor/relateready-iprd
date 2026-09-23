@@ -11,6 +11,7 @@ const express = require("express");
 const crypto = require("crypto");
 const router = express.Router();
 const db = require("../db/init");
+const { renumberGender } = require("../services/speedDatingAttendees");
 const { sendMail } = require("../services/graphMail");
 const { speedDatingWelcomeEmail } = require("../services/emailTemplates");
 
@@ -24,7 +25,7 @@ function findEvent(id) {
 router.get("/events/:eventId/meta", (req, res) => {
   const event = findEvent(req.params.eventId);
   if (!event) return res.status(404).json({ error: "Evento no encontrado." });
-  const registered = db.prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ?").get(event.id).n;
+  const registered = db.prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND cancelled_at IS NULL").get(event.id).n;
   res.json({
     id: event.id,
     name: event.name,
@@ -80,13 +81,13 @@ router.post("/events/:eventId/registro", (req, res) => {
     return res.status(400).json({ error: `Este evento es para personas ${rangeLabel}.` });
   }
 
-  const registered = db.prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ?").get(event.id).n;
+  const registered = db.prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND cancelled_at IS NULL").get(event.id).n;
   if (registered >= event.capacity) {
     return res.status(400).json({ error: "Este evento ya alcanzó su aforo máximo." });
   }
 
   const sameGenderCount = db
-    .prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND gender = ?")
+    .prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND gender = ? AND cancelled_at IS NULL")
     .get(event.id, gender).n;
 
   const id = crypto.randomUUID();
@@ -192,7 +193,18 @@ router.get("/attendee/:token/estado", (req, res) => {
     total_rondas: event.total_rounds,
     mi_nombre: attendee.name,
     mi_genero: attendee.gender,
+    evento_fecha: event.event_date || null,
+    evento_lugar: event.venue_name || null,
+    evento_lugar_direccion: event.venue_address || null,
   };
+
+  // Cancelado tiene prioridad sobre cualquier otro estado del evento: si ya
+  // canceló su participación (POST /attendee/:token/cancelar), su pantalla
+  // debe mostrar eso sin importar si el evento sigue en registro o ya
+  // inició sin ella/él.
+  if (attendee.cancelled_at) {
+    return res.json({ ...base, evento_estado: "cancelado", motivo: attendee.cancellation_reason || null, mi_mesa: null, descansa: false });
+  }
 
   if (event.status === "registro") {
     return res.json({ ...base, evento_estado: "esperando_inicio", mi_mesa: attendee.table_number, descansa: false });
@@ -258,6 +270,43 @@ router.get("/attendee/:token/estado", (req, res) => {
     pregunta_ronda: event.round_state === "ronda_activa" ? roundQuestion(event, event.current_round_number) : null,
     pregunta_siguiente: isTransition ? roundQuestion(event, event.current_round_number + 1) : null,
   });
+});
+
+// POST /api/speed-dating/attendee/:token/cancelar — { reason }. Solo
+// mientras el evento sigue en "registro" — una vez iniciado, las mesas y
+// rondas ya quedaron fijas en sd_pairings (ver services/speedDatingMatch.js)
+// así que cancelar ya no tiene el mismo efecto y se maneja en persona con
+// el organizador. No borra la fila: la marca como cancelada con el motivo,
+// para que quede el historial en el panel del organizador (routes/
+// speedDatingAdmin.js), y libera su cupo y su lugar en la numeración de
+// mesas (services/speedDatingAttendees.js) para que otra persona pueda
+// registrarse en su lugar.
+router.post("/attendee/:token/cancelar", (req, res) => {
+  const attendee = loadAttendeeByToken(req.params.token);
+  if (!attendee) return res.status(404).json({ error: "No encontramos tu registro — revisa el link." });
+  const event = findEvent(attendee.event_id);
+  if (!event) return res.status(404).json({ error: "Evento no encontrado." });
+
+  if (attendee.cancelled_at) {
+    return res.json({ ok: true });
+  }
+  if (event.status !== "registro") {
+    return res.status(400).json({ error: "El evento ya inició — ya no se puede cancelar desde aquí. Escríbele directo al organizador." });
+  }
+
+  const reason = (req.body && typeof req.body.reason === "string" ? req.body.reason : "").trim();
+  if (!reason) {
+    return res.status(400).json({ error: "Cuéntanos brevemente el motivo para poder cancelar tu registro." });
+  }
+
+  db.prepare("UPDATE sd_attendees SET cancelled_at = ?, cancellation_reason = ? WHERE id = ?").run(
+    new Date().toISOString(),
+    reason,
+    attendee.id
+  );
+  renumberGender(event.id, attendee.gender);
+
+  res.json({ ok: true });
 });
 
 // POST /api/speed-dating/attendee/:token/vote — { vote: 'si' | 'no' }
