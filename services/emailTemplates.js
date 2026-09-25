@@ -292,5 +292,40 @@ function speedDatingWelcomeEmail({ name, lang, gender, eventName, eventDate, ven
   };
 }
 
-module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail };
+
+// Se envía cuando alguien intenta registrarse a un evento que ya alcanzó su
+// aforo máximo (routes/speedDatingPublic.js) — su registro no se pierde,
+// queda guardado en sd_waitlist para que el organizador lo invite por
+// WhatsApp al próximo evento (panel, routes/speedDatingAdmin.js) apenas se
+// confirme fecha.
+function speedDatingWaitlistEmail({ name, lang, eventName }) {
+  const firstName = firstNameOf(name, lang);
+
+  if (lang === "en") {
+    return {
+      subject: `${eventName} is full — you're on the list for the next one`,
+      html: shell({
+        lang,
+        bodyHtml: `
+          <p style="font-size:16px;margin:0 0 16px;">Hi ${firstName},</p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 20px;"><strong>${eventName}</strong> just reached full capacity — but we saved your info. We'll message you on WhatsApp as soon as we confirm the date for the next event.</p>
+          <p style="font-size:12.5px;line-height:1.5;margin:16px 0 0;color:${MUTED};">Thanks for your patience — we can't wait to have you at the next one.</p>
+        `,
+      }),
+    };
+  }
+  return {
+    subject: `${eventName} se llenó — quedaste en la lista para el próximo`,
+    html: shell({
+      lang,
+      bodyHtml: `
+        <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">¡<strong>${eventName}</strong> ya alcanzó su aforo máximo! Guardamos tus datos — te vamos a escribir por WhatsApp apenas tengamos fecha confirmada para el próximo evento.</p>
+        <p style="font-size:12.5px;line-height:1.5;margin:16px 0 0;color:${MUTED};">Gracias por tu paciencia — ¡nos encantaría tenerte en el próximo!</p>
+      `,
+    }),
+  };
+}
+
+module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail };
 

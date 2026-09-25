@@ -251,4 +251,33 @@ addSdAttendeesColumnIfMissing("age", "age INTEGER");
 addSdAttendeesColumnIfMissing("cancelled_at", "cancelled_at TEXT");
 addSdAttendeesColumnIfMissing("cancellation_reason", "cancellation_reason TEXT");
 
+// ── Migración: lista de espera cuando un evento se llena (2026-09) ───────
+// sd_waitlist: cuando alguien intenta registrarse a un evento que ya
+// alcanzó su aforo máximo (routes/speedDatingPublic.js, POST
+// /events/:eventId/registro), no se le rechaza sin más — se guardan sus
+// datos aquí para invitarlo por WhatsApp al próximo evento apenas se
+// confirme fecha (panel del organizador, routes/speedDatingAdmin.js). Es
+// una tabla nueva (no una columna agregada a una tabla existente), así que
+// no hace falta el patrón addColumnIfMissing — alcanza con CREATE TABLE IF
+// NOT EXISTS, igual que sd_events/sd_attendees más arriba.
+//  - event_id: el evento que estaba lleno cuando se registró (para que el
+//    organizador sepa de qué evento vino cada persona en lista de espera).
+//  - contacted_at: NULL hasta que el organizador la marca como ya
+//    contactada desde el panel (evita invitarla dos veces).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sd_waitlist (
+    id TEXT PRIMARY KEY,
+    event_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    gender TEXT NOT NULL,
+    age INTEGER,
+    share_phone_consent INTEGER NOT NULL DEFAULT 0,
+    contacted_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_sd_waitlist_event ON sd_waitlist(event_id);
+`);
+
 module.exports = db;

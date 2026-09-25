@@ -12,6 +12,7 @@ const express = require("express");
 const crypto = require("crypto");
 const router = express.Router();
 const db = require("../db/init");
+const ExcelJS = require("exceljs");
 const { generateSchedule, computeMutualMatches, persistMatches } = require("../services/speedDatingMatch");
 const { renumberGender } = require("../services/speedDatingAttendees");
 const { sendMail } = require("../services/graphMail");
@@ -368,6 +369,16 @@ router.get("/:eventId", (req, res) => {
   const women = activeAttendees.filter((a) => a.gender === "F");
   const men = activeAttendees.filter((a) => a.gender === "M");
 
+  // Lista de espera: gente que intentó registrarse cuando este evento ya
+  // estaba lleno (routes/speedDatingPublic.js) — sus datos no se pierden,
+  // se muestran aquí para invitarlos por WhatsApp al próximo evento.
+  // openEvents alimenta el selector de "invitar a este evento" de esa
+  // sección (cualquier otro evento que siga con registro abierto).
+  const waitlist = db.prepare("SELECT * FROM sd_waitlist WHERE event_id = ? ORDER BY created_at ASC").all(event.id);
+  const openEvents = db
+    .prepare("SELECT id, name, event_date FROM sd_events WHERE status = 'registro' AND id != ? ORDER BY created_at DESC")
+    .all(event.id);
+
   const baseUrl = baseUrlOf(req);
   const registroUrl = `${baseUrl}/evento/${event.id}`;
 
@@ -394,6 +405,26 @@ router.get("/:eventId", (req, res) => {
             ${waUrl ? `<a href="${waUrl}" target="_blank" rel="noopener" class="btn small ghost">Enviar por WhatsApp</a>` : ""}
             <a href="/admin/speed-dating/${event.id}/attendees/${a.id}/editar" class="btn small ghost">Editar</a>
             ${event.status === "registro" ? `<form class="inline" method="POST" action="/admin/speed-dating/${event.id}/attendees/${a.id}/eliminar" onsubmit="return confirm('¿Eliminar a ${esc(a.name).replace(/'/g, "\\'")} de este evento? Esta acción no se puede deshacer.');"><button type="submit" class="btn small danger">Eliminar</button></form>` : ""}
+          </div>
+        </td>
+      </tr>`;
+    })
+    .join("");
+
+  const waitlistRows = waitlist
+    .map((entry) => {
+      const waDigits = waPhoneDigits(entry.phone);
+      return `<tr>
+        <td>${esc(entry.name)}<br><span class="muted">${esc(entry.email) || "—"}${entry.phone ? " · " + esc(entry.phone) : ""}</span></td>
+        <td>${entry.gender === "F" ? "Mujer" : "Hombre"}${entry.age ? ", " + entry.age + " años" : ""}</td>
+        <td>${entry.share_phone_consent ? "Sí" : "No"}</td>
+        <td>${entry.created_at ? new Date(entry.created_at).toLocaleDateString("es-EC") : "—"}</td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+            ${waDigits ? `<button type="button" class="btn small ghost wl-whatsapp-btn" data-wl-name="${esc(entry.name).replace(/"/g, "&quot;")}" data-wl-phone="${waDigits}">Enviar por WhatsApp</button>` : '<span class="muted">Sin teléfono válido</span>'}
+            <form class="inline" method="POST" action="/admin/speed-dating/${event.id}/waitlist/${entry.id}/marcar-contactado">
+              <button type="submit" class="btn small ${entry.contacted_at ? "" : "ghost"}">${entry.contacted_at ? "Contactado ✓" : "Marcar como contactado"}</button>
+            </form>
           </div>
         </td>
       </tr>`;
@@ -497,13 +528,57 @@ router.get("/:eventId", (req, res) => {
     </div>
 
     <div class="card">
-      <h2 style="margin:0 0 14px;font-size:15px;">Asistentes (${activeAttendees.length}${attendees.length !== activeAttendees.length ? ` · ${attendees.length - activeAttendees.length} canceló su cupo` : ""})</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+        <h2 style="margin:0;font-size:15px;">Asistentes (${activeAttendees.length}${attendees.length !== activeAttendees.length ? ` · ${attendees.length - activeAttendees.length} canceló su cupo` : ""})</h2>
+        <a href="/admin/speed-dating/${event.id}/exportar" class="btn small ghost">Exportar a Excel ⬇</a>
+      </div>
       <table>
         <thead><tr><th>Persona</th><th>Género</th><th>Mesa</th><th>Autorizó WhatsApp</th><th>Correo de resultados</th><th></th></tr></thead>
         <tbody>${attendeeRows || '<tr><td colspan="6" style="text-align:center;color:#999;padding:24px;">Todavía no hay nadie registrado.</td></tr>'}</tbody>
       </table>
     </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 6px;font-size:15px;">Lista de espera (${waitlist.length})</h2>
+      <p class="muted" style="margin:0 0 14px;">Se llena sola: cuando alguien intenta registrarse y este evento ya no tiene cupo, sus datos quedan guardados aquí en vez de perderse — invítalos por WhatsApp al próximo evento apenas tengas fecha.</p>
+      ${waitlist.length ? `
+      <div style="margin-bottom:14px;">
+        <label class="muted" style="display:block;margin-bottom:4px;">Invitar al evento (opcional — arma el link del mensaje):</label>
+        <select id="wl-target-event" style="padding:8px 10px;border:1px solid ${BRAND.border};border-radius:8px;font-size:13px;">
+          <option value="">— Sin link todavía, solo avisar —</option>
+          ${openEvents.map((oe) => `<option value="${oe.id}">${esc(oe.name)}${oe.event_date ? " · " + esc(oe.event_date) : ""}</option>`).join("")}
+        </select>
+      </div>
+      <table>
+        <thead><tr><th>Persona</th><th>Género</th><th>Autorizó WhatsApp</th><th>Se registró</th><th></th></tr></thead>
+        <tbody>${waitlistRows}</tbody>
+      </table>
+      ` : '<p class="muted" style="margin:0;">Todavía nadie ha quedado en lista de espera para este evento.</p>'}
+    </div>
   </div>
+
+  <script>
+    document.querySelectorAll('.wl-whatsapp-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var name = btn.dataset.wlName;
+        var phone = btn.dataset.wlPhone;
+        if (!phone) { alert('Esta persona no dejó un teléfono válido.'); return; }
+        var select = document.getElementById('wl-target-event');
+        var targetId = select ? select.value : '';
+        var targetLabel = select && select.selectedOptions[0] ? select.selectedOptions[0].textContent : '';
+        var firstName = (name || '').trim().split(/\s+/)[0] || name;
+        var lines = ['Hola ' + firstName + ' 👋 Soy del equipo de RelateReady.', '', 'El evento al que querías ir se llenó, ¡pero ya tenemos el próximo!'];
+        if (targetId) {
+          lines.push('Aquí está tu link para registrarte a *' + targetLabel + '*:', location.origin + '/evento/' + targetId);
+        } else {
+          lines.push('Apenas tengamos fecha confirmada para el próximo evento te compartimos aquí mismo el link para que te registres.');
+        }
+        lines.push('', '¡Te esperamos! 💛');
+        var url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(lines.join('\n'));
+        window.open(url, '_blank', 'noopener');
+      });
+    });
+  </script>
 </body></html>`);
 });
 
@@ -635,6 +710,24 @@ router.post("/:eventId/attendees/:attendeeId/eliminar", (req, res) => {
   res.redirect(`/admin/speed-dating/${event.id}`);
 });
 
+// ── Marcar/desmarcar a alguien de la lista de espera como ya contactado —
+// simple ida y vuelta (toggle) para que el organizador lleve registro de a
+// quién ya le avisó del próximo evento, sin duplicar mensajes. Disponible
+// en cualquier momento, sin depender del estado del evento.
+router.post("/:eventId/waitlist/:waitlistId/marcar-contactado", (req, res) => {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
+  if (!event) return res.status(404).send("Evento no encontrado.");
+  const entry = db.prepare("SELECT * FROM sd_waitlist WHERE id = ? AND event_id = ?").get(req.params.waitlistId, event.id);
+  if (!entry) return res.status(404).send("Registro de lista de espera no encontrado.");
+
+  db.prepare("UPDATE sd_waitlist SET contacted_at = ? WHERE id = ?").run(
+    entry.contacted_at ? null : new Date().toISOString(),
+    entry.id
+  );
+
+  res.redirect(`/admin/speed-dating/${event.id}`);
+});
+
 // ── Iniciar evento: cierra registro y genera el calendario de rondas ────
 router.post("/:eventId/iniciar", (req, res) => {
   const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
@@ -739,6 +832,111 @@ router.get("/:eventId/reporte", (req, res) => {
     </div>
   </div>
 </body></html>`);
+});
+
+// ── Exportar asistentes a Excel (disponible en cualquier momento, antes y
+// después del evento — no depende del estado). Incluye a todos los
+// asistentes, también a quienes cancelaron su cupo (services/
+// speedDatingAttendees.js), con su motivo, para que quede como respaldo
+// completo del evento. ───────────────────────────────────────────────────
+router.get("/:eventId/exportar", async (req, res) => {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
+  if (!event) return res.status(404).send("Evento no encontrado.");
+
+  const attendees = db
+    .prepare("SELECT * FROM sd_attendees WHERE event_id = ? ORDER BY gender DESC, seat_index ASC")
+    .all(event.id);
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "RelateReady";
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet("Asistentes");
+  sheet.columns = [
+    { header: "Nombre", key: "name", width: 28 },
+    { header: "Correo", key: "email", width: 30 },
+    { header: "Teléfono/WhatsApp", key: "phone", width: 18 },
+    { header: "Género", key: "gender", width: 10 },
+    { header: "Edad", key: "age", width: 8 },
+    { header: "Mesa", key: "mesa", width: 24 },
+    { header: "Autorizó compartir WhatsApp", key: "consent", width: 16 },
+    { header: "Estado", key: "estado", width: 14 },
+    { header: "Motivo de cancelación", key: "motivo", width: 32 },
+    { header: "Correo de resultados", key: "match_email_status", width: 16 },
+    { header: "Fecha de registro", key: "created_at", width: 20 },
+  ];
+  sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+  sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB5732A" } };
+  sheet.views = [{ state: "frozen", ySplit: 1 }];
+
+  attendees.forEach((a) => {
+    const mesa = a.cancelled_at
+      ? "—"
+      : a.gender === "F"
+      ? `Mesa fija ${a.table_number ?? "—"}`
+      : `Posición de rotación ${a.seat_index != null ? a.seat_index + 1 : "—"}`;
+    sheet.addRow({
+      name: a.name,
+      email: a.email || "",
+      phone: a.phone || "",
+      gender: a.gender === "F" ? "Mujer" : "Hombre",
+      age: a.age != null ? a.age : "",
+      mesa,
+      consent: a.share_phone_consent ? "Sí" : "No",
+      estado: a.cancelled_at ? "Canceló" : "Activo",
+      motivo: a.cancellation_reason || "",
+      match_email_status: a.match_email_status || "",
+      created_at: a.created_at ? new Date(a.created_at).toLocaleString("es-EC") : "",
+    });
+  });
+
+  // Segunda hoja con la lista de espera de este evento (si tiene alguna) —
+  // mismo criterio de "exportable en cualquier momento" que la de
+  // asistentes, para que el organizador tenga todo en un solo archivo.
+  const waitlistEntries = db
+    .prepare("SELECT * FROM sd_waitlist WHERE event_id = ? ORDER BY created_at ASC")
+    .all(event.id);
+
+  if (waitlistEntries.length) {
+    const wlSheet = workbook.addWorksheet("Lista de espera");
+    wlSheet.columns = [
+      { header: "Nombre", key: "name", width: 28 },
+      { header: "Correo", key: "email", width: 30 },
+      { header: "Teléfono/WhatsApp", key: "phone", width: 18 },
+      { header: "Género", key: "gender", width: 10 },
+      { header: "Edad", key: "age", width: 8 },
+      { header: "Autorizó compartir WhatsApp", key: "consent", width: 16 },
+      { header: "Contactado", key: "contacted", width: 14 },
+      { header: "Fecha", key: "created_at", width: 20 },
+    ];
+    wlSheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    wlSheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB5732A" } };
+    wlSheet.views = [{ state: "frozen", ySplit: 1 }];
+
+    waitlistEntries.forEach((entry) => {
+      wlSheet.addRow({
+        name: entry.name,
+        email: entry.email || "",
+        phone: entry.phone || "",
+        gender: entry.gender === "F" ? "Mujer" : "Hombre",
+        age: entry.age != null ? entry.age : "",
+        consent: entry.share_phone_consent ? "Sí" : "No",
+        contacted: entry.contacted_at ? "Sí" : "No",
+        created_at: entry.created_at ? new Date(entry.created_at).toLocaleString("es-EC") : "",
+      });
+    });
+  }
+
+  const safeName = (event.name || "evento").replace(/[^a-z0-9]+/gi, "_").toLowerCase();
+  const filename = `asistentes_${safeName}.xlsx`;
+
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  await workbook.xlsx.write(res);
+  res.end();
 });
 
 // ── Reenvío manual del correo de resultados a un asistente ──────────────

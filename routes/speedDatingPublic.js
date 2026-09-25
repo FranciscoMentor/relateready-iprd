@@ -13,7 +13,7 @@ const router = express.Router();
 const db = require("../db/init");
 const { renumberGender } = require("../services/speedDatingAttendees");
 const { sendMail } = require("../services/graphMail");
-const { speedDatingWelcomeEmail } = require("../services/emailTemplates");
+const { speedDatingWelcomeEmail, speedDatingWaitlistEmail } = require("../services/emailTemplates");
 
 router.use(express.json());
 
@@ -82,8 +82,41 @@ router.post("/events/:eventId/registro", (req, res) => {
   }
 
   const registered = db.prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND cancelled_at IS NULL").get(event.id).n;
+
+  // ── Aforo lleno: no se rechaza a la persona, se guarda en lista de
+  // espera (sd_waitlist) para invitarla por WhatsApp al próximo evento en
+  // cuanto se confirme fecha — ver panel del organizador, routes/
+  // speedDatingAdmin.js. El correo de aviso es igual de "dispara y olvida"
+  // que el de bienvenida: si falla, el registro en la lista de espera ya
+  // quedó guardado igual.
   if (registered >= event.capacity) {
-    return res.status(400).json({ error: "Este evento ya alcanzó su aforo máximo." });
+    const waitlistId = crypto.randomUUID();
+    db.prepare(
+      `INSERT INTO sd_waitlist
+        (id, event_id, created_at, name, email, phone, gender, age, share_phone_consent)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      waitlistId,
+      event.id,
+      new Date().toISOString(),
+      name.trim(),
+      email.trim(),
+      phone.trim(),
+      gender,
+      age,
+      sharePhoneConsent ? 1 : 0
+    );
+
+    try {
+      const { subject, html } = speedDatingWaitlistEmail({ name: name.trim(), lang: "es", eventName: event.name });
+      sendMail({ to: email.trim(), subject, html }).catch((err) => {
+        console.error("[speedDatingPublic] Error enviando correo de lista de espera —", err.message);
+      });
+    } catch (err) {
+      console.error("[speedDatingPublic] Error preparando correo de lista de espera —", err.message);
+    }
+
+    return res.json({ ok: true, waitlisted: true });
   }
 
   const sameGenderCount = db

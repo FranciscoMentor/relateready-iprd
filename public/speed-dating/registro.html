@@ -43,7 +43,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       <p class="sd-prompt" id="evento-nombre" style="font-size:19px;"></p>
       <p class="sd-subtext" id="evento-lugar" style="display:none;"></p>
       <p class="sd-subtext" id="evento-edad" style="display:none;"></p>
-      <p class="sd-subtext">Completa tus datos para asignarte tu mesa (si eres mujer) o tu ronda de citas (si eres hombre).</p>
+      <p class="sd-subtext" id="form-intro">Completa tus datos para asignarte tu mesa (si eres mujer) o tu ronda de citas (si eres hombre).</p>
 
       <div class="field">
         <label>Nombre completo</label>
@@ -93,6 +93,17 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       <p id="success-text">Guarda este link — es tu acceso personal durante todo el evento.</p>
       <button class="sd-cta-primary" id="go-btn" style="margin-top:14px;">Ir a mi pantalla</button>
     </div>
+
+    <div id="waitlist-success-block" class="sd-center-col sd-hidden">
+      <div class="sd-big-icon lg">
+        <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M50 88 C50 88 10 60 10 33 C10 17 22 7 36 7 C44 7 50 12 50 21 C50 12 56 7 64 7 C78 7 90 17 90 33 C90 60 50 88 50 88 Z"/>
+          <path d="M65 71 L72 78 L86 62" stroke-width="8"/>
+        </svg>
+      </div>
+      <h2>¡Quedaste en la lista! 🙌</h2>
+      <p>Se agotaron los cupos para este evento, pero ya guardamos tus datos. Te vamos a escribir por WhatsApp apenas tengamos fecha confirmada para el próximo evento — no tienes que hacer nada más por ahora.</p>
+    </div>
   </div>
 
 <script>
@@ -105,6 +116,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
 
   let gender = 'F';
   let consent = 1;
+  let soldOut = false;
 
   function selectToggle(containerId, value, setter) {
     const container = document.getElementById(containerId);
@@ -137,12 +149,14 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
         errorText.textContent = 'El registro para este evento ya está cerrado.';
         return;
       }
-      if (data.cuposDisponibles <= 0) {
-        errorBlock.classList.remove('sd-hidden');
-        errorText.textContent = 'Este evento ya alcanzó su aforo máximo.';
-        return;
-      }
-      document.getElementById('evento-nombre').textContent = `Bienvenida a ${data.name}`;
+      soldOut = data.cuposDisponibles <= 0;
+      document.getElementById('evento-nombre').textContent = soldOut
+        ? `${data.name} ya agotó su cupo`
+        : `Bienvenida a ${data.name}`;
+      document.getElementById('form-intro').textContent = soldOut
+        ? 'Se agotaron los cupos para este evento, pero puedes dejarnos tus datos: te escribiremos por WhatsApp apenas tengamos fecha para el próximo. 🙌'
+        : 'Completa tus datos para asignarte tu mesa (si eres mujer) o tu ronda de citas (si eres hombre).';
+      document.getElementById('submit-btn').textContent = soldOut ? 'Unirme a la lista de espera' : 'Confirmar registro';
       if (data.venueName || data.venueAddress) {
         const lugarEl = document.getElementById('evento-lugar');
         lugarEl.textContent = [data.venueName, data.venueAddress].filter(Boolean).join(' — ');
@@ -171,7 +185,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
     const formError = document.getElementById('form-error');
     formError.classList.add('sd-hidden');
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Registrando…';
+    submitBtn.textContent = soldOut ? 'Guardando…' : 'Registrando…';
     try {
       const resp = await fetch(`/api/speed-dating/events/${eventId}/registro`, {
         method: 'POST',
@@ -190,6 +204,12 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       if (typeof fbq === 'function') fbq('track', 'Lead');
 
       form.classList.add('sd-hidden');
+
+      if (data.waitlisted) {
+        document.getElementById('waitlist-success-block').classList.remove('sd-hidden');
+        return;
+      }
+
       const successBlock = document.getElementById('success-block');
       successBlock.classList.remove('sd-hidden');
       const asistenteUrl = `/speed-dating/asistente.html?token=${data.voteToken}`;
@@ -202,7 +222,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       formError.textContent = err.message;
       formError.classList.remove('sd-hidden');
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Confirmar registro';
+      submitBtn.textContent = soldOut ? 'Unirme a la lista de espera' : 'Confirmar registro';
     }
   });
 
