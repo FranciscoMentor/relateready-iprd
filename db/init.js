@@ -211,6 +211,16 @@ addSdEventsColumnIfMissing("venue_address", "venue_address TEXT");
 // — la misma pregunta para todas las mesas esa ronda.
 addSdEventsColumnIfMissing("round_questions", "round_questions TEXT");
 
+// ── Migración: hora del evento (2026-09) ──────────────────────────────────
+// event_time: hora de inicio del evento (formato "HH:MM", 24h — lo mismo
+// que produce un <input type="time">), independiente de event_date. Se usa
+// junto a la fecha en todo lo que ya mostraba event_date: el correo de
+// bienvenida, los recordatorios automáticos de 3 y 1 día antes (ver
+// services/speedDatingReminderScheduler.js), el mensaje de WhatsApp del
+// panel, y la pantalla del asistente. NULL = evento sin hora configurada
+// todavía (no rompe nada: en ese caso simplemente no se muestra hora).
+addSdEventsColumnIfMissing("event_time", "event_time TEXT");
+
 // ── Migración: rango de edad obligatorio del evento (2026-09) ────────────
 // min_age / max_age: cada evento debe dirigirse a un rango de edad (ej. 25
 // a 40 años) — se define al crear o editar el evento (routes/
@@ -250,6 +260,16 @@ addSdAttendeesColumnIfMissing("age", "age INTEGER");
 // rondas ya quedaron fijas en sd_pairings.
 addSdAttendeesColumnIfMissing("cancelled_at", "cancelled_at TEXT");
 addSdAttendeesColumnIfMissing("cancellation_reason", "cancellation_reason TEXT");
+
+// ── Migración: recordatorios automáticos de 3 y 1 día antes (2026-09) ────
+// reminder_3d_sent_at / reminder_1d_sent_at: cuándo (si ya se envió) el
+// recordatorio automático de 3 días y de 1 día antes del evento — ver
+// services/speedDatingReminderScheduler.js. NULL = todavía no se le ha
+// enviado ese recordatorio. Se guardan por separado (no un solo campo)
+// porque son dos correos independientes con contenido distinto (el de 3
+// días incluye el link para cancelar, el de 1 día no).
+addSdAttendeesColumnIfMissing("reminder_3d_sent_at", "reminder_3d_sent_at TEXT");
+addSdAttendeesColumnIfMissing("reminder_1d_sent_at", "reminder_1d_sent_at TEXT");
 
 // ── Migración: lista de espera cuando un evento se llena (2026-09) ───────
 // sd_waitlist: cuando alguien intenta registrarse a un evento que ya

@@ -66,6 +66,19 @@ function button(url, label) {
   return `<a href="${url}" style="display:inline-block;background:${ACCENT};color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:6px;font-family:Georgia,'Times New Roman',serif;font-size:15px;">${label}</a>`;
 }
 
+// "20:00" (lo que produce un <input type="time">, ver routes/
+// speedDatingAdmin.js) -> "8:00 p.m." / "8:00 PM". NULL si el evento no
+// tiene hora configurada (sd_events.event_time).
+function formatEventTime(timeStr, lang) {
+  if (!timeStr) return null;
+  const [h, m] = timeStr.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  const isPm = h >= 12;
+  const h12 = ((h + 11) % 12) + 1;
+  const period = lang === "en" ? (isPm ? "PM" : "AM") : (isPm ? "p.m." : "a.m.");
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
 function firstNameOf(name, lang) {
   const first = String(name || "").trim().split(/\s+/)[0];
   return first || (lang === "en" ? "there" : "");
@@ -228,7 +241,7 @@ function speedDatingMatchEmail({ name, lang, eventName, matches }) {
 // /api/speed-dating/events/:eventId/registro en routes/speedDatingPublic.js.
 // No bloquea la respuesta del registro: si el correo falla, el registro
 // igual queda guardado (el error solo se registra en consola).
-function speedDatingWelcomeEmail({ name, lang, gender, eventName, eventDate, venueName, venueAddress, minAge, maxAge, tableNumber, asistenteUrl }) {
+function speedDatingWelcomeEmail({ name, lang, gender, eventName, eventDate, eventTime, venueName, venueAddress, minAge, maxAge, tableNumber, asistenteUrl }) {
   const firstName = firstNameOf(name, lang);
 
   const formattedDate = eventDate
@@ -238,6 +251,7 @@ function speedDatingWelcomeEmail({ name, lang, gender, eventName, eventDate, ven
         month: "long",
       })
     : null;
+  const formattedTime = formatEventTime(eventTime, lang);
 
   const ageRangeLabel =
     minAge && maxAge
@@ -249,13 +263,13 @@ function speedDatingWelcomeEmail({ name, lang, gender, eventName, eventDate, ven
       : null;
 
   const detailRowsEs = `
-    ${formattedDate ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Fecha:</strong> ${formattedDate}</p>` : ""}
+    ${formattedDate ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Fecha:</strong> ${formattedDate}${formattedTime ? `, ${formattedTime}` : ""}</p>` : ""}
     ${venueName ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Lugar:</strong> ${venueName}${venueAddress ? ` — ${venueAddress}` : ""}</p>` : ""}
     ${ageRangeLabel ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Este evento es para:</strong> ${ageRangeLabel}</p>` : ""}
     ${tableNumber ? `<p style="margin:0;font-size:14px;"><strong>Tu mesa fija:</strong> Mesa ${tableNumber} — no te muevas de ahí en toda la noche.</p>` : ""}
   `;
   const detailRowsEn = `
-    ${formattedDate ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Date:</strong> ${formattedDate}</p>` : ""}
+    ${formattedDate ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Date:</strong> ${formattedDate}${formattedTime ? `, ${formattedTime}` : ""}</p>` : ""}
     ${venueName ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Venue:</strong> ${venueName}${venueAddress ? ` — ${venueAddress}` : ""}</p>` : ""}
     ${ageRangeLabel ? `<p style="margin:0 0 8px;font-size:14px;"><strong>This event is for:</strong> ${ageRangeLabel}</p>` : ""}
     ${tableNumber ? `<p style="margin:0;font-size:14px;"><strong>Your fixed table:</strong> Table ${tableNumber} — you'll stay there all night.</p>` : ""}
@@ -338,5 +352,89 @@ function speedDatingWaitlistEmail({ name, lang, eventName, genderOnly }) {
   };
 }
 
-module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail };
+
+// Cuerpo compartido de los dos recordatorios (3 días y 1 día antes) — solo
+// cambia el título/urgencia y si se incluye el link de cancelar (Francisco
+// pidió que el de 3 días sí lo tenga, para liberar cupo a tiempo, pero el
+// de 1 día no, ya muy sobre la hora). Español únicamente: a diferencia del
+// test general (bilingüe), todo el flujo de speed dating ya se maneja en
+// español (routes/speedDatingPublic.js siempre llama con lang: "es").
+function speedDatingReminderBodyEs({ firstName, eventName, formattedDate, formattedTime, venueName, venueAddress, tableNumber, asistenteUrl, testUrl, headline, includeCancelLink }) {
+  return `
+    <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">${headline} <strong>${eventName}</strong>.</p>
+    <div style="border:1px solid #E7DFD2;border-radius:10px;padding:16px 18px;margin:0 0 20px;">
+      ${formattedDate ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Fecha:</strong> ${formattedDate}${formattedTime ? `, ${formattedTime}` : ""}</p>` : ""}
+      ${venueName ? `<p style="margin:0;font-size:14px;"><strong>Lugar:</strong> ${venueName}${venueAddress ? ` — ${venueAddress}` : ""}</p>` : ""}
+      ${tableNumber ? `<p style="margin:8px 0 0;font-size:14px;"><strong>Tu mesa fija:</strong> Mesa ${tableNumber} — no te muevas de ahí en toda la noche.</p>` : ""}
+    </div>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 14px;">Antes de esa noche, te recomendamos hacer el test de RelateReady (toma unos 10 minutos) — te ayuda a entender mejor tu estilo en las relaciones, así llegas con más claridad a tus conversaciones.</p>
+    <p style="margin:0 0 20px;">${button(testUrl, "Hacer el test de RelateReady")}</p>
+    <p style="margin:0 0 12px;">${button(asistenteUrl, "Ver mi pantalla del evento")}</p>
+    ${includeCancelLink ? `<p style="font-size:12.5px;line-height:1.5;margin:20px 0 0;color:${MUTED};">¿No vas a poder asistir? <a href="${asistenteUrl}" style="color:${MUTED};">Cancela tu cupo aquí</a> para que se lo demos a alguien más.</p>` : ""}
+  `;
+}
+
+// Se envía automáticamente 3 días antes de la fecha del evento (ver
+// services/speedDatingReminderScheduler.js) — sí incluye el link para
+// cancelar, porque todavía da tiempo de liberar el cupo y ofrecérselo a la
+// lista de espera.
+function speedDatingReminder3dEmail({ name, eventName, eventDate, eventTime, venueName, venueAddress, tableNumber, asistenteUrl, testUrl }) {
+  const firstName = firstNameOf(name, "es");
+  const formattedDate = eventDate
+    ? new Date(`${eventDate}T00:00:00`).toLocaleDateString("es-EC", { weekday: "long", day: "numeric", month: "long" })
+    : null;
+  const formattedTime = formatEventTime(eventTime, "es");
+  return {
+    subject: `Faltan 3 días para ${eventName} 🎉`,
+    html: shell({
+      lang: "es",
+      bodyHtml: speedDatingReminderBodyEs({
+        firstName,
+        eventName,
+        formattedDate,
+        formattedTime,
+        venueName,
+        venueAddress,
+        tableNumber,
+        asistenteUrl,
+        testUrl,
+        headline: "¡Ya casi llega la noche de",
+        includeCancelLink: true,
+      }),
+    }),
+  };
+}
+
+// Se envía automáticamente el día antes del evento. Mismo contenido que el
+// de 3 días, pero sin el link de cancelar (a esta altura ya es muy sobre la
+// hora para reacomodar mesas) y con un tono de "es mañana".
+function speedDatingReminder1dEmail({ name, eventName, eventDate, eventTime, venueName, venueAddress, tableNumber, asistenteUrl, testUrl }) {
+  const firstName = firstNameOf(name, "es");
+  const formattedDate = eventDate
+    ? new Date(`${eventDate}T00:00:00`).toLocaleDateString("es-EC", { weekday: "long", day: "numeric", month: "long" })
+    : null;
+  const formattedTime = formatEventTime(eventTime, "es");
+  return {
+    subject: `¡Mañana es ${eventName}! 💛`,
+    html: shell({
+      lang: "es",
+      bodyHtml: speedDatingReminderBodyEs({
+        firstName,
+        eventName,
+        formattedDate,
+        formattedTime,
+        venueName,
+        venueAddress,
+        tableNumber,
+        asistenteUrl,
+        testUrl,
+        headline: "¡Mañana es el gran día!",
+        includeCancelLink: false,
+      }),
+    }),
+  };
+}
+
+module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail };
 

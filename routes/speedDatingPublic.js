@@ -196,6 +196,7 @@ router.post("/events/:eventId/registro", (req, res) => {
       gender,
       eventName: event.name,
       eventDate: event.event_date,
+      eventTime: event.event_time,
       venueName: event.venue_name,
       venueAddress: event.venue_address,
       minAge: event.min_age,
@@ -263,6 +264,7 @@ router.get("/attendee/:token/estado", (req, res) => {
     mi_nombre: attendee.name,
     mi_genero: attendee.gender,
     evento_fecha: event.event_date || null,
+    evento_hora: event.event_time || null,
     evento_lugar: event.venue_name || null,
     evento_lugar_direccion: event.venue_address || null,
   };

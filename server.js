@@ -11,6 +11,7 @@ const speedDatingPublicRoutes = require("./routes/speedDatingPublic");
 const db = require("./db/init");
 const reminderScheduler = require("./services/reminderScheduler");
 const speedDatingScheduler = require("./services/speedDatingScheduler");
+const speedDatingReminderScheduler = require("./services/speedDatingReminderScheduler");
 
 const app = express();
 app.set("trust proxy", 1); // necesario en Render para que req.protocol refleje https
@@ -97,3 +98,8 @@ reminderScheduler.start();
 // (ver services/speedDatingScheduler.js) — mismo criterio: solo se activa
 // si el correo automático está configurado.
 speedDatingScheduler.start();
+
+// Recordatorios automáticos de 3 días y 1 día antes de cada evento de
+// speed dating (ver services/speedDatingReminderScheduler.js) — mismo
+// criterio: solo se activa si el correo automático está configurado.
+speedDatingReminderScheduler.start();

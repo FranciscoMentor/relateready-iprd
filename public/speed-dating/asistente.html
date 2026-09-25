@@ -72,6 +72,16 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
     }
   }
 
+  // "20:00" (lo que guarda sd_events.event_time) -> "8:00 p.m.".
+  function formatTimeEs(timeStr) {
+    if (!timeStr) return null;
+    const [h, m] = timeStr.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    const period = h >= 12 ? 'p.m.' : 'a.m.';
+    const h12 = ((h + 11) % 12) + 1;
+    return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+  }
+
   // Cuántos días faltan para la fecha del evento, contando desde hoy en el
   // huso horario del celular de la persona. null si el evento no tiene
   // fecha configurada (eventos viejos). 0 = es hoy. Negativo no debería
@@ -117,7 +127,13 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       const firstName = firstNameOf(estado.mi_nombre);
       const mesaLine = estado.mi_mesa ? `Ya tienes tu mesa fija asignada: <strong>Mesa ${estado.mi_mesa}</strong>. ` : '';
       const days = daysUntilEvent(estado.evento_fecha);
-      const dateVenueBits = [estado.evento_fecha ? formatDateEs(estado.evento_fecha) : null, estado.evento_lugar].filter(Boolean).join(' · ');
+      const fechaHora = estado.evento_fecha
+        ? formatDateEs(estado.evento_fecha) + (estado.evento_hora ? ', ' + formatTimeEs(estado.evento_hora) : '')
+        : null;
+      const lugarCompleto = estado.evento_lugar
+        ? estado.evento_lugar + (estado.evento_lugar_direccion ? ' — ' + estado.evento_lugar_direccion : '')
+        : null;
+      const dateVenueBits = [fechaHora, lugarCompleto].filter(Boolean).join(' · ');
 
       if (days !== null && days > 0) {
         const daysWord = days === 1 ? 'Falta 1 día' : `Faltan ${days} días`;

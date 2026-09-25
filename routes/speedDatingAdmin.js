@@ -147,6 +147,18 @@ function formatEventDateEs(eventDate) {
   });
 }
 
+// "20:00" (lo que produce un <input type="time">) -> "8:00 p.m.", para
+// mostrarla junto a la fecha en el mensaje de WhatsApp y en el encabezado
+// del panel. NULL si el evento no tiene hora configurada.
+function formatEventTimeEs(eventTime) {
+  if (!eventTime) return null;
+  const [h, m] = eventTime.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  const period = h >= 12 ? "p.m." : "a.m.";
+  const h12 = ((h + 11) % 12) + 1;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
 // Mensaje que se manda por WhatsApp al hacer clic en "Enviar por WhatsApp"
 // en el panel — lleva la misma información que ya recibió por correo al
 // registrarse (evento, fecha, lugar, mesa si ya la tiene, y su link
@@ -155,8 +167,9 @@ function formatEventDateEs(eventDate) {
 function buildWhatsappMessage({ attendee, event, asistenteUrl }) {
   const firstName = (attendee.name || "").trim().split(/\s+/)[0] || attendee.name;
   const formattedDate = formatEventDateEs(event.event_date);
+  const formattedTime = formatEventTimeEs(event.event_time);
   const lines = [`Hola ${firstName} 👋 Soy del equipo de RelateReady.`, "", `Aquí está tu acceso a *${event.name}*:`];
-  if (formattedDate) lines.push(`📅 ${formattedDate}`);
+  if (formattedDate) lines.push(`📅 ${formattedDate}${formattedTime ? ", " + formattedTime : ""}`);
   if (event.venue_name) lines.push(`📍 ${event.venue_name}${event.venue_address ? " — " + event.venue_address : ""}`);
   if (attendee.gender === "F" && attendee.table_number) lines.push(`🪩 Tu mesa fija: Mesa ${attendee.table_number}`);
   lines.push("", "Tu link personal para el evento (guárdalo, lo vas a necesitar esa noche):", asistenteUrl, "", "¡Te esperamos! 💛");
@@ -231,6 +244,7 @@ function renderCreateForm(values = {}, error = null) {
   const v = {
     name: values.name || "",
     event_date: values.event_date || "",
+    event_time: values.event_time || "",
     capacity: values.capacity || 24,
     venue_name: values.venue_name || "",
     venue_address: values.venue_address || "",
@@ -245,6 +259,7 @@ function renderCreateForm(values = {}, error = null) {
       <form method="POST" action="/admin/speed-dating" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
         <div><label class="muted" style="display:block;margin-bottom:4px;">Nombre</label><input type="text" name="name" value="${esc(v.name)}" placeholder="Ej. Mila Rooftop — 20 sep" required></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Fecha</label><input type="date" name="event_date" value="${esc(v.event_date)}"></div>
+        <div><label class="muted" style="display:block;margin-bottom:4px;">Hora</label><input type="time" name="event_time" value="${esc(v.event_time)}" style="width:110px;"></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Aforo máximo</label><input type="number" name="capacity" value="${esc(v.capacity)}" min="2" max="60" style="width:90px;"></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Edad mínima</label><input type="number" name="min_age" value="${esc(v.min_age)}" placeholder="25" min="18" max="99" style="width:80px;"></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Edad máxima</label><input type="number" name="max_age" value="${esc(v.max_age)}" placeholder="45" min="18" max="99" style="width:80px;"></div>
@@ -274,7 +289,7 @@ function sendEventsListPage(res, { values, error } = {}) {
       const m = counts.find((c) => c.gender === "M");
       const ageLabel = e.min_age && e.max_age ? `${e.min_age}–${e.max_age} años` : e.min_age ? `${e.min_age}+ años` : e.max_age ? `hasta ${e.max_age} años` : "";
       return `<tr>
-        <td><a href="/admin/speed-dating/${e.id}" style="color:${BRAND.ink};font-weight:700;text-decoration:none;">${esc(e.name)}</a><br><span class="muted">${esc(e.event_date) || "sin fecha"}${e.venue_name ? " · " + esc(e.venue_name) : ""}${ageLabel ? " · " + ageLabel : ""}</span></td>
+        <td><a href="/admin/speed-dating/${e.id}" style="color:${BRAND.ink};font-weight:700;text-decoration:none;">${esc(e.name)}</a><br><span class="muted">${esc(e.event_date) || "sin fecha"}${e.event_time ? ", " + esc(formatEventTimeEs(e.event_time)) : ""}${e.venue_name ? " · " + esc(e.venue_name) : ""}${ageLabel ? " · " + ageLabel : ""}</span></td>
         <td><span class="badge" style="background:${STATUS_COLOR[e.status] || "#999"}">${STATUS_LABEL[e.status] || e.status}</span></td>
         <td>${w ? w.n : 0} mujeres · ${m ? m.n : 0} hombres</td>
         <td>${esc((e.created_at || "").slice(0, 16).replace("T", " "))}</td>
@@ -315,6 +330,7 @@ router.post("/", express.urlencoded({ extended: true }), (req, res) => {
   const values = {
     name,
     event_date: (req.body.event_date || "").trim(),
+    event_time: (req.body.event_time || "").trim(),
     capacity: req.body.capacity || 24,
     venue_name: (req.body.venue_name || "").trim(),
     venue_address: (req.body.venue_address || "").trim(),
@@ -336,13 +352,14 @@ router.post("/", express.urlencoded({ extended: true }), (req, res) => {
 
   const id = crypto.randomUUID();
   db.prepare(
-    `INSERT INTO sd_events (id, created_at, name, event_date, capacity, status, round_state, current_round_number, venue_name, venue_address, round_questions, min_age, max_age)
-     VALUES (?, ?, ?, ?, ?, 'registro', 'esperando_inicio', 0, ?, ?, ?, ?, ?)`
+    `INSERT INTO sd_events (id, created_at, name, event_date, event_time, capacity, status, round_state, current_round_number, venue_name, venue_address, round_questions, min_age, max_age)
+     VALUES (?, ?, ?, ?, ?, ?, 'registro', 'esperando_inicio', 0, ?, ?, ?, ?, ?)`
   ).run(
     id,
     new Date().toISOString(),
     name,
     (req.body.event_date || "").trim() || null,
+    (req.body.event_time || "").trim() || null,
     capacity,
     (req.body.venue_name || "").trim() || null,
     (req.body.venue_address || "").trim() || null,
@@ -376,7 +393,7 @@ router.get("/:eventId", (req, res) => {
   // sección (cualquier otro evento que siga con registro abierto).
   const waitlist = db.prepare("SELECT * FROM sd_waitlist WHERE event_id = ? ORDER BY created_at ASC").all(event.id);
   const openEvents = db
-    .prepare("SELECT id, name, event_date FROM sd_events WHERE status = 'registro' AND id != ? ORDER BY created_at DESC")
+    .prepare("SELECT id, name, event_date, event_time FROM sd_events WHERE status = 'registro' AND id != ? ORDER BY created_at DESC")
     .all(event.id);
 
   // Mismo tope del 60% del aforo por género que aplica el registro público
@@ -455,7 +472,7 @@ router.get("/:eventId", (req, res) => {
     <div class="page-head">
       <span class="eyebrow">${eyebrowLabel}</span>
       <h1>${esc(event.name)}</h1>
-      <p class="lede">${esc(event.event_date) || "Sin fecha"}${event.venue_name ? " · " + esc(event.venue_name) : ""}${event.venue_address ? " (" + esc(event.venue_address) + ")" : ""} · Aforo máximo ${event.capacity} asistentes${event.min_age || event.max_age ? " · " + (event.min_age && event.max_age ? `${event.min_age}–${event.max_age} años` : event.min_age ? `${event.min_age}+ años` : `hasta ${event.max_age} años`) : ""} · <span class="accent-word" style="font-weight:700;">${ROUND_STATE_LABEL[event.round_state] || STATUS_LABEL[event.status]}</span></p>
+      <p class="lede">${esc(event.event_date) || "Sin fecha"}${event.event_time ? ", " + esc(formatEventTimeEs(event.event_time)) : ""}${event.venue_name ? " · " + esc(event.venue_name) : ""}${event.venue_address ? " (" + esc(event.venue_address) + ")" : ""} · Aforo máximo ${event.capacity} asistentes${event.min_age || event.max_age ? " · " + (event.min_age && event.max_age ? `${event.min_age}–${event.max_age} años` : event.min_age ? `${event.min_age}+ años` : `hasta ${event.max_age} años`) : ""} · <span class="accent-word" style="font-weight:700;">${ROUND_STATE_LABEL[event.round_state] || STATUS_LABEL[event.status]}</span></p>
     </div>
 
     <div class="stats">
@@ -471,6 +488,7 @@ router.get("/:eventId", (req, res) => {
         <form method="POST" action="/admin/speed-dating/${event.id}/editar" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px;">
           <div><label class="muted" style="display:block;margin-bottom:4px;">Nombre</label><input type="text" name="name" value="${esc(event.name)}" required></div>
           <div><label class="muted" style="display:block;margin-bottom:4px;">Fecha</label><input type="date" name="event_date" value="${esc(event.event_date || "")}"></div>
+          <div><label class="muted" style="display:block;margin-bottom:4px;">Hora</label><input type="time" name="event_time" value="${esc(event.event_time || "")}" style="width:110px;"></div>
           <div><label class="muted" style="display:block;margin-bottom:4px;">Aforo máximo</label><input type="number" name="capacity" value="${event.capacity}" min="2" max="500" style="width:90px;"></div>
           <div><label class="muted" style="display:block;margin-bottom:4px;">Edad mínima</label><input type="number" name="min_age" value="${event.min_age || ""}" placeholder="25" min="18" max="99" style="width:80px;"></div>
           <div><label class="muted" style="display:block;margin-bottom:4px;">Edad máxima</label><input type="number" name="max_age" value="${event.max_age || ""}" placeholder="45" min="18" max="99" style="width:80px;"></div>
@@ -551,7 +569,7 @@ router.get("/:eventId", (req, res) => {
         <label class="muted" style="display:block;margin-bottom:4px;">Invitar al evento (opcional — arma el link del mensaje):</label>
         <select id="wl-target-event" style="padding:8px 10px;border:1px solid ${BRAND.border};border-radius:8px;font-size:13px;">
           <option value="">— Sin link todavía, solo avisar —</option>
-          ${openEvents.map((oe) => `<option value="${oe.id}">${esc(oe.name)}${oe.event_date ? " · " + esc(oe.event_date) : ""}</option>`).join("")}
+          ${openEvents.map((oe) => `<option value="${oe.id}">${esc(oe.name)}${oe.event_date ? " · " + esc(oe.event_date) : ""}${oe.event_time ? ", " + esc(formatEventTimeEs(oe.event_time)) : ""}</option>`).join("")}
         </select>
       </div>
       <table>
@@ -597,6 +615,7 @@ router.post("/:eventId/editar", express.urlencoded({ extended: true }), (req, re
 
   const name = (req.body.name || "").trim() || event.name;
   const eventDate = (req.body.event_date || "").trim() || null;
+  const eventTime = (req.body.event_time || "").trim() || null;
   const capacity = Number(req.body.capacity) > 0 ? Number(req.body.capacity) : event.capacity;
   const venueName = (req.body.venue_name || "").trim() || null;
   const venueAddress = (req.body.venue_address || "").trim() || null;
@@ -611,8 +630,8 @@ router.post("/:eventId/editar", express.urlencoded({ extended: true }), (req, re
   }
 
   db.prepare(
-    `UPDATE sd_events SET name = ?, event_date = ?, capacity = ?, venue_name = ?, venue_address = ?, round_questions = ?, min_age = ?, max_age = ? WHERE id = ?`
-  ).run(name, eventDate, capacity, venueName, venueAddress, roundQuestions, minAge, maxAge, event.id);
+    `UPDATE sd_events SET name = ?, event_date = ?, event_time = ?, capacity = ?, venue_name = ?, venue_address = ?, round_questions = ?, min_age = ?, max_age = ? WHERE id = ?`
+  ).run(name, eventDate, eventTime, capacity, venueName, venueAddress, roundQuestions, minAge, maxAge, event.id);
 
   res.redirect(`/admin/speed-dating/${event.id}`);
 });
