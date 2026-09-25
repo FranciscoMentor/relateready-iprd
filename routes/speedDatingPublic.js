@@ -21,18 +21,50 @@ function findEvent(id) {
   return db.prepare("SELECT * FROM sd_events WHERE id = ?").get(id);
 }
 
+// Proporción del aforo que un solo género puede llenar antes de que su
+// registro se cierre (y el otro género se quede con el resto del cupo) —
+// pedido de Francisco (2026-09) para no terminar con un evento
+// desbalanceado (ej. 20 mujeres y 4 hombres). Math.floor redondea siempre
+// hacia abajo para no pasarse nunca del 60% real; Math.max(1, …) evita que
+// un aforo muy chico (1 o 2 personas) cierre un género antes de que nadie
+// alcance a registrarse.
+const GENDER_CAP_RATIO = 0.6;
+
+function capacityState(event) {
+  const registered = db.prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND cancelled_at IS NULL").get(event.id).n;
+  const womenCount = db
+    .prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND gender = 'F' AND cancelled_at IS NULL")
+    .get(event.id).n;
+  const menCount = db
+    .prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND gender = 'M' AND cancelled_at IS NULL")
+    .get(event.id).n;
+  const genderCap = Math.max(1, Math.floor(event.capacity * GENDER_CAP_RATIO));
+  return {
+    registered,
+    womenCount,
+    menCount,
+    genderCap,
+    eventFull: registered >= event.capacity,
+    genderFull: { F: womenCount >= genderCap, M: menCount >= genderCap },
+  };
+}
+
 // GET /api/speed-dating/events/:eventId/meta — para la pantalla de registro.
 router.get("/events/:eventId/meta", (req, res) => {
   const event = findEvent(req.params.eventId);
   if (!event) return res.status(404).json({ error: "Evento no encontrado." });
-  const registered = db.prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND cancelled_at IS NULL").get(event.id).n;
+  const state = capacityState(event);
   res.json({
     id: event.id,
     name: event.name,
     status: event.status,
     capacity: event.capacity,
-    registered,
-    cuposDisponibles: Math.max(0, event.capacity - registered),
+    registered: state.registered,
+    cuposDisponibles: Math.max(0, event.capacity - state.registered),
+    generoAbierto: {
+      F: !state.eventFull && !state.genderFull.F,
+      M: !state.eventFull && !state.genderFull.M,
+    },
     venueName: event.venue_name || null,
     venueAddress: event.venue_address || null,
     minAge: event.min_age || null,
@@ -81,15 +113,18 @@ router.post("/events/:eventId/registro", (req, res) => {
     return res.status(400).json({ error: `Este evento es para personas ${rangeLabel}.` });
   }
 
-  const registered = db.prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND cancelled_at IS NULL").get(event.id).n;
+  const state = capacityState(event);
+  const sameGenderCount = gender === "F" ? state.womenCount : state.menCount;
 
-  // ── Aforo lleno: no se rechaza a la persona, se guarda en lista de
-  // espera (sd_waitlist) para invitarla por WhatsApp al próximo evento en
-  // cuanto se confirme fecha — ver panel del organizador, routes/
-  // speedDatingAdmin.js. El correo de aviso es igual de "dispara y olvida"
-  // que el de bienvenida: si falla, el registro en la lista de espera ya
-  // quedó guardado igual.
-  if (registered >= event.capacity) {
+  // ── Aforo lleno (en total, o ya se llenó el 60% del cupo para este mismo
+  // género — ver capacityState arriba): no se rechaza a la persona, se
+  // guarda en lista de espera (sd_waitlist) para invitarla por WhatsApp al
+  // próximo evento en cuanto se confirme fecha — ver panel del
+  // organizador, routes/speedDatingAdmin.js. El correo de aviso es igual
+  // de "dispara y olvida" que el de bienvenida: si falla, el registro en
+  // la lista de espera ya quedó guardado igual.
+  const genderClosed = !state.eventFull && sameGenderCount >= state.genderCap;
+  if (state.eventFull || genderClosed) {
     const waitlistId = crypto.randomUUID();
     db.prepare(
       `INSERT INTO sd_waitlist
@@ -108,7 +143,12 @@ router.post("/events/:eventId/registro", (req, res) => {
     );
 
     try {
-      const { subject, html } = speedDatingWaitlistEmail({ name: name.trim(), lang: "es", eventName: event.name });
+      const { subject, html } = speedDatingWaitlistEmail({
+        name: name.trim(),
+        lang: "es",
+        eventName: event.name,
+        genderOnly: genderClosed,
+      });
       sendMail({ to: email.trim(), subject, html }).catch((err) => {
         console.error("[speedDatingPublic] Error enviando correo de lista de espera —", err.message);
       });
@@ -116,12 +156,8 @@ router.post("/events/:eventId/registro", (req, res) => {
       console.error("[speedDatingPublic] Error preparando correo de lista de espera —", err.message);
     }
 
-    return res.json({ ok: true, waitlisted: true });
+    return res.json({ ok: true, waitlisted: true, reason: genderClosed ? "gender_full" : "event_full" });
   }
-
-  const sameGenderCount = db
-    .prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND gender = ? AND cancelled_at IS NULL")
-    .get(event.id, gender).n;
 
   const id = crypto.randomUUID();
   const voteToken = crypto.randomUUID();

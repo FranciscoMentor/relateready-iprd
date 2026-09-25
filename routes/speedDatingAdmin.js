@@ -379,6 +379,11 @@ router.get("/:eventId", (req, res) => {
     .prepare("SELECT id, name, event_date FROM sd_events WHERE status = 'registro' AND id != ? ORDER BY created_at DESC")
     .all(event.id);
 
+  // Mismo tope del 60% del aforo por género que aplica el registro público
+  // (routes/speedDatingPublic.js, capacityState) — se muestra aquí solo
+  // para que el organizador vea de un vistazo si algún género ya se cerró.
+  const genderCap = Math.max(1, Math.floor(event.capacity * 0.6));
+
   const baseUrl = baseUrlOf(req);
   const registroUrl = `${baseUrl}/evento/${event.id}`;
 
@@ -454,8 +459,8 @@ router.get("/:eventId", (req, res) => {
     </div>
 
     <div class="stats">
-      <div class="stat-card"><div class="stat-num">${women.length}</div><div class="stat-label">Mujeres registradas</div></div>
-      <div class="stat-card"><div class="stat-num">${men.length}</div><div class="stat-label">Hombres registrados</div></div>
+      <div class="stat-card"><div class="stat-num">${women.length}</div><div class="stat-label">Mujeres registradas${women.length >= genderCap ? `<br><span class="badge" style="background:${BRAND.clay};margin-top:4px;">Cerrado (60%)</span>` : ""}</div></div>
+      <div class="stat-card"><div class="stat-num">${men.length}</div><div class="stat-label">Hombres registrados${men.length >= genderCap ? `<br><span class="badge" style="background:${BRAND.clay};margin-top:4px;">Cerrado (60%)</span>` : ""}</div></div>
       <div class="stat-card"><div class="stat-num">${event.total_rounds || "—"}</div><div class="stat-label">Rondas totales</div></div>
       <div class="stat-card"><div class="stat-num">${event.current_round_number}</div><div class="stat-label">Ronda actual</div></div>
     </div>

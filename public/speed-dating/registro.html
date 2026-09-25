@@ -67,6 +67,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
           <button type="button" data-value="F" class="sel">Mujer</button>
           <button type="button" data-value="M">Hombre</button>
         </div>
+        <p class="sd-subtext sd-hidden" id="gender-note" style="margin-top:6px;"></p>
       </div>
 
       <div class="sd-consent-box">
@@ -102,7 +103,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
         </svg>
       </div>
       <h2>¡Quedaste en la lista! 🙌</h2>
-      <p>Se agotaron los cupos para este evento, pero ya guardamos tus datos. Te vamos a escribir por WhatsApp apenas tengamos fecha confirmada para el próximo evento — no tienes que hacer nada más por ahora.</p>
+      <p id="waitlist-success-text">Se agotaron los cupos para este evento, pero ya guardamos tus datos. Te vamos a escribir por WhatsApp apenas tengamos fecha confirmada para el próximo evento — no tienes que hacer nada más por ahora.</p>
     </div>
   </div>
 
@@ -117,6 +118,19 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
   let gender = 'F';
   let consent = 1;
   let soldOut = false;
+  let generoAbierto = { F: true, M: true };
+
+  function updateGenderNote() {
+    const note = document.getElementById('gender-note');
+    if (!soldOut && generoAbierto[gender] === false) {
+      const otro = gender === 'F' ? 'hombres' : 'mujeres';
+      const propio = gender === 'F' ? 'mujeres' : 'hombres';
+      note.textContent = `Ya no hay más cupo para ${propio} en este evento (sigue abierto para ${otro}). Puedes registrarte igual: te anotamos en la lista de espera para el próximo evento.`;
+      note.classList.remove('sd-hidden');
+    } else {
+      note.classList.add('sd-hidden');
+    }
+  }
 
   function selectToggle(containerId, value, setter) {
     const container = document.getElementById(containerId);
@@ -126,6 +140,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
   document.getElementById('gender-toggle').addEventListener('click', (e) => {
     if (e.target.tagName !== 'BUTTON') return;
     selectToggle('gender-toggle', e.target.dataset.value, (v) => gender = v);
+    updateGenderNote();
   });
   document.getElementById('consent-toggle').addEventListener('click', (e) => {
     if (e.target.tagName !== 'BUTTON') return;
@@ -157,6 +172,8 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
         ? 'Se agotaron los cupos para este evento, pero puedes dejarnos tus datos: te escribiremos por WhatsApp apenas tengamos fecha para el próximo. 🙌'
         : 'Completa tus datos para asignarte tu mesa (si eres mujer) o tu ronda de citas (si eres hombre).';
       document.getElementById('submit-btn').textContent = soldOut ? 'Unirme a la lista de espera' : 'Confirmar registro';
+      if (data.generoAbierto) generoAbierto = data.generoAbierto;
+      updateGenderNote();
       if (data.venueName || data.venueAddress) {
         const lugarEl = document.getElementById('evento-lugar');
         lugarEl.textContent = [data.venueName, data.venueAddress].filter(Boolean).join(' — ');
@@ -207,6 +224,9 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
 
       if (data.waitlisted) {
         document.getElementById('waitlist-success-block').classList.remove('sd-hidden');
+        document.getElementById('waitlist-success-text').textContent = data.reason === 'gender_full'
+          ? 'Ya se llenó el cupo para tu grupo en este evento (seguimos con registro abierto para el otro género). Guardamos tus datos — te vamos a escribir por WhatsApp apenas tengamos fecha confirmada para el próximo evento.'
+          : 'Se agotaron los cupos para este evento, pero ya guardamos tus datos. Te vamos a escribir por WhatsApp apenas tengamos fecha confirmada para el próximo evento — no tienes que hacer nada más por ahora.';
         return;
       }
 
