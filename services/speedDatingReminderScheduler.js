@@ -26,6 +26,20 @@ const { speedDatingReminder3dEmail, speedDatingReminder1dEmail } = require("./em
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // cada hora
 const FIRST_CHECK_DELAY_MS = 4 * 60 * 1000; // 4 min después de arrancar (reminderScheduler usa 2, speedDatingScheduler usa 3)
 
+// El recordatorio de 1 día antes no debe salir a cualquier hora random según
+// cuándo arrancó el servidor — se fija para que nunca salga antes de las
+// 10:00 a.m. hora de Ecuador (America/Guayaquil, UTC-5 todo el año, sin
+// horario de verano). Como este proceso revisa cada hora, en la práctica
+// sale dentro de la primera revisión desde las 10 a.m. en adelante ese día.
+// El de 3 días antes no tiene esta restricción (no se pidió).
+const REMINDER_1D_MIN_LOCAL_HOUR = 10;
+const ECUADOR_UTC_OFFSET_HOURS = -5;
+
+function ecuadorLocalHour() {
+  const utcHour = new Date().getUTCHours();
+  return (utcHour + ECUADOR_UTC_OFFSET_HOURS + 24) % 24;
+}
+
 function baseUrl() {
   // Render inyecta RENDER_EXTERNAL_URL automáticamente en todo servicio web
   // — no requiere configurar nada a mano. PUBLIC_BASE_URL queda como
@@ -88,7 +102,7 @@ async function runOnce() {
     const days = daysUntil(event.event_date);
     if (days === 3) {
       await sendReminderToEvent(event, { column: "reminder_3d_sent_at", buildEmail: speedDatingReminder3dEmail });
-    } else if (days === 1) {
+    } else if (days === 1 && ecuadorLocalHour() >= REMINDER_1D_MIN_LOCAL_HOUR) {
       await sendReminderToEvent(event, { column: "reminder_1d_sent_at", buildEmail: speedDatingReminder1dEmail });
     }
   }

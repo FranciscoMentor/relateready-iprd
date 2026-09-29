@@ -369,6 +369,7 @@ function speedDatingReminderBodyEs({ firstName, eventName, formattedDate, format
       ${tableNumber ? `<p style="margin:8px 0 0;font-size:14px;"><strong>Tu mesa fija:</strong> Mesa ${tableNumber} — no te muevas de ahí en toda la noche.</p>` : ""}
     </div>
     <p style="font-size:15px;line-height:1.6;margin:0 0 14px;">Antes de esa noche, te recomendamos hacer el test de RelateReady (toma unos 10 minutos) — te ayuda a entender mejor tu estilo en las relaciones, así llegas con más claridad a tus conversaciones.</p>
+    <p style="font-size:13.5px;line-height:1.5;margin:0 0 20px;color:${MUTED};">Ojo: no hace falta que pagues por el informe completo — durante el evento vamos a sortear varios códigos para descargarlo gratis.</p>
     <p style="margin:0 0 20px;">${button(testUrl, "Hacer el test de RelateReady")}</p>
     <p style="margin:0 0 12px;">${button(asistenteUrl, "Ver mi pantalla del evento")}</p>
     ${includeCancelLink ? `<p style="font-size:12.5px;line-height:1.5;margin:20px 0 0;color:${MUTED};">¿No vas a poder asistir? <a href="${asistenteUrl}" style="color:${MUTED};">Cancela tu cupo aquí</a> para que se lo demos a alguien más.</p>` : ""}
