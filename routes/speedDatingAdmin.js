@@ -440,7 +440,7 @@ router.get("/:eventId", (req, res) => {
         <td>${esc(entry.name)}<br><span class="muted">${esc(entry.email) || "—"}${entry.phone ? " · " + esc(entry.phone) : ""}</span></td>
         <td>${entry.gender === "F" ? "Mujer" : "Hombre"}${entry.age ? ", " + entry.age + " años" : ""}</td>
         <td>${entry.share_phone_consent ? "Sí" : "No"}</td>
-        <td>${entry.created_at ? new Date(entry.created_at).toLocaleDateString("es-EC") : "—"}</td>
+        <td>${entry.created_at ? new Date(entry.created_at).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" }) : "—"}</td>
         <td>
           <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
             ${waDigits ? `<button type="button" class="btn small ghost wl-whatsapp-btn" data-wl-name="${esc(entry.name).replace(/"/g, "&quot;")}" data-wl-phone="${waDigits}">Enviar por WhatsApp</button>` : '<span class="muted">Sin teléfono válido</span>'}
@@ -910,7 +910,7 @@ router.get("/:eventId/exportar", async (req, res) => {
       estado: a.cancelled_at ? "Canceló" : "Activo",
       motivo: a.cancellation_reason || "",
       match_email_status: a.match_email_status || "",
-      created_at: a.created_at ? new Date(a.created_at).toLocaleString("es-EC") : "",
+      created_at: a.created_at ? new Date(a.created_at).toLocaleString("es-EC", { timeZone: "America/Guayaquil" }) : "",
     });
   });
 
@@ -946,7 +946,7 @@ router.get("/:eventId/exportar", async (req, res) => {
         age: entry.age != null ? entry.age : "",
         consent: entry.share_phone_consent ? "Sí" : "No",
         contacted: entry.contacted_at ? "Sí" : "No",
-        created_at: entry.created_at ? new Date(entry.created_at).toLocaleString("es-EC") : "",
+        created_at: entry.created_at ? new Date(entry.created_at).toLocaleString("es-EC", { timeZone: "America/Guayaquil" }) : "",
       });
     });
   }
