@@ -34,6 +34,10 @@ function shell({ bodyHtml, lang }) {
     lang === "en" ? "RelateReady — a project by Adamantine Mentoring." : "RelateReady — un proyecto de Adamantine Mentoring.";
   return `<!doctype html>
 <html lang="${lang}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
   <body style="margin:0;padding:0;background:${PAPER};font-family:Georgia,'Times New Roman',serif;color:${INK};">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${PAPER};padding:32px 16px;">
       <tr>
@@ -366,6 +370,7 @@ function speedDatingReminderBodyEs({ firstName, eventName, formattedDate, format
     <div style="border:1px solid #E7DFD2;border-radius:10px;padding:16px 18px;margin:0 0 20px;">
       ${formattedDate ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Fecha:</strong> ${formattedDate}${formattedTime ? `, ${formattedTime}` : ""}</p>` : ""}
       ${venueName ? `<p style="margin:0;font-size:14px;"><strong>Lugar:</strong> ${venueName}${venueAddress ? ` — ${venueAddress}` : ""}</p>` : ""}
+      <p style="margin:8px 0 0;font-size:14px;"><strong>Parqueadero gratis disponible en el edificio.</strong></p>
       ${tableNumber ? `<p style="margin:8px 0 0;font-size:14px;"><strong>Tu mesa fija:</strong> Mesa ${tableNumber} — no te muevas de ahí en toda la noche.</p>` : ""}
       <p style="margin:8px 0 0;font-size:14px;"><strong>Importante:</strong> lleva tu <strong>celular cargado</strong> — lo vas a necesitar para participar en el evento.</p>
     </div>
