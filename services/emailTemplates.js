@@ -367,7 +367,7 @@ function speedDatingReminderBodyEs({ firstName, eventName, formattedDate, format
       ${formattedDate ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Fecha:</strong> ${formattedDate}${formattedTime ? `, ${formattedTime}` : ""}</p>` : ""}
       ${venueName ? `<p style="margin:0;font-size:14px;"><strong>Lugar:</strong> ${venueName}${venueAddress ? ` — ${venueAddress}` : ""}</p>` : ""}
       ${tableNumber ? `<p style="margin:8px 0 0;font-size:14px;"><strong>Tu mesa fija:</strong> Mesa ${tableNumber} — no te muevas de ahí en toda la noche.</p>` : ""}
-      <p style="margin:8px 0 0;font-size:14px;"><strong>Importante:</strong> lleva tu celular cargado — lo vas a necesitar para participar en el evento.</p>
+      <p style="margin:8px 0 0;font-size:14px;"><strong>Importante:</strong> lleva tu <strong>celular cargado</strong> — lo vas a necesitar para participar en el evento.</p>
     </div>
     <p style="font-size:15px;line-height:1.6;margin:0 0 14px;">Antes de esa noche, te recomendamos hacer el test de RelateReady (toma unos 10 minutos) — te ayuda a entender mejor tu estilo en las relaciones, así llegas con más claridad a tus conversaciones.</p>
     <p style="font-size:13.5px;line-height:1.5;margin:0 0 20px;color:${MUTED};">Ojo: no hace falta que pagues por el informe completo — durante el evento vamos a sortear varios códigos para descargarlo gratis.</p>
