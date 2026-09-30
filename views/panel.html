@@ -468,7 +468,7 @@
       <p style="font-size:13px;margin:0 0 6px;"><strong>Estado:</strong> <span class="badge" style="background:${STATUS_COLOR[r.payment_status]||'#999'}">${STATUS_LABEL[r.payment_status]||r.payment_status}</span></p>
       <p style="font-size:13px;margin:0 0 6px;"><strong>Protocolo de derivación:</strong> ${r.referral_triggered ? '<span style="color:#9C3B2E;font-weight:700;">Sí, activado</span>' : "No"}</p>
       <p style="font-size:13px;margin:0 0 10px;"><strong>Link de resultados:</strong> <button class="link-btn" id="d-copy-link">Copiar link</button></p>
-      ${r.payment_status !== "pending" ? `<p style="font-size:13px;"><a href="/api/report/extended/${r.id}" target="_blank" class="link-btn" style="text-decoration:none;">Ver / descargar informe extendido (PDF)</a></p>` : `<button class="btn small" id="d-mark-paid">Marcar como pagado</button>`}
+      ${r.payment_status !== "pending" ? `<p style="font-size:13px;"><a href="/api/report/extended/${r.id}" target="_blank" class="link-btn" style="text-decoration:none;">Ver / descargar informe extendido (PDF)</a></p>` : `<button class="btn small" id="d-mark-paid">Marcar como pagado</button> <button class="btn small ghost" id="d-resend-summary">Reenviar link de resultados</button>`}
       ${r.payment_status !== "pending" ? `
       <p style="font-size:13px;margin:0 0 6px;"><strong>Correo del informe:</strong>
         ${r.extended_email_status ? `<span class="badge" style="background:${EMAIL_STATUS_COLOR[r.extended_email_status]||'#999'}">${EMAIL_STATUS_LABEL[r.extended_email_status]||r.extended_email_status}</span>` : `<span class="muted">Aún no se ha generado/enviado</span>`}
@@ -486,6 +486,10 @@
       <div class="form-field"><label>Notas</label><textarea id="d-followup-notes">${esc(r.follow_up_notes)||''}</textarea></div>
       <button class="btn small" id="d-save-followup">Guardar seguimiento</button>
       <button class="btn ghost small" id="d-close" style="margin-left:8px;">Cerrar</button>
+
+      <h2 style="margin-top:24px;color:#9C3B2E;">Zona de riesgo</h2>
+      <p class="muted" style="margin:0 0 10px;">Elimina permanentemente toda la información de esta persona, incluido su resultado del test. Esta acción no se puede deshacer.</p>
+      <button class="btn small" id="d-delete" style="background:#9C3B2E;">Eliminar cliente</button>
     `;
 
     document.getElementById("d-close").addEventListener("click", closeDetailModal);
@@ -526,6 +530,37 @@
         alert("No se pudo reenviar el correo.");
         resendEmailBtn.disabled = false;
         resendEmailBtn.textContent = "Reenviar correo";
+      }
+    });
+    const resendSummaryBtn = document.getElementById("d-resend-summary");
+    if (resendSummaryBtn) resendSummaryBtn.addEventListener("click", async ()=>{
+      resendSummaryBtn.disabled = true;
+      resendSummaryBtn.textContent = "Enviando…";
+      try {
+        const res = await fetch(`/admin/api/results/${r.id}/resend-summary-link`, { method:"POST" });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || "No se pudo enviar el link de resultados."); }
+        else { resendSummaryBtn.textContent = "Enviado ✓"; setTimeout(()=>{ resendSummaryBtn.textContent = "Reenviar link de resultados"; resendSummaryBtn.disabled = false; }, 2000); return; }
+      } catch (e) {
+        alert("No se pudo enviar el link de resultados.");
+      }
+      resendSummaryBtn.disabled = false;
+      resendSummaryBtn.textContent = "Reenviar link de resultados";
+    });
+    const deleteBtn = document.getElementById("d-delete");
+    if (deleteBtn) deleteBtn.addEventListener("click", async ()=>{
+      if (!confirm(`¿ELIMINAR PERMANENTEMENTE toda la información de ${r.name}, incluido su resultado del test? Esta acción no se puede deshacer.`)) return;
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = "Eliminando…";
+      try {
+        const res = await fetch(`/admin/api/results/${r.id}`, { method:"DELETE" });
+        if (!res.ok) { const data = await res.json().catch(()=>({})); alert(data.error || "No se pudo eliminar el cliente."); deleteBtn.disabled = false; deleteBtn.textContent = "Eliminar cliente"; return; }
+        closeDetailModal();
+        await loadResults();
+      } catch (e) {
+        alert("No se pudo eliminar el cliente.");
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = "Eliminar cliente";
       }
     });
   }

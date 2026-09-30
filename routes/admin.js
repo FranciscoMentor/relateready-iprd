@@ -13,6 +13,7 @@ const db = require("../db/init");
 const { DIMENSIONS } = require("../data/dimensions");
 const { generatePdfForSubmission, sendExtendedReportEmail, triggerExtendedReportEmailOnce } = require("../services/extendedReport");
 const { listReferrals, GRAPH_REFERRALS_ENABLED } = require("../services/graphExcel");
+const { sendReminderNow } = require("../services/reminderScheduler");
 
 const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Number(process.env.EXTENDED_PRICE_CENTS) : 2499;
 
@@ -200,6 +201,8 @@ function baseStyles() {
     .btn{padding:9px 18px;background:${BRAND.accent};color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:12.5px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
     .btn.ghost{background:transparent;border:1px solid ${BRAND.border};color:${BRAND.ink};}
     .btn.small{padding:6px 12px;font-size:11.5px;}
+    .btn.danger{background:${BRAND.clay};}
+    .link-btn.danger{color:${BRAND.clay};}
     table{width:100%;border-collapse:collapse;background:#fff;font-size:13px;}
     th{background:${BRAND.ink};color:${BRAND.light};font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:11px 12px;text-align:left;}
     td{padding:11px 12px;border-bottom:1px solid ${BRAND.border};vertical-align:top;}
@@ -285,6 +288,9 @@ router.get("/", (req, res) => {
       paymentCell += `
         <form method="POST" action="/admin/submission/${r.id}/mark-paid" class="inline-form" onsubmit="return confirm('¿Confirmas que viste este pago real (Payphone u otro medio) para ${esc(r.name).replace(/'/g, "")}');">
           <button type="submit" class="link-btn">Marcar como pagado</button>
+        </form>
+        <form method="POST" action="/admin/submission/${r.id}/resend-summary-link" class="inline-form">
+          <button type="submit" class="link-btn">Reenviar link de resultados</button>
         </form>`;
     } else {
       paymentCell += `<br><button type="button" class="link-btn" onclick="copyResultLink('${r.id}', this)">Copiar link de resultados</button>`;
@@ -312,6 +318,9 @@ router.get("/", (req, res) => {
       <td>
         <a href="/admin/submission/${r.id}" class="link-btn" style="text-decoration:none;">Ver detalle</a>
         ${r.payment_status !== "pending" ? `<br><a href="/api/report/extended/${r.id}" target="_blank" class="link-btn" style="text-decoration:none;">Ver informe</a>` : ""}
+        <form method="POST" action="/admin/submission/${r.id}/delete" class="inline-form" onsubmit="return confirm('¿ELIMINAR PERMANENTEMENTE toda la información de ${esc(r.name).replace(/'/g, "")}, incluido su resultado del test? Esta acción no se puede deshacer.');">
+          <button type="submit" class="link-btn danger">Eliminar</button>
+        </form>
       </td>
     </tr>`;
   }).join("");
@@ -461,9 +470,20 @@ router.get("/submission/:id", (req, res) => {
             </form>
           </span></div>` : ""}
           ${r.payment_status === "pending" ? `
-          <form method="POST" action="/admin/submission/${r.id}/mark-paid" style="margin-top:12px;" onsubmit="return confirm('¿Confirmas que viste este pago real?');">
+          <form method="POST" action="/admin/submission/${r.id}/mark-paid" style="margin-top:12px;display:inline-block;margin-right:8px;" onsubmit="return confirm('¿Confirmas que viste este pago real?');">
             <button type="submit" class="btn small">Marcar como pagado</button>
+          </form>
+          <form method="POST" action="/admin/submission/${r.id}/resend-summary-link" style="margin-top:12px;display:inline-block;">
+            <button type="submit" class="btn small ghost">Reenviar link de resultados</button>
           </form>` : ""}
+        </div>
+
+        <div class="card">
+          <h2 style="margin:0 0 14px;font-size:15px;color:${BRAND.clay};">Zona de riesgo</h2>
+          <p class="muted" style="margin:0 0 12px;">Elimina permanentemente toda la información de esta persona, incluido su resultado del test. Esta acción no se puede deshacer.</p>
+          <form method="POST" action="/admin/submission/${r.id}/delete" onsubmit="return confirm('¿ELIMINAR PERMANENTEMENTE toda la información de ${esc(r.name).replace(/'/g, "")}, incluido su resultado del test? Esta acción no se puede deshacer.');">
+            <button type="submit" class="btn small danger">Eliminar cliente</button>
+          </form>
         </div>
 
         <div class="card">
@@ -563,6 +583,40 @@ router.post("/submission/:id/resend-extended-email", async (req, res) => {
     console.error(`[admin] Error reenviando correo del Informe Extendido (${req.params.id}) —`, err.message);
   }
   res.redirect(backTo);
+});
+
+/**
+ * Reenvía manualmente el correo con el link de resultados resumido (gratis,
+ * antes de pagar) — para clientes que hicieron el test pero todavía no han
+ * comprado el Informe Extendido. Reusa el mismo correo/plantilla que el
+ * recordatorio automático de 24-48h (ver services/reminderScheduler.js),
+ * pero disparado a mano y sin esperar esa ventana. Si el envío ya no está
+ * pendiente (ya pagó) o no tiene correo registrado, no hace nada.
+ */
+router.post("/submission/:id/resend-summary-link", async (req, res) => {
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  try {
+    await sendReminderNow(req.params.id, baseUrl);
+  } catch (err) {
+    console.error(`[admin] Error reenviando link de resultados (${req.params.id}) —`, err.message);
+  }
+  const backTo = req.get("Referer") && req.get("Referer").includes(`/submission/${req.params.id}`)
+    ? `/admin/submission/${req.params.id}`
+    : "/admin";
+  res.redirect(backTo);
+});
+
+/**
+ * Elimina PERMANENTEMENTE toda la información de un envío/cliente, incluido
+ * su resultado del test — no hay tablas relacionadas (todo vive en
+ * submissions, ver db/init.js), así que un solo DELETE basta. No hay
+ * confirmación del lado del servidor más allá del confirm() del navegador;
+ * esta es una acción irreversible pedida explícitamente por Francisco desde
+ * el detalle/lista de clientes.
+ */
+router.post("/submission/:id/delete", (req, res) => {
+  db.prepare("DELETE FROM submissions WHERE id = ?").run(req.params.id);
+  res.redirect("/admin");
 });
 
 /** Exporta todos los envíos (o los que coincidan con el filtro) como CSV. */
@@ -706,6 +760,36 @@ router.post("/api/results/:id/resend-extended-email", async (req, res) => {
     return res.status(500).json({ error: "No se pudo generar/enviar el correo: " + err.message });
   }
   res.json({ ok: true, submission: serializeSubmission(db.prepare("SELECT * FROM submissions WHERE id = ?").get(req.params.id)) });
+});
+
+/** Versión JSON del reenvío del link de resultados resumido (botón del panel-control, vía fetch). */
+router.post("/api/results/:id/resend-summary-link", async (req, res) => {
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  let result;
+  try {
+    result = await sendReminderNow(req.params.id, baseUrl);
+  } catch (err) {
+    console.error(`[admin] Error reenviando link de resultados (${req.params.id}) —`, err.message);
+    return res.status(500).json({ error: "No se pudo enviar el correo: " + err.message });
+  }
+  if (!result.sent) {
+    return res.status(400).json({ error: result.error || "No se pudo enviar el correo." });
+  }
+  const updated = db.prepare("SELECT * FROM submissions WHERE id = ?").get(req.params.id);
+  res.json({ ok: true, submission: updated ? serializeSubmission(updated) : null });
+});
+
+/**
+ * Elimina PERMANENTEMENTE toda la información de un envío/cliente (versión
+ * JSON, usada por el botón "Eliminar cliente" del panel-control). Ver la
+ * nota de la ruta clásica equivalente arriba — no hay tablas relacionadas,
+ * un solo DELETE basta.
+ */
+router.delete("/api/results/:id", (req, res) => {
+  const existing = db.prepare("SELECT id FROM submissions WHERE id = ?").get(req.params.id);
+  if (!existing) return res.status(404).json({ error: "Registro no encontrado." });
+  db.prepare("DELETE FROM submissions WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
 });
 
 /**

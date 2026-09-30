@@ -60,4 +60,35 @@ function start() {
   console.log("[reminderScheduler] Activo — revisa cada hora si hay recordatorios pendientes de más de 24h.");
 }
 
-module.exports = { start };
+/**
+ * Envío manual (bajo demanda) del mismo correo de "tus resultados te están
+ * esperando" que runOnce() envía automáticamente a las 24-48h — para que
+ * Francisco pueda reenviar el link de resultados resumido a un cliente
+ * específico ANTES de que pague, desde el botón "Reenviar link de
+ * resultados" en /admin y /panel-control, sin esperar (ni depender de) la
+ * ventana de 24h-7días que usa el recordatorio automático. No exige que
+ * reminder_sent_at esté vacío: se puede reenviar las veces que haga falta.
+ * Nunca lanza — igual que sendMail(), siempre resuelve { sent, error }.
+ */
+async function sendReminderNow(subId, baseUrl) {
+  const sub = db.prepare("SELECT id, name, email, lang, payment_status FROM submissions WHERE id = ?").get(subId);
+  if (!sub) return { sent: false, error: "Registro no encontrado." };
+  if (sub.payment_status !== "pending") {
+    return { sent: false, error: "Este envío ya no está pendiente de pago." };
+  }
+  if (!sub.email) {
+    return { sent: false, error: "Este envío no tiene un correo registrado." };
+  }
+  const { subject, html } = pendingReportReminderEmail({
+    name: sub.name,
+    lang: sub.lang === "en" ? "en" : "es",
+    resultsUrl: `${baseUrl}/?sid=${sub.id}`,
+  });
+  const result = await sendMail({ to: sub.email, subject, html });
+  if (result.sent) {
+    db.prepare("UPDATE submissions SET reminder_sent_at = ? WHERE id = ?").run(new Date().toISOString(), sub.id);
+  }
+  return { sent: !!result.sent, error: result.sent ? null : result.error || result.reason || "Error desconocido" };
+}
+
+module.exports = { start, sendReminderNow };
