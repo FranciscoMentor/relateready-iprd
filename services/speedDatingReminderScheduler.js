@@ -14,10 +14,18 @@
 // aunque este proceso revise varias veces el mismo día nunca se duplica.
 //
 // sd_events solo guarda la fecha (event_date), no la hora exacta del
-// mundo — para no depender del huso horario del servidor (Render corre en
-// UTC) al calcular "faltan 3 días", se compara la fecha del evento contra
-// la fecha de hoy en UTC, ambas como fechas puras (sin hora). Con una
-// revisión cada hora esto es más que suficiente para no perderse el día.
+// mundo. IMPORTANTE (bug corregido 2026-09-30): "hoy" para calcular
+// "faltan 3/1 días" se calcula en hora de Ecuador, NO en UTC del
+// servidor. Render corre en UTC, que va 5 horas adelante de Ecuador —
+// si se usara la fecha UTC tal cual, desde las 7pm hora de Ecuador en
+// adelante el calendario UTC ya marca el día siguiente, y el evento se
+// ve "un día más cerca" de lo que realmente es en Ecuador. Esto causó
+// que el recordatorio de 1 día antes (que ya no depende de una hora
+// mínima salvo por REMINDER_1D_MIN_LOCAL_HOUR) se disparara la noche
+// anterior en vez de la mañana del día correcto, porque para esa hora
+// de la noche ya "cumplía" tanto el día (por el desfase UTC) como la
+// hora mínima (7pm ya es >= 10am). Por eso "hoy" ahora se calcula
+// restando el offset de Ecuador antes de leer la fecha calendario.
 
 const db = require("../db/init");
 const { sendMail, GRAPH_MAIL_ENABLED } = require("./graphMail");
@@ -40,6 +48,14 @@ function ecuadorLocalHour() {
   return (utcHour + ECUADOR_UTC_OFFSET_HOURS + 24) % 24;
 }
 
+// Fecha calendario ("YYYY-MM-DD") de "hoy" en hora de Ecuador, no en UTC
+// del servidor — ver nota arriba. Se logra desplazando el instante actual
+// por el offset de Ecuador antes de leer su fecha en UTC.
+function ecuadorTodayStr() {
+  const shifted = new Date(Date.now() + ECUADOR_UTC_OFFSET_HOURS * 60 * 60 * 1000);
+  return shifted.toISOString().slice(0, 10);
+}
+
 function baseUrl() {
   // Render inyecta RENDER_EXTERNAL_URL automáticamente en todo servicio web
   // — no requiere configurar nada a mano. PUBLIC_BASE_URL queda como
@@ -51,12 +67,12 @@ function baseUrl() {
 // "YYYY-MM-DD") y hoy, contando ambas como fechas puras en UTC — evita
 // arrastrar horas/minutos que compliquen la resta.
 function daysUntil(eventDate) {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = ecuadorTodayStr();
   const diffMs = new Date(`${eventDate}T00:00:00Z`) - new Date(`${todayStr}T00:00:00Z`);
   return Math.round(diffMs / 86400000);
 }
 
-async function sendReminderToEvent(event, { column, buildEmail }) {
+async function sendReminderToEvent(event, { column, buildEmail, extraEmailOptions = {} }) {
   const attendees = db
     .prepare(
       `SELECT * FROM sd_attendees
@@ -83,6 +99,7 @@ async function sendReminderToEvent(event, { column, buildEmail }) {
       tableNumber: attendee.gender === "F" ? attendee.table_number : null,
       asistenteUrl,
       testUrl,
+      ...extraEmailOptions,
     });
 
     const result = await sendMail({ to: attendee.email, subject, html });
@@ -91,6 +108,28 @@ async function sendReminderToEvent(event, { column, buildEmail }) {
       console.log(`[speedDatingReminderScheduler] ${column} enviado a ${attendee.email} (evento ${event.name}).`);
     }
   }
+}
+
+// ── Reenvío manual corregido del recordatorio de 1 día antes ────────────
+// Botón de emergencia (panel de admin) para cuando el automático salió a
+// la hora/día equivocado — ver bug corregido arriba (2026-09-30). Resetea
+// la marca de "ya enviado" de TODOS los asistentes activos del evento y
+// vuelve a enviar de inmediato, con una nota de disculpa + confirmación de
+// la fecha real del evento (correctionNote), en vez de esperar a la
+// próxima revisión horaria automática.
+async function resendReminder1dCorrected(eventId) {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(eventId);
+  if (!event) return { ok: false, reason: "event_not_found" };
+
+  db.prepare("UPDATE sd_attendees SET reminder_1d_sent_at = NULL WHERE event_id = ? AND cancelled_at IS NULL").run(eventId);
+
+  await sendReminderToEvent(event, {
+    column: "reminder_1d_sent_at",
+    buildEmail: speedDatingReminder1dEmail,
+    extraEmailOptions: { correctionNote: true },
+  });
+
+  return { ok: true };
 }
 
 async function runOnce() {
@@ -118,4 +157,4 @@ function start() {
   console.log("[speedDatingReminderScheduler] Activo — revisa cada hora si hay eventos a 3 o 1 día de distancia.");
 }
 
-module.exports = { start, runOnce };
+module.exports = { start, runOnce, resendReminder1dCorrected };

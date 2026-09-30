@@ -17,6 +17,7 @@ const { generateSchedule, computeMutualMatches, persistMatches } = require("../s
 const { renumberGender } = require("../services/speedDatingAttendees");
 const { sendMail } = require("../services/graphMail");
 const { speedDatingMatchEmail } = require("../services/emailTemplates");
+const speedDatingReminderScheduler = require("../services/speedDatingReminderScheduler");
 
 // Paleta oficial de marca (la misma que ya usa el resto del sitio en
 // public/css/styles.css :root, y la que Francisco confirmó como paleta
@@ -551,6 +552,14 @@ router.get("/:eventId", (req, res) => {
     </div>
 
     <div class="card">
+      <h2 style="margin:0 0 6px;font-size:15px;">Reenviar recordatorio de 1 día antes</h2>
+      <p class="muted" style="margin:0 0 12px;">Botón de emergencia: vuelve a enviar el recordatorio de 1 día antes a todos los asistentes activos con correo, con una nota de disculpa aclarando la fecha real del evento. Úsalo solo si el automático salió a la hora o el día equivocado.</p>
+      <form method="POST" action="/admin/speed-dating/${event.id}/reenviar-recordatorio-1d" onsubmit="return confirm('¿Reenviar el recordatorio de 1 día (con nota de disculpa) a todos los asistentes activos de este evento?');">
+        <button type="submit" class="btn small ghost">Reenviar recordatorio de 1 día (corregido) ⚠</button>
+      </form>
+    </div>
+
+    <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
         <h2 style="margin:0;font-size:15px;">Asistentes (${activeAttendees.length}${attendees.length !== activeAttendees.length ? ` · ${attendees.length - activeAttendees.length} canceló su cupo` : ""})</h2>
         <a href="/admin/speed-dating/${event.id}/exportar" class="btn small ghost">Exportar a Excel ⬇</a>
@@ -994,6 +1003,22 @@ router.post("/:eventId/attendees/:attendeeId/reenviar-correo", async (req, res) 
     }
   } catch (err) {
     console.error("[speedDatingAdmin] Error reenviando correo de resultados —", err.message);
+  }
+  res.redirect(backTo);
+});
+
+// ── Reenvío manual corregido del recordatorio de 1 día antes ────────────
+// Botón de emergencia en el panel del evento (ver tarjeta arriba) — usado
+// cuando el recordatorio automático salió a la hora o el día equivocado
+// (bug de zona horaria corregido en speedDatingReminderScheduler.js,
+// 2026-09-30). Resetea la marca de envío y reenvía de inmediato con nota
+// de disculpa.
+router.post("/:eventId/reenviar-recordatorio-1d", async (req, res) => {
+  const backTo = `/admin/speed-dating/${req.params.eventId}`;
+  try {
+    await speedDatingReminderScheduler.resendReminder1dCorrected(req.params.eventId);
+  } catch (err) {
+    console.error("[speedDatingAdmin] Error reenviando recordatorio de 1 día corregido —", err.message);
   }
   res.redirect(backTo);
 });

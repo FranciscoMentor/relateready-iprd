@@ -363,9 +363,10 @@ function speedDatingWaitlistEmail({ name, lang, eventName, genderOnly }) {
 // de 1 día no, ya muy sobre la hora). Español únicamente: a diferencia del
 // test general (bilingüe), todo el flujo de speed dating ya se maneja en
 // español (routes/speedDatingPublic.js siempre llama con lang: "es").
-function speedDatingReminderBodyEs({ firstName, eventName, formattedDate, formattedTime, venueName, venueAddress, tableNumber, asistenteUrl, testUrl, headline, includeCancelLink }) {
+function speedDatingReminderBodyEs({ firstName, eventName, formattedDate, formattedTime, venueName, venueAddress, tableNumber, asistenteUrl, testUrl, headline, includeCancelLink, correctionNote }) {
   return `
     <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
+    ${correctionNote ? `<div style="background:#FBF3E7;border:1px solid #E9D2A6;border-radius:10px;padding:14px 16px;margin:0 0 20px;"><p style="margin:0;font-size:14px;line-height:1.55;">Disculpa la confusión: por un error técnico nuestro, es posible que hayas recibido este recordatorio antes de tiempo. Para que quede claro: <strong>el evento es mañana</strong>${formattedDate ? ` — ${formattedDate}` : ""}${formattedTime ? `, ${formattedTime}` : ""} — no hoy. ¡Te esperamos!</p></div>` : ""}
     <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">${headline} <strong>${eventName}</strong>.</p>
     <div style="border:1px solid #E7DFD2;border-radius:10px;padding:16px 18px;margin:0 0 20px;">
       ${formattedDate ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Fecha:</strong> ${formattedDate}${formattedTime ? `, ${formattedTime}` : ""}</p>` : ""}
@@ -416,7 +417,7 @@ function speedDatingReminder3dEmail({ name, eventName, eventDate, eventTime, ven
 // Se envía automáticamente el día antes del evento. Mismo contenido que el
 // de 3 días, pero sin el link de cancelar (a esta altura ya es muy sobre la
 // hora para reacomodar mesas) y con un tono de "es mañana".
-function speedDatingReminder1dEmail({ name, eventName, eventDate, eventTime, venueName, venueAddress, tableNumber, asistenteUrl, testUrl }) {
+function speedDatingReminder1dEmail({ name, eventName, eventDate, eventTime, venueName, venueAddress, tableNumber, asistenteUrl, testUrl, correctionNote }) {
   const firstName = firstNameOf(name, "es");
   const formattedDate = eventDate
     ? new Date(`${eventDate}T00:00:00`).toLocaleDateString("es-EC", { weekday: "long", day: "numeric", month: "long" })
@@ -438,6 +439,7 @@ function speedDatingReminder1dEmail({ name, eventName, eventDate, eventTime, ven
         testUrl,
         headline: "¡Mañana es el gran día!",
         includeCancelLink: false,
+        correctionNote,
       }),
     }),
   };
