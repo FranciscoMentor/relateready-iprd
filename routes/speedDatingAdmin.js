@@ -139,6 +139,16 @@ function waPhoneDigits(phone) {
   return "593" + digits;
 }
 
+// Un celular ecuatoriano válido para WhatsApp, ya limpio (ver arriba), debe
+// quedar en exactamente 12 dígitos empezando con "5939" (593 + el 9 con el
+// que arrancan los celulares aquí, sin el 0 inicial). Cualquier otra cosa
+// (muy corto, muy largo, o texto que no dejó dígitos) se marca como
+// sospechoso en el panel para que el organizador lo revise antes del
+// evento — no bloquea el registro ni el envío, solo avisa.
+function looksLikeValidEcuadorMobile(digits) {
+  return digits.length === 12 && digits.startsWith("5939");
+}
+
 function formatEventDateEs(eventDate) {
   if (!eventDate) return null;
   return new Date(`${eventDate}T00:00:00`).toLocaleDateString("es-EC", {
@@ -411,11 +421,15 @@ router.get("/:eventId", (req, res) => {
       const asistenteUrl = `${baseUrl}/speed-dating/asistente.html?token=${a.vote_token}`;
       const waDigits = waPhoneDigits(a.phone);
       const waUrl = waDigits ? `https://wa.me/${waDigits}?text=${encodeURIComponent(buildWhatsappMessage({ attendee: a, event, asistenteUrl }))}` : null;
+      const phoneLooksSuspicious = !!a.phone && !looksLikeValidEcuadorMobile(waDigits);
+      const phoneWarning = phoneLooksSuspicious
+        ? ` <span class="badge" style="background:${BRAND.clay};" title="Este número no tiene el formato esperado de un celular de Ecuador — revísalo antes de usarlo para WhatsApp.">⚠ revisar número</span>`
+        : "";
       const cancelBadge = a.cancelled_at
         ? `<br><span class="badge" style="background:${BRAND.clay};margin-top:4px;">Canceló</span>${a.cancellation_reason ? ` <span class="muted">${esc(a.cancellation_reason)}</span>` : ""}`
         : "";
       return `<tr>
-        <td>${esc(a.name)}<br><span class="muted">${esc(a.email) || "—"}${a.phone ? " · " + esc(a.phone) : ""}</span>${cancelBadge}</td>
+        <td>${esc(a.name)}<br><span class="muted">${esc(a.email) || "—"}${a.phone ? " · " + esc(a.phone) : ""}</span>${phoneWarning}${cancelBadge}</td>
         <td>${a.gender === "F" ? "Mujer" : "Hombre"}${a.age ? ", " + a.age + " años" : ""}</td>
         <td>${mesa}</td>
         <td>${a.share_phone_consent ? "Sí" : "No"}</td>
