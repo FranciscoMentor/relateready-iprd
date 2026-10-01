@@ -231,6 +231,20 @@ addSdEventsColumnIfMissing("event_time", "event_time TEXT");
 addSdEventsColumnIfMissing("min_age", "min_age INTEGER");
 addSdEventsColumnIfMissing("max_age", "max_age INTEGER");
 
+// ── Migración: cierre manual de registro por género (2026-10) ────────────
+// closed_men / closed_women: el organizador puede cerrar el registro de un
+// solo género en cualquier momento (ej. "ya tengo suficientes hombres para
+// esta noche, que solo sigan registrándose mujeres"), independientemente
+// del tope automático del 60% (GENDER_CAP_RATIO en routes/
+// speedDatingPublic.js). A partir de que se marca en 1, cualquier persona
+// de ese género que intente registrarse se guarda en la lista de espera
+// (mismo mecanismo que el tope automático) en vez de ocupar un cupo. 0 =
+// sin cierre manual (comportamiento de siempre, solo manda el tope
+// automático). Se controla desde el panel del organizador — ver
+// routes/speedDatingAdmin.js.
+addSdEventsColumnIfMissing("closed_men", "closed_men INTEGER NOT NULL DEFAULT 0");
+addSdEventsColumnIfMissing("closed_women", "closed_women INTEGER NOT NULL DEFAULT 0");
+
 // ── Migración: edad de cada asistente (2026-09) ───────────────────────────
 // age: la edad que la persona declaró al registrarse — se usa para hacer
 // cumplir min_age/max_age (arriba) y queda guardada para que el organizador

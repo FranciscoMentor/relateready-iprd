@@ -39,13 +39,23 @@ function capacityState(event) {
     .prepare("SELECT COUNT(*) AS n FROM sd_attendees WHERE event_id = ? AND gender = 'M' AND cancelled_at IS NULL")
     .get(event.id).n;
   const genderCap = Math.max(1, Math.floor(event.capacity * GENDER_CAP_RATIO));
+  // Cierre manual por género (closed_men/closed_women — ver migración en
+  // db/init.js): el organizador lo puede activar en cualquier momento desde
+  // el panel, independientemente de si ese género ya llegó o no al 60%
+  // automático. Se combina con el tope automático de abajo (basta con que
+  // una de las dos condiciones se cumpla para considerar el género cerrado).
+  const genderClosedManual = { F: !!event.closed_women, M: !!event.closed_men };
   return {
     registered,
     womenCount,
     menCount,
     genderCap,
     eventFull: registered >= event.capacity,
-    genderFull: { F: womenCount >= genderCap, M: menCount >= genderCap },
+    genderFull: {
+      F: womenCount >= genderCap || genderClosedManual.F,
+      M: menCount >= genderCap || genderClosedManual.M,
+    },
+    genderClosedManual,
   };
 }
 
@@ -123,7 +133,9 @@ router.post("/events/:eventId/registro", (req, res) => {
   // organizador, routes/speedDatingAdmin.js. El correo de aviso es igual
   // de "dispara y olvida" que el de bienvenida: si falla, el registro en
   // la lista de espera ya quedó guardado igual.
-  const genderClosed = !state.eventFull && sameGenderCount >= state.genderCap;
+  // state.genderFull ya combina el tope automático del 60% con el cierre
+  // manual por género (closed_men/closed_women) — ver capacityState arriba.
+  const genderClosed = !state.eventFull && state.genderFull[gender];
   if (state.eventFull || genderClosed) {
     const waitlistId = crypto.randomUUID();
     db.prepare(

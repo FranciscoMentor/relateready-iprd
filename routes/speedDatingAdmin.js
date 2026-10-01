@@ -491,10 +491,29 @@ router.get("/:eventId", (req, res) => {
     </div>
 
     <div class="stats">
-      <div class="stat-card"><div class="stat-num">${women.length}</div><div class="stat-label">Mujeres registradas${women.length >= genderCap ? `<br><span class="badge" style="background:${BRAND.clay};margin-top:4px;">Cerrado (60%)</span>` : ""}</div></div>
-      <div class="stat-card"><div class="stat-num">${men.length}</div><div class="stat-label">Hombres registrados${men.length >= genderCap ? `<br><span class="badge" style="background:${BRAND.clay};margin-top:4px;">Cerrado (60%)</span>` : ""}</div></div>
+      <div class="stat-card"><div class="stat-num">${women.length}</div><div class="stat-label">Mujeres registradas${event.closed_women ? `<br><span class="badge" style="background:${BRAND.clay};margin-top:4px;">Cerrado manual</span>` : women.length >= genderCap ? `<br><span class="badge" style="background:${BRAND.clay};margin-top:4px;">Cerrado (60%)</span>` : ""}</div></div>
+      <div class="stat-card"><div class="stat-num">${men.length}</div><div class="stat-label">Hombres registrados${event.closed_men ? `<br><span class="badge" style="background:${BRAND.clay};margin-top:4px;">Cerrado manual</span>` : men.length >= genderCap ? `<br><span class="badge" style="background:${BRAND.clay};margin-top:4px;">Cerrado (60%)</span>` : ""}</div></div>
       <div class="stat-card"><div class="stat-num">${event.total_rounds || "—"}</div><div class="stat-label">Rondas totales</div></div>
       <div class="stat-card"><div class="stat-num">${event.current_round_number}</div><div class="stat-label">Ronda actual</div></div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 6px;font-size:15px;">Registro por género</h2>
+      <p class="muted" style="margin:0 0 12px;font-size:13px;">Cierra el registro de un género en cualquier momento (sin tocar el aforo ni el otro género) — quien intente registrarse mientras está cerrado se guarda en la lista de espera, igual que cuando se llena el 60% automático.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <form method="POST" action="/admin/speed-dating/${event.id}/registro-genero">
+          <input type="hidden" name="gender" value="M">
+          <input type="hidden" name="closed" value="${event.closed_men ? "0" : "1"}">
+          <button type="submit" class="btn ${event.closed_men ? "ghost" : ""}">${event.closed_men ? "Reabrir registro de hombres" : "Cerrar registro de hombres"}</button>
+        </form>
+        <form method="POST" action="/admin/speed-dating/${event.id}/registro-genero">
+          <input type="hidden" name="gender" value="F">
+          <input type="hidden" name="closed" value="${event.closed_women ? "0" : "1"}">
+          <button type="submit" class="btn ${event.closed_women ? "ghost" : ""}">${event.closed_women ? "Reabrir registro de mujeres" : "Cerrar registro de mujeres"}</button>
+        </form>
+      </div>
+      ${event.closed_men ? `<p class="muted" style="margin:10px 0 0;font-size:12.5px;">🔒 Registro de hombres cerrado manualmente.</p>` : ""}
+      ${event.closed_women ? `<p class="muted" style="margin:10px 0 0;font-size:12.5px;">🔒 Registro de mujeres cerrado manualmente.</p>` : ""}
     </div>
 
     <div class="card">
@@ -655,6 +674,26 @@ router.post("/:eventId/editar", express.urlencoded({ extended: true }), (req, re
   db.prepare(
     `UPDATE sd_events SET name = ?, event_date = ?, event_time = ?, capacity = ?, venue_name = ?, venue_address = ?, round_questions = ?, min_age = ?, max_age = ? WHERE id = ?`
   ).run(name, eventDate, eventTime, capacity, venueName, venueAddress, roundQuestions, minAge, maxAge, event.id);
+
+  res.redirect(`/admin/speed-dating/${event.id}`);
+});
+
+// POST /:eventId/registro-genero — cierra o reabre el registro público de
+// un solo género (ver migración closed_men/closed_women en db/init.js y
+// capacityState en routes/speedDatingPublic.js). No toca el aforo ni el
+// otro género: mientras está cerrado, quien intente registrarse de ese
+// género se guarda en la lista de espera en vez de ocupar un cupo.
+router.post("/:eventId/registro-genero", express.urlencoded({ extended: true }), (req, res) => {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
+  if (!event) return res.status(404).send("Evento no encontrado.");
+
+  const gender = req.body.gender === "F" ? "F" : req.body.gender === "M" ? "M" : null;
+  const closed = req.body.closed === "1" ? 1 : 0;
+  if (gender === "M") {
+    db.prepare("UPDATE sd_events SET closed_men = ? WHERE id = ?").run(closed, event.id);
+  } else if (gender === "F") {
+    db.prepare("UPDATE sd_events SET closed_women = ? WHERE id = ?").run(closed, event.id);
+  }
 
   res.redirect(`/admin/speed-dating/${event.id}`);
 });
