@@ -593,6 +593,14 @@ router.get("/:eventId", (req, res) => {
     </div>
 
     <div class="card">
+      <h2 style="margin:0 0 6px;font-size:15px;">Enviar recordatorio del mismo día</h2>
+      <p class="muted" style="margin:0 0 12px;">Manda ahora mismo un recordatorio extra a todos los asistentes activos con correo que todavía no lo hayan recibido — mismos datos del evento (fecha, lugar, mesa, celular cargado), sin la nota de disculpa, y con un aviso para que tengan el correo a la mano y entren con el botón apenas empiece el evento. Úsalo el mismo día, unas horas antes.</p>
+      <form method="POST" action="/admin/speed-dating/${event.id}/recordatorio-mismo-dia" onsubmit="return confirm('¿Enviar el recordatorio del mismo día a todos los asistentes activos de este evento?');">
+        <button type="submit" class="btn small">Enviar recordatorio del mismo día</button>
+      </form>
+    </div>
+
+    <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
         <h2 style="margin:0;font-size:15px;">Asistentes (${activeAttendees.length}${attendees.length !== activeAttendees.length ? ` · ${attendees.length - activeAttendees.length} canceló su cupo` : ""})</h2>
         <a href="/admin/speed-dating/${event.id}/exportar" class="btn small ghost">Exportar a Excel ⬇</a>
@@ -1072,6 +1080,20 @@ router.post("/:eventId/reenviar-recordatorio-1d", async (req, res) => {
     await speedDatingReminderScheduler.resendReminder1dCorrected(req.params.eventId);
   } catch (err) {
     console.error("[speedDatingAdmin] Error reenviando recordatorio de 1 día corregido —", err.message);
+  }
+  res.redirect(backTo);
+});
+
+// POST /:eventId/recordatorio-mismo-dia — recordatorio manual de último
+// momento (ver sendSameDayReminder en services/speedDatingReminderScheduler
+// .js): no es automático, Francisco lo dispara a mano el mismo día del
+// evento, típicamente unas horas antes.
+router.post("/:eventId/recordatorio-mismo-dia", async (req, res) => {
+  const backTo = `/admin/speed-dating/${req.params.eventId}`;
+  try {
+    await speedDatingReminderScheduler.sendSameDayReminder(req.params.eventId);
+  } catch (err) {
+    console.error("[speedDatingAdmin] Error enviando recordatorio del mismo día —", err.message);
   }
   res.redirect(backTo);
 });

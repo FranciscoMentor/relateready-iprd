@@ -363,7 +363,7 @@ function speedDatingWaitlistEmail({ name, lang, eventName, genderOnly }) {
 // de 1 día no, ya muy sobre la hora). Español únicamente: a diferencia del
 // test general (bilingüe), todo el flujo de speed dating ya se maneja en
 // español (routes/speedDatingPublic.js siempre llama con lang: "es").
-function speedDatingReminderBodyEs({ firstName, eventName, formattedDate, formattedTime, venueName, venueAddress, tableNumber, asistenteUrl, testUrl, headline, includeCancelLink, correctionNote }) {
+function speedDatingReminderBodyEs({ firstName, eventName, formattedDate, formattedTime, venueName, venueAddress, tableNumber, asistenteUrl, testUrl, headline, includeCancelLink, correctionNote, startButtonNote, beforeNightPhrase }) {
   return `
     <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
     ${correctionNote ? `<div style="background:#FBF3E7;border:1px solid #E9D2A6;border-radius:10px;padding:14px 16px;margin:0 0 20px;"><p style="margin:0;font-size:14px;line-height:1.55;">Disculpa la confusión: por un error técnico nuestro, es posible que hayas recibido este recordatorio antes de tiempo. Para que quede claro: <strong>el evento es mañana</strong>${formattedDate ? ` — ${formattedDate}` : ""}${formattedTime ? `, ${formattedTime}` : ""} — no hoy. ¡Te esperamos!</p></div>` : ""}
@@ -375,10 +375,11 @@ function speedDatingReminderBodyEs({ firstName, eventName, formattedDate, format
       ${tableNumber ? `<p style="margin:8px 0 0;font-size:14px;"><strong>Tu mesa fija:</strong> Mesa ${tableNumber} — no te muevas de ahí en toda la noche.</p>` : ""}
       <p style="margin:8px 0 0;font-size:14px;"><strong>Importante:</strong> lleva tu <strong>celular cargado</strong> — lo vas a necesitar para participar en el evento.</p>
     </div>
-    <p style="font-size:15px;line-height:1.6;margin:0 0 14px;">Antes de esa noche, te recomendamos hacer el test de RelateReady (toma unos 10 minutos) — te ayuda a entender mejor tu estilo en las relaciones, así llegas con más claridad a tus conversaciones.</p>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 14px;">Antes de ${beforeNightPhrase || "esa noche"}, te recomendamos hacer el test de RelateReady (toma unos 10 minutos) — te ayuda a entender mejor tu estilo en las relaciones, así llegas con más claridad a tus conversaciones.</p>
     <p style="font-size:13.5px;line-height:1.5;margin:0 0 20px;color:${MUTED};">Ojo: no hace falta que pagues por el informe completo — durante el evento vamos a sortear varios códigos para descargarlo gratis.</p>
     <p style="margin:0 0 20px;">${button(testUrl, "Hacer el test de RelateReady")}</p>
     <p style="margin:0 0 12px;">${button(asistenteUrl, "Ver mi pantalla del evento")}</p>
+    ${startButtonNote ? `<div style="background:#FBF3E7;border:1px solid #E9D2A6;border-radius:10px;padding:14px 16px;margin:12px 0 0;"><p style="margin:0;font-size:13.5px;line-height:1.55;">📌 <strong>Ten este correo a la mano esta noche:</strong> apenas comience el evento, entra aquí mismo y presiona el botón de arriba para abrir tu pantalla y empezar a participar.</p></div>` : ""}
     ${includeCancelLink ? `<p style="font-size:12.5px;line-height:1.5;margin:20px 0 0;color:${MUTED};">¿No vas a poder asistir? <a href="${asistenteUrl}" style="color:${MUTED};">Cancela tu cupo aquí</a> para que se lo demos a alguien más.</p>` : ""}
   `;
 }
@@ -445,5 +446,42 @@ function speedDatingReminder1dEmail({ name, eventName, eventDate, eventTime, ven
   };
 }
 
-module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail };
+// Recordatorio adicional del MISMO día del evento (unas horas antes) — se
+// dispara manualmente desde el panel (botón "Enviar recordatorio del mismo
+// día", ver routes/speedDatingAdmin.js y services/speedDatingReminderScheduler
+// .js), no por el cron automático de 3d/1d. Mismo contenido que el de 1 día,
+// pero nunca lleva la nota de corrección/disculpa (correctionNote) y sí
+// lleva el aviso de "ten este correo a la mano" para abrir la pantalla del
+// evento apenas comience.
+function speedDatingSameDayReminderEmail({ name, eventName, eventDate, eventTime, venueName, venueAddress, tableNumber, asistenteUrl, testUrl }) {
+  const firstName = firstNameOf(name, "es");
+  const formattedDate = eventDate
+    ? new Date(`${eventDate}T00:00:00`).toLocaleDateString("es-EC", { weekday: "long", day: "numeric", month: "long" })
+    : null;
+  const formattedTime = formatEventTime(eventTime, "es");
+  return {
+    subject: `Faltan pocas horas para ${eventName} 🎉`,
+    html: shell({
+      lang: "es",
+      bodyHtml: speedDatingReminderBodyEs({
+        firstName,
+        eventName,
+        formattedDate,
+        formattedTime,
+        venueName,
+        venueAddress,
+        tableNumber,
+        asistenteUrl,
+        testUrl,
+        headline: "Esta será una noche especial — ya faltan pocas horas para",
+        includeCancelLink: false,
+        correctionNote: false,
+        startButtonNote: true,
+        beforeNightPhrase: "llegar esta noche",
+      }),
+    }),
+  };
+}
+
+module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail };
 

@@ -285,6 +285,15 @@ addSdAttendeesColumnIfMissing("cancellation_reason", "cancellation_reason TEXT")
 addSdAttendeesColumnIfMissing("reminder_3d_sent_at", "reminder_3d_sent_at TEXT");
 addSdAttendeesColumnIfMissing("reminder_1d_sent_at", "reminder_1d_sent_at TEXT");
 
+// ── Migración: recordatorio adicional del mismo día (2026-10) ────────────
+// reminder_sameday_sent_at: igual patrón que reminder_3d/1d_sent_at, pero
+// para el recordatorio manual de último momento que el organizador dispara
+// el mismo día del evento (ver botón "Enviar recordatorio del mismo día" en
+// routes/speedDatingAdmin.js y sendSameDayReminder en services/
+// speedDatingReminderScheduler.js) — evita reenvíos duplicados si se hace
+// doble clic por accidente.
+addSdAttendeesColumnIfMissing("reminder_sameday_sent_at", "reminder_sameday_sent_at TEXT");
+
 // ── Migración: lista de espera cuando un evento se llena (2026-09) ───────
 // sd_waitlist: cuando alguien intenta registrarse a un evento que ya
 // alcanzó su aforo máximo (routes/speedDatingPublic.js, POST

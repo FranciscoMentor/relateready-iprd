@@ -29,7 +29,7 @@
 
 const db = require("../db/init");
 const { sendMail, GRAPH_MAIL_ENABLED } = require("./graphMail");
-const { speedDatingReminder3dEmail, speedDatingReminder1dEmail } = require("./emailTemplates");
+const { speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail } = require("./emailTemplates");
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // cada hora
 const FIRST_CHECK_DELAY_MS = 4 * 60 * 1000; // 4 min después de arrancar (reminderScheduler usa 2, speedDatingScheduler usa 3)
@@ -132,6 +132,26 @@ async function resendReminder1dCorrected(eventId) {
   return { ok: true };
 }
 
+// ── Recordatorio manual del mismo día ────────────────────────────────────
+// Botón de emergencia/último momento (panel de admin) para avisar unas
+// horas antes del evento — no es automático (no depende de daysUntil ni
+// del chequeo cada hora) porque Francisco lo dispara a mano cuando quiere,
+// típicamente la misma tarde del evento. Usa reminder_sameday_sent_at para
+// no reenviar dos veces a quien ya lo recibió si se hace doble clic, pero
+// a diferencia de resendReminder1dCorrected NO resetea nada — siempre
+// manda solo a quien todavía no lo tenga marcado.
+async function sendSameDayReminder(eventId) {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(eventId);
+  if (!event) return { ok: false, reason: "event_not_found" };
+
+  await sendReminderToEvent(event, {
+    column: "reminder_sameday_sent_at",
+    buildEmail: speedDatingSameDayReminderEmail,
+  });
+
+  return { ok: true };
+}
+
 async function runOnce() {
   const events = db
     .prepare(`SELECT * FROM sd_events WHERE status = 'registro' AND event_date IS NOT NULL`)
@@ -157,4 +177,4 @@ function start() {
   console.log("[speedDatingReminderScheduler] Activo — revisa cada hora si hay eventos a 3 o 1 día de distancia.");
 }
 
-module.exports = { start, runOnce, resendReminder1dCorrected };
+module.exports = { start, runOnce, resendReminder1dCorrected, sendSameDayReminder };
