@@ -649,6 +649,12 @@ router.get("/:eventId", (req, res) => {
     </div>
 
     <div class="card">
+      <h2 style="margin:0 0 6px;font-size:15px;">Completar votos de respaldo (tarjetas de papel)</h2>
+      <p class="muted" style="margin:0 0 12px;">Si en alguna ronda se usaron las tarjetas físicas de Sí/No como respaldo (o algún voto del celular no alcanzó a registrarse), aquí puedes cargarlos manualmente. Solo se piden los votos que todavía faltan — los que ya están registrados desde el celular no se tocan — y al guardar se recalculan automáticamente los matches, incluyendo los que falten por el correo de 48h.</p>
+      <a href="/admin/speed-dating/${event.id}/completar-votos" class="btn ghost">Completar votos faltantes →</a>
+    </div>
+
+    <div class="card">
       <h2 style="margin:0 0 6px;font-size:15px;">Reenviar recordatorio de 1 día antes</h2>
       <p class="muted" style="margin:0 0 12px;">Botón de emergencia: vuelve a enviar el recordatorio de 1 día antes a todos los asistentes activos con correo, con una nota de disculpa aclarando la fecha real del evento. Úsalo solo si el automático salió a la hora o el día equivocado.</p>
       <form method="POST" action="/admin/speed-dating/${event.id}/reenviar-recordatorio-1d" onsubmit="return confirm('¿Reenviar el recordatorio de 1 día (con nota de disculpa) a todos los asistentes activos de este evento?');">
@@ -961,6 +967,154 @@ router.post("/:eventId/finalizar", (req, res) => {
   const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
   if (event && event.status === "en_curso") finalizeEvent(event.id);
   res.redirect(`/admin/speed-dating/${req.params.eventId}`);
+});
+
+// ── Completar votos de respaldo (tarjetas de papel) ─────────────────────
+// Para cuando en alguna ronda se usaron las tarjetas físicas de Sí/No en
+// vez del celular (por ejemplo, como respaldo tras cerrar una ronda antes
+// de tiempo), o algún voto del celular nunca llegó a registrarse. Muestra,
+// ronda por ronda, SOLO las mesas con algún voto faltante (los ya
+// registrados desde el celular se muestran como texto, no como campo
+// editable, para no arriesgarse a sobrescribirlos sin querer). Al guardar,
+// inserta los votos directamente en sd_votes (mismo patrón que el voto
+// público de routes/speedDatingPublic.js) y vuelve a calcular los matches
+// mutuos con persistMatches — que es seguro de llamar varias veces, nunca
+// borra ni duplica un match ya guardado (UNIQUE + INSERT OR IGNORE), así
+// que si el evento ya está finalizado esto puede rescatar matches que se
+// hubieran perdido antes de que salga el correo automático de 48h
+// (services/speedDatingScheduler.js, que lee de sd_matches).
+router.get("/:eventId/completar-votos", (req, res) => {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
+  if (!event) return res.status(404).send("Evento no encontrado.");
+
+  const pairings = db
+    .prepare("SELECT * FROM sd_pairings WHERE event_id = ? AND man_id IS NOT NULL ORDER BY round_number ASC, table_number ASC")
+    .all(event.id);
+  const attendeeById = new Map(
+    db.prepare("SELECT * FROM sd_attendees WHERE event_id = ?").all(event.id).map((a) => [a.id, a])
+  );
+  const voteRows = db
+    .prepare(
+      `SELECT pairing_id, voter_attendee_id, vote FROM sd_votes
+       WHERE pairing_id IN (SELECT id FROM sd_pairings WHERE event_id = ?)`
+    )
+    .all(event.id);
+  const voteMap = new Map(voteRows.map((v) => [`${v.pairing_id}:${v.voter_attendee_id}`, v.vote]));
+
+  const byRound = new Map();
+  let missingTotal = 0;
+  for (const p of pairings) {
+    const woman = attendeeById.get(p.woman_id);
+    const man = attendeeById.get(p.man_id);
+    if (!woman || !man) continue;
+    const womanVote = voteMap.get(`${p.id}:${p.woman_id}`) || null;
+    const manVote = voteMap.get(`${p.id}:${p.man_id}`) || null;
+    if (!womanVote) missingTotal++;
+    if (!manVote) missingTotal++;
+    if (womanVote && manVote) continue; // esta mesa ya está completa — no hace falta mostrarla
+    if (!byRound.has(p.round_number)) byRound.set(p.round_number, []);
+    byRound.get(p.round_number).push({ pairing: p, woman, man, womanVote, manVote });
+  }
+
+  const voteCell = (pairingId, attendeeId, existingVote, label) => {
+    if (existingVote) {
+      const niceVote = existingVote === "si" ? "Sí" : "No";
+      return `<strong>${esc(label)}</strong><br><span class="muted">Ya registrado: ${niceVote}</span>`;
+    }
+    const field = `vote_${pairingId}_${attendeeId}`;
+    return `<strong>${esc(label)}</strong><br>
+      <label style="margin-right:10px;"><input type="radio" name="${field}" value="si"> Sí</label>
+      <label style="margin-right:10px;"><input type="radio" name="${field}" value="no"> No</label>
+      <label><input type="radio" name="${field}" value="" checked> — sin dato —</label>`;
+  };
+
+  const roundNumbers = [...byRound.keys()].sort((a, b) => a - b);
+  const roundsHtml = roundNumbers
+    .map((roundNum) => {
+      const rows = byRound
+        .get(roundNum)
+        .map(
+          ({ pairing, woman, man, womanVote, manVote }) => `<tr>
+            <td>Mesa ${pairing.table_number}</td>
+            <td>${voteCell(pairing.id, woman.id, womanVote, woman.name)}</td>
+            <td>${voteCell(pairing.id, man.id, manVote, man.name)}</td>
+          </tr>`
+        )
+        .join("");
+      return `<div class="card">
+        <h2 style="margin:0 0 12px;font-size:15px;">Ronda ${roundNum}</h2>
+        <table>
+          <thead><tr><th>Mesa</th><th>Mujer</th><th>Hombre</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    })
+    .join("");
+
+  const guardado = req.query.guardado !== undefined ? parseInt(req.query.guardado, 10) || 0 : null;
+  const nuevos = req.query.nuevos !== undefined ? parseInt(req.query.nuevos, 10) || 0 : null;
+
+  res.send(`<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Completar votos · ${esc(event.name)}</title><style>${baseStyles()}</style></head>
+<body>
+  ${topbar()}
+  <div class="container">
+    <p><a href="/admin/speed-dating/${event.id}" class="muted" style="text-decoration:none;">← Volver al evento</a></p>
+    <div class="page-head">
+      <span class="eyebrow">Votos de respaldo</span>
+      <h1>${esc(event.name)} — <span class="accent-word">completar votos faltantes</span></h1>
+      <p class="lede">Usa esto para cargar los votos de las tarjetas físicas, o cualquier voto del celular que no haya llegado a registrarse. Solo se muestran las mesas con algo pendiente — las que ya tienen los dos votos no aparecen aquí.</p>
+    </div>
+    ${guardado !== null ? `<div class="card" style="background:${BRAND.green}22;border:1px solid ${BRAND.green};">
+      <p style="margin:0;">✓ Se guardaron ${guardado} voto(s) nuevo(s)${nuevos ? ` — se encontraron ${nuevos} match(es) mutuo(s) nuevo(s) gracias a estos votos` : ""}.</p>
+    </div>` : ""}
+    <div class="card">
+      <p style="margin:0;">Votos pendientes en total: <strong>${missingTotal}</strong>${missingTotal === 0 ? " — ya no falta nada 🎉" : ""}</p>
+    </div>
+    ${missingTotal > 0 ? `<form method="POST" action="/admin/speed-dating/${event.id}/completar-votos">
+      ${roundsHtml}
+      <button type="submit" class="btn" style="margin-top:4px;">Guardar votos</button>
+    </form>` : ""}
+  </div>
+</body></html>`);
+});
+
+router.post("/:eventId/completar-votos", express.urlencoded({ extended: true }), (req, res) => {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
+  if (!event) return res.status(404).send("Evento no encontrado.");
+
+  const pairingIds = new Set(
+    db.prepare("SELECT id FROM sd_pairings WHERE event_id = ?").all(event.id).map((r) => r.id)
+  );
+  const attendeeIds = new Set(
+    db.prepare("SELECT id FROM sd_attendees WHERE event_id = ?").all(event.id).map((r) => r.id)
+  );
+
+  const insertVote = db.prepare(
+    `INSERT INTO sd_votes (id, pairing_id, voter_attendee_id, vote, created_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(pairing_id, voter_attendee_id) DO UPDATE SET vote = excluded.vote`
+  );
+
+  let savedCount = 0;
+  const now = new Date().toISOString();
+  for (const [key, rawValue] of Object.entries(req.body || {})) {
+    const match = /^vote_([0-9a-fA-F-]{36})_([0-9a-fA-F-]{36})$/.exec(key);
+    if (!match) continue;
+    const [, pairingId, attendeeId] = match;
+    const value = typeof rawValue === "string" ? rawValue.trim() : "";
+    if (value !== "si" && value !== "no") continue;
+    if (!pairingIds.has(pairingId) || !attendeeIds.has(attendeeId)) continue; // seguridad: solo datos de este evento
+    insertVote.run(crypto.randomUUID(), pairingId, attendeeId, value, now);
+    savedCount++;
+  }
+
+  const beforeCount = db.prepare("SELECT COUNT(*) AS c FROM sd_matches WHERE event_id = ?").get(event.id).c;
+  persistMatches(event.id);
+  const afterCount = db.prepare("SELECT COUNT(*) AS c FROM sd_matches WHERE event_id = ?").get(event.id).c;
+
+  res.redirect(`/admin/speed-dating/${event.id}/completar-votos?guardado=${savedCount}&nuevos=${afterCount - beforeCount}`);
 });
 
 // ── Informe de matching inmediato (disponible en cualquier momento) ─────
