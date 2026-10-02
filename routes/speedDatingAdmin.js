@@ -397,6 +397,39 @@ router.get("/:eventId", (req, res) => {
   const women = activeAttendees.filter((a) => a.gender === "F");
   const men = activeAttendees.filter((a) => a.gender === "M");
 
+  // Quién falta por votar en la ronda actual — para que el organizador vea
+  // ANTES de presionar "Cerrar ronda actual" si hay gente que todavía no ha
+  // dado su voto Sí/No. Una vez cerrada la ronda, round_state pasa a
+  // 'cambio_de_mesa' y el endpoint de voto (routes/speedDatingPublic.js)
+  // deja de aceptar votos de esa ronda, así que a quien quedó pendiente ya
+  // no se le vuelve a mostrar el botón para esa ronda — por eso esta lista
+  // solo tiene sentido (y solo se calcula) mientras round_state sigue en
+  // 'ronda_activa'.
+  let pendingVoters = [];
+  if (event.status === "en_curso" && event.round_state === "ronda_activa") {
+    const currentPairings = db
+      .prepare("SELECT * FROM sd_pairings WHERE event_id = ? AND round_number = ? AND man_id IS NOT NULL")
+      .all(event.id, event.current_round_number);
+    if (currentPairings.length) {
+      const pairingIds = currentPairings.map((p) => p.id);
+      const votedRows = db
+        .prepare(`SELECT pairing_id, voter_attendee_id FROM sd_votes WHERE pairing_id IN (${pairingIds.map(() => "?").join(",")})`)
+        .all(...pairingIds);
+      const votedSet = new Set(votedRows.map((v) => `${v.pairing_id}:${v.voter_attendee_id}`));
+      const attendeeById = new Map(attendees.map((a) => [a.id, a]));
+      for (const p of currentPairings) {
+        for (const attendeeId of [p.woman_id, p.man_id]) {
+          const a = attendeeById.get(attendeeId);
+          if (!a || a.cancelled_at) continue;
+          if (!votedSet.has(`${p.id}:${attendeeId}`)) {
+            pendingVoters.push({ name: a.name, gender: a.gender, mesa: p.table_number });
+          }
+        }
+      }
+      pendingVoters.sort((a, b) => a.mesa - b.mesa || a.name.localeCompare(b.name));
+    }
+  }
+
   // Lista de espera: gente que intentó registrarse cuando este evento ya
   // estaba lleno (routes/speedDatingPublic.js) — sus datos no se pierden,
   // se muestran aquí para invitarlos por WhatsApp al próximo evento.
@@ -472,6 +505,12 @@ router.get("/:eventId", (req, res) => {
   const canCerrarRonda = event.status === "en_curso" && event.round_state === "ronda_activa";
   const canSiguienteRonda = event.status === "en_curso" && (event.round_state === "esperando_inicio" || event.round_state === "cambio_de_mesa");
   const canFinalizar = event.status === "en_curso";
+  // Deshacer un "Cerrar ronda actual" presionado por error antes de que
+  // todos hayan votado. Solo es seguro mientras seguimos en 'cambio_de_mesa'
+  // para ESTA ronda (current_round_number no ha cambiado todavía) — en
+  // cuanto se presiona "Iniciar ronda siguiente" el número de ronda avanza
+  // y esa ventana de voto ya no se puede recuperar desde aquí.
+  const canReabrirRonda = event.status === "en_curso" && event.round_state === "cambio_de_mesa";
   const isLastTransition = event.round_state === "cambio_de_mesa" && event.current_round_number >= (event.total_rounds || 0);
   const roundQuestionsList = parseRoundQuestions(event.round_questions);
 
@@ -548,12 +587,22 @@ router.get("/:eventId", (req, res) => {
     <div class="card">
       <h2 style="margin:0 0 12px;font-size:15px;">Control del evento en vivo</h2>
       <p style="margin:0 0 14px;">Estado actual: <span class="round-state">${isLastTransition ? "Cambio de mesa → cierre del evento" : ROUND_STATE_LABEL[event.round_state]}</span></p>
+      ${event.round_state === "ronda_activa" ? (pendingVoters.length
+        ? `<div style="background:#FBEEE0;border:1px solid ${BRAND.clay};border-radius:10px;padding:12px 14px;margin:0 0 14px;">
+             <p style="margin:0 0 6px;font-weight:700;font-size:13.5px;">⏳ Faltan por votar en esta ronda (${pendingVoters.length}):</p>
+             <p style="margin:0;font-size:13px;line-height:1.6;">${pendingVoters.map((v) => `Mesa ${v.mesa} · ${esc(v.name)}`).join("<br>")}</p>
+           </div>`
+        : `<p style="margin:0 0 14px;color:${BRAND.green};font-size:13px;">✓ Todos los que tienen mesa esta ronda ya votaron.</p>`
+      ) : ""}
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <form method="POST" action="/admin/speed-dating/${event.id}/iniciar">
           <button type="submit" class="btn" ${canIniciar ? "" : "disabled"}>Cerrar registro e iniciar evento</button>
         </form>
-        <form method="POST" action="/admin/speed-dating/${event.id}/cerrar-ronda">
+        <form method="POST" action="/admin/speed-dating/${event.id}/cerrar-ronda" id="form-cerrar-ronda">
           <button type="submit" class="btn" ${canCerrarRonda ? "" : "disabled"}>Cerrar ronda actual</button>
+        </form>
+        <form method="POST" action="/admin/speed-dating/${event.id}/reabrir-ronda" onsubmit="return confirm('¿Reabrir la ronda actual? Esto deshace el cierre y vuelve a mostrar los botones de Sí/No a quien todavía no haya votado en esta ronda. Úsalo solo si cerraste la ronda antes de tiempo.');">
+          <button type="submit" class="btn ghost" ${canReabrirRonda ? "" : "disabled"}>↩ Reabrir ronda actual</button>
         </form>
         <form method="POST" action="/admin/speed-dating/${event.id}/siguiente-ronda">
           <button type="submit" class="btn" ${canSiguienteRonda ? "" : "disabled"}>${isLastTransition ? "Finalizar evento" : "Iniciar ronda siguiente"}</button>
@@ -564,6 +613,21 @@ router.get("/:eventId", (req, res) => {
       </div>
       ${event.status === "registro" ? '<p class="muted" style="margin-top:12px;">El registro sigue abierto — cuando todos hayan llegado, cierra el registro para calcular las mesas y las rondas.</p>' : ""}
     </div>
+    <script>
+      (function () {
+        var PENDING_VOTERS = JSON.parse(${JSON.stringify(JSON.stringify([...pendingVoters])).replace(/</g, "\\u003c")});
+        var f = document.getElementById("form-cerrar-ronda");
+        if (f) {
+          f.addEventListener("submit", function (e) {
+            if (PENDING_VOTERS.length) {
+              var lines = PENDING_VOTERS.map(function (v) { return "Mesa " + v.mesa + " \u00b7 " + v.name; }).join("\n");
+              var msg = PENDING_VOTERS.length + " persona(s) todav\u00eda no han votado esta ronda:\n" + lines + "\n\n\u00bfCerrar la ronda de todos modos? Ya no van a poder votar en esta ronda (puedes reabrirla despu\u00e9s con \u00abReabrir ronda actual\u00bb si te equivocaste).";
+              if (!confirm(msg)) e.preventDefault();
+            }
+          });
+        }
+      })();
+    </script>
 
     ${roundQuestionsList.length ? `
     <div class="card">
@@ -856,6 +920,17 @@ router.post("/:eventId/iniciar", (req, res) => {
 router.post("/:eventId/cerrar-ronda", (req, res) => {
   db.prepare(
     `UPDATE sd_events SET round_state = 'cambio_de_mesa' WHERE id = ? AND status = 'en_curso' AND round_state = 'ronda_activa'`
+  ).run(req.params.eventId);
+  res.redirect(`/admin/speed-dating/${req.params.eventId}`);
+});
+
+// Deshace un "Cerrar ronda actual" presionado por error. Solo funciona
+// mientras current_round_number no ha avanzado todavía (round_state sigue
+// en 'cambio_de_mesa' para esta misma ronda) — no borra ni toca sd_pairings
+// ni sd_votes, así que los votos ya emitidos se conservan intactos.
+router.post("/:eventId/reabrir-ronda", (req, res) => {
+  db.prepare(
+    `UPDATE sd_events SET round_state = 'ronda_activa' WHERE id = ? AND status = 'en_curso' AND round_state = 'cambio_de_mesa'`
   ).run(req.params.eventId);
   res.redirect(`/admin/speed-dating/${req.params.eventId}`);
 });
