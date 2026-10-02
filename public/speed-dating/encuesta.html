@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Encuesta de satisfacción · Speed Dating RelateReady</title>
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="stylesheet" href="/speed-dating/speed-dating.css">
+</head>
+<body class="sd-body">
+  <div class="sd-wrap">
+    <div class="sd-brand-row">
+      <img src="/assets/relateready-logo-crop.png" alt="RelateReady">
+      <span class="sd-code-chip" id="venue-chip">—</span>
+    </div>
+
+    <div id="loading-block"><p class="sd-subtext">Cargando…</p></div>
+    <div id="error-block" class="sd-error-banner sd-hidden"></div>
+
+    <div id="app" class="sd-hidden"></div>
+  </div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const token = params.get('token');
+  const loadingBlock = document.getElementById('loading-block');
+  const errorBlock = document.getElementById('error-block');
+  const app = document.getElementById('app');
+  const venueChip = document.getElementById('venue-chip');
+
+  function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function showError(msg) {
+    loadingBlock.classList.add('sd-hidden');
+    errorBlock.textContent = msg;
+    errorBlock.classList.remove('sd-hidden');
+  }
+
+  if (!token) {
+    showError('Este link no es válido — revisa que lo hayas abierto completo desde el correo.');
+  } else {
+    fetch(`/api/speed-dating/attendee/${encodeURIComponent(token)}/encuesta`)
+      .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) { showError(data.error || 'No pudimos cargar la encuesta.'); return; }
+        render(data);
+      })
+      .catch(() => showError('No pudimos conectar — revisa tu internet e intenta de nuevo.'));
+  }
+
+  function render(data) {
+    loadingBlock.classList.add('sd-hidden');
+    venueChip.textContent = data.evento_lugar || data.evento_nombre || '—';
+
+    if (data.ya_respondio) {
+      renderThanks(data, true);
+      return;
+    }
+
+    const firstName = (data.mi_nombre || '').trim().split(/\s+/)[0] || '';
+
+    app.innerHTML = `
+      <div class="sd-pill" style="background:var(--accent-soft);color:var(--accent-dark, var(--accent));display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:6px 13px;border-radius:999px;margin-bottom:14px;">
+        <span style="width:5px;height:5px;border-radius:50%;background:var(--accent);"></span>Encuesta de satisfacción
+      </div>
+      <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:21px;margin:0 0 6px;">¿Cómo te fue en ${esc(data.evento_nombre || 'el evento')}?</h2>
+      <p class="sd-subtext" style="margin:0 0 22px;">Hola ${esc(firstName)} — son solo 6 preguntas, menos de 2 minutos.</p>
+
+      <form id="survey-form">
+        ${ratingBlock('rating_registro', '1. Registro y llegada', '¿Qué tan fácil y organizado fue el check-in?')}
+        ${ratingBlock('rating_rondas', '2. El formato de las rondas', 'Duración, dinámica, preguntas de conversación')}
+        ${ratingBlock('rating_lugar', '3. El lugar y el ambiente', data.evento_lugar ? esc(data.evento_lugar) + ': comodidad, ambiente, ubicación' : 'Comodidad, ambiente, ubicación')}
+        ${ratingBlock('rating_organizacion', '4. Organización general', 'Puntualidad, comunicación del equipo organizador')}
+
+        <div class="sd-survey-block">
+          <p class="sd-survey-label">5. ¿Algo que te gustaría que mejoremos o destacar?</p>
+          <p class="sd-survey-help">Opcional</p>
+          <textarea class="sd-survey-textarea" id="field-comment" maxlength="2000"></textarea>
+        </div>
+
+        <div class="sd-survey-block">
+          <p class="sd-survey-label">6. ¿Qué tan probable es que recomiendes este evento a un/a amigo/a?</p>
+          <p class="sd-survey-help">0 = Nada probable · 10 = Muy probable</p>
+          <div class="sd-nps-grid" id="nps-grid">
+            ${Array.from({ length: 11 }, (_, n) => `<button type="button" class="sd-nps-btn" data-value="${n}">${n}</button>`).join('')}
+          </div>
+        </div>
+
+        <div id="form-error" class="sd-error-banner sd-hidden"></div>
+        <button type="submit" class="sd-cta-primary" id="submit-btn">Enviar respuestas</button>
+        <p class="sd-subtext" style="text-align:center;margin-top:12px;">Tus respuestas son anónimas para los demás asistentes y solo se usan para mejorar futuros eventos.</p>
+      </form>
+    `;
+    app.classList.remove('sd-hidden');
+    wireForm();
+  }
+
+  function ratingBlock(field, label, help) {
+    return `
+      <div class="sd-survey-block">
+        <p class="sd-survey-label">${esc(label)}</p>
+        <p class="sd-survey-help">${help}</p>
+        <div class="sd-rating-row" data-field="${field}">
+          ${[1, 2, 3, 4, 5].map((n) => `<button type="button" class="sd-rating-btn" data-value="${n}">${n}</button>`).join('')}
+        </div>
+        <div class="sd-scale-caps"><span>Muy malo</span><span>Excelente</span></div>
+      </div>
+    `;
+  }
+
+  function wireForm() {
+    document.querySelectorAll('.sd-rating-row').forEach((row) => {
+      row.addEventListener('click', (e) => {
+        const btn = e.target.closest('.sd-rating-btn');
+        if (!btn) return;
+        row.querySelectorAll('.sd-rating-btn').forEach((b) => b.classList.remove('sel'));
+        btn.classList.add('sel');
+      });
+    });
+
+    document.getElementById('nps-grid').addEventListener('click', (e) => {
+      const btn = e.target.closest('.sd-nps-btn');
+      if (!btn) return;
+      document.querySelectorAll('.sd-nps-btn').forEach((b) => b.classList.remove('sel'));
+      btn.classList.add('sel');
+    });
+
+    document.getElementById('survey-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitForm();
+    });
+  }
+
+  function selectedValue(selector) {
+    const sel = document.querySelector(selector + ' .sel');
+    return sel ? Number(sel.dataset.value) : null;
+  }
+
+  function submitForm() {
+    const formError = document.getElementById('form-error');
+    formError.classList.add('sd-hidden');
+
+    const payload = {
+      rating_registro: selectedValue('[data-field="rating_registro"]'),
+      rating_rondas: selectedValue('[data-field="rating_rondas"]'),
+      rating_lugar: selectedValue('[data-field="rating_lugar"]'),
+      rating_organizacion: selectedValue('[data-field="rating_organizacion"]'),
+      nps_score: document.querySelector('#nps-grid .sel') ? Number(document.querySelector('#nps-grid .sel').dataset.value) : null,
+      comment: document.getElementById('field-comment').value,
+    };
+
+    const missingRating = ['rating_registro', 'rating_rondas', 'rating_lugar', 'rating_organizacion'].some((k) => payload[k] == null);
+    if (missingRating || payload.nps_score == null) {
+      formError.textContent = 'Por favor responde todas las preguntas antes de enviar (el comentario es el único opcional).';
+      formError.classList.remove('sd-hidden');
+      window.scrollTo({ top: formError.offsetTop - 20, behavior: 'smooth' });
+      return;
+    }
+
+    const submitBtn = document.getElementById('submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Enviando…';
+
+    fetch(`/api/speed-dating/attendee/${encodeURIComponent(token)}/encuesta`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) {
+          formError.textContent = data.error || 'No pudimos guardar tu respuesta — intenta de nuevo.';
+          formError.classList.remove('sd-hidden');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Enviar respuestas';
+          return;
+        }
+        renderThanks({}, false);
+      })
+      .catch(() => {
+        formError.textContent = 'No pudimos conectar — revisa tu internet e intenta de nuevo.';
+        formError.classList.remove('sd-hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Enviar respuestas';
+      });
+  }
+
+  function renderThanks(data, already) {
+    app.innerHTML = `
+      <div class="sd-survey-thanks">
+        <div class="emoji">💛</div>
+        <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:21px;margin:0 0 8px;">¡Gracias por tu respuesta!</h2>
+        <p class="sd-subtext">${already ? 'Ya habíamos recibido tu encuesta — no hace falta responder de nuevo.' : 'Tu opinión nos ayuda a mejorar cada evento de RelateReady.'}</p>
+      </div>
+    `;
+    app.classList.remove('sd-hidden');
+  }
+</script>
+</body>
+</html>

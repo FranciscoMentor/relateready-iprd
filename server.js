@@ -12,6 +12,7 @@ const db = require("./db/init");
 const reminderScheduler = require("./services/reminderScheduler");
 const speedDatingScheduler = require("./services/speedDatingScheduler");
 const speedDatingReminderScheduler = require("./services/speedDatingReminderScheduler");
+const speedDatingSurveyScheduler = require("./services/speedDatingSurveyScheduler");
 
 const app = express();
 app.set("trust proxy", 1); // necesario en Render para que req.protocol refleje https
@@ -103,3 +104,8 @@ speedDatingScheduler.start();
 // speed dating (ver services/speedDatingReminderScheduler.js) — mismo
 // criterio: solo se activa si el correo automático está configurado.
 speedDatingReminderScheduler.start();
+
+// Encuesta corta de satisfacción la mañana siguiente al evento, antes del
+// mediodía (hora de Ecuador) — ver services/speedDatingSurveyScheduler.js.
+// Mismo criterio: solo se activa si el correo automático está configurado.
+speedDatingSurveyScheduler.start();

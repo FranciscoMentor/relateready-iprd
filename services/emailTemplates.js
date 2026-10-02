@@ -483,5 +483,30 @@ function speedDatingSameDayReminderEmail({ name, eventName, eventDate, eventTime
   };
 }
 
-module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail };
+// ── Encuesta de satisfacción (2026-10) ─────────────────────────────────────
+// Correo enviado la mañana siguiente al evento, antes del mediodía (hora de
+// Ecuador) — ver services/speedDatingSurveyScheduler.js. Distinto del correo
+// de resultados/matches de 48h: aquí NO se habla de matches porque todavía
+// no se han calculado ni enviado. surveyUrl lleva el mismo vote_token que ya
+// usa cada asistente para votar en vivo (routes/speedDatingPublic.js) — no
+// hace falta un login ni un token nuevo.
+function speedDatingSurveyEmail({ name, eventName, venueName, surveyUrl }) {
+  const firstName = firstNameOf(name, "es");
+  const venuePhrase = venueName ? ` en ${venueName}` : "";
+  return {
+    subject: `¿Cómo te fue en ${eventName}? Cuéntanos en 2 minutos 💬`,
+    html: shell({
+      lang: "es",
+      bodyHtml: `
+        <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Gracias por haber sido parte de <b>${eventName}</b>${venuePhrase}. Nos encantaría saber cómo viviste la noche — tu opinión nos ayuda a mejorar cada evento.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Son solo 6 preguntas cortas, te toma menos de 2 minutos.</p>
+        <p style="margin:0 0 12px;">${button(surveyUrl, "Responder la encuesta")}</p>
+        <p style="font-size:13px;line-height:1.6;margin:0;color:${MUTED};">Tu respuesta es anónima para los demás asistentes y solo se usa para mejorar futuros eventos.</p>
+      `,
+    }),
+  };
+}
+
+module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail, speedDatingSurveyEmail };
 

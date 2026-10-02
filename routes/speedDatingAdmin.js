@@ -655,6 +655,12 @@ router.get("/:eventId", (req, res) => {
     </div>
 
     <div class="card">
+      <h2 style="margin:0 0 6px;font-size:15px;">Encuesta de satisfacción</h2>
+      <p class="muted" style="margin:0 0 12px;">Se envía automáticamente por correo la mañana siguiente al evento, antes del mediodía (hora de Ecuador) — evalúa registro, rondas, lugar y organización, más una recomendación. No pregunta por matches (esos salen 48h después).</p>
+      <a href="/admin/speed-dating/${event.id}/encuesta-resultados" class="btn ghost">Ver resultados de la encuesta →</a>
+    </div>
+
+    <div class="card">
       <h2 style="margin:0 0 6px;font-size:15px;">Reenviar recordatorio de 1 día antes</h2>
       <p class="muted" style="margin:0 0 12px;">Botón de emergencia: vuelve a enviar el recordatorio de 1 día antes a todos los asistentes activos con correo, con una nota de disculpa aclarando la fecha real del evento. Úsalo solo si el automático salió a la hora o el día equivocado.</p>
       <form method="POST" action="/admin/speed-dating/${event.id}/reenviar-recordatorio-1d" onsubmit="return confirm('¿Reenviar el recordatorio de 1 día (con nota de disculpa) a todos los asistentes activos de este evento?');">
@@ -1325,6 +1331,162 @@ router.post("/:eventId/recordatorio-mismo-dia", async (req, res) => {
     console.error("[speedDatingAdmin] Error enviando recordatorio del mismo día —", err.message);
   }
   res.redirect(backTo);
+});
+
+
+// ── Encuesta de satisfacción: tabulación con gráficos (2026-10) ──────────
+// Disponible en cualquier momento (no depende de que ya se haya enviado el
+// correo) — simplemente muestra las respuestas que existan hasta ahora en
+// sd_survey_responses. No pregunta por matches/resultados (esos se
+// calculan 48h después, ver services/speedDatingScheduler.js) — esta
+// encuesta solo evalúa la experiencia del evento en sí.
+router.get("/:eventId/encuesta-resultados", (req, res) => {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
+  if (!event) return res.status(404).send("Evento no encontrado.");
+
+  const eligible = db
+    .prepare(
+      `SELECT COUNT(*) AS c FROM sd_attendees WHERE event_id = ? AND cancelled_at IS NULL AND email IS NOT NULL AND TRIM(email) <> ''`
+    )
+    .get(event.id).c;
+
+  const responses = db
+    .prepare(
+      `SELECT sr.*, a.name AS attendee_name
+       FROM sd_survey_responses sr
+       JOIN sd_attendees a ON a.id = sr.attendee_id
+       WHERE sr.event_id = ?
+       ORDER BY sr.created_at DESC`
+    )
+    .all(event.id);
+
+  const responseCount = responses.length;
+  const responseRate = eligible > 0 ? Math.round((responseCount / eligible) * 100) : 0;
+
+  const SECTIONS = [
+    { field: "rating_registro", label: "Registro y llegada" },
+    { field: "rating_rondas", label: "El formato de las rondas" },
+    { field: "rating_lugar", label: "El lugar y el ambiente" },
+    { field: "rating_organizacion", label: "Organización general" },
+  ];
+
+  const sectionStats = SECTIONS.map((s) => {
+    const values = responses.map((r) => r[s.field]).filter((v) => v != null);
+    const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+    const counts = [1, 2, 3, 4, 5].map((n) => values.filter((v) => v === n).length);
+    return { ...s, avg, total: values.length, counts };
+  });
+
+  const npsValues = responses.map((r) => r.nps_score).filter((v) => v != null);
+  const promoters = npsValues.filter((n) => n >= 9).length;
+  const passives = npsValues.filter((n) => n >= 7 && n <= 8).length;
+  const detractors = npsValues.filter((n) => n <= 6).length;
+  const npsTotal = npsValues.length;
+  const nps = npsTotal > 0 ? Math.round(((promoters - detractors) / npsTotal) * 100) : null;
+  const pct = (n) => (npsTotal > 0 ? Math.round((n / npsTotal) * 100) : 0);
+
+  const comments = responses.filter((r) => r.comment && r.comment.trim());
+
+  const RAMP = ["#F0E4D1", BRAND.accentSoft, "#CF9A52", BRAND.accent, BRAND.accentDark];
+
+  function distributionBar(stat) {
+    if (!stat.total) {
+      return `<p class="muted" style="margin:6px 0 0;font-size:12.5px;">Sin respuestas todavía.</p>`;
+    }
+    const segs = stat.counts
+      .map((c, i) => {
+        const pctSeg = Math.round((c / stat.total) * 100);
+        if (pctSeg <= 0) return "";
+        const dark = i >= 3;
+        return `<div style="width:${pctSeg}%;background:${RAMP[i]};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:${dark ? "#fff" : BRAND.ink};min-width:${pctSeg > 0 ? "18px" : "0"};">${pctSeg >= 8 ? pctSeg + "%" : ""}</div>`;
+      })
+      .join("");
+    return `
+      <div style="display:flex;width:100%;height:24px;border-radius:7px;overflow:hidden;gap:2px;margin-top:8px;">${segs}</div>
+      <div style="display:flex;gap:12px;margin-top:6px;flex-wrap:wrap;font-size:11px;color:${BRAND.muted};">
+        ${[1, 2, 3, 4, 5].map((n, i) => `<span style="display:inline-flex;align-items:center;gap:4px;"><i style="width:9px;height:9px;border-radius:2px;background:${RAMP[i]};display:inline-block;"></i>${n} · ${stat.counts[i]}</span>`).join("")}
+      </div>`;
+  }
+
+  res.send(`<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Encuesta de satisfacción · ${esc(event.name)}</title><style>${baseStyles()}</style></head>
+<body>
+  ${topbar()}
+  <div class="container">
+    <p><a href="/admin/speed-dating/${event.id}" class="muted" style="text-decoration:none;">← Volver al evento</a></p>
+    <div class="page-head">
+      <span class="eyebrow">Encuesta de satisfacción</span>
+      <h1>${esc(event.name)} — <span class="accent-word">cómo les fue</span></h1>
+      <p class="lede">Encuesta enviada automáticamente la mañana siguiente al evento, antes del mediodía — no incluye preguntas sobre matches (esos se calculan y envían 48h después).</p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 12px;font-size:15px;">Participación</h2>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:150px;background:${BRAND.light};border-radius:10px;padding:14px 16px;">
+          <div style="font-size:28px;font-weight:700;line-height:1;">${responseRate}%</div>
+          <div style="font-size:12.5px;color:${BRAND.muted};margin-top:6px;">Tasa de respuesta</div>
+        </div>
+        <div style="flex:1;min-width:150px;background:${BRAND.light};border-radius:10px;padding:14px 16px;">
+          <div style="font-size:28px;font-weight:700;line-height:1;">${responseCount} / ${eligible}</div>
+          <div style="font-size:12.5px;color:${BRAND.muted};margin-top:6px;">Invitados que respondieron</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 4px;font-size:15px;">Calificación promedio por sección</h2>
+      <p class="muted" style="margin:0 0 4px;">Escala de 1 a 5.</p>
+      ${sectionStats
+        .map(
+          (s) => `
+        <div style="margin:16px 0;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+            <span style="font-size:13.5px;font-weight:600;">${esc(s.label)}</span>
+            <span style="font-size:13.5px;font-weight:700;">${s.avg != null ? s.avg.toFixed(1) : "—"}</span>
+          </div>
+          ${distributionBar(s)}
+        </div>`
+        )
+        .join("")}
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 4px;font-size:15px;">Recomendación (0–10)</h2>
+      <p class="muted" style="margin:0 0 10px;">"¿Qué tan probable es que recomiendes este evento a un/a amigo/a?" — Promotores: 9–10 · Pasivos: 7–8 · Detractores: 0–6.</p>
+      ${
+        npsTotal > 0
+          ? `
+        <div style="font-size:26px;font-weight:700;margin:0 0 2px;">${nps > 0 ? "+" : ""}${nps}</div>
+        <p class="muted" style="margin:0 0 10px;">Puntaje NPS (de -100 a 100), sobre ${npsTotal} respuesta${npsTotal === 1 ? "" : "s"}</p>
+        <div style="display:flex;width:100%;height:34px;border-radius:8px;overflow:hidden;gap:2px;">
+          <div style="width:${pct(promoters)}%;background:${BRAND.green};display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;white-space:nowrap;">✓ Promotores · ${pct(promoters)}%</div>
+          <div style="width:${pct(passives)}%;background:${BRAND.muted};display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;white-space:nowrap;">– Pasivos · ${pct(passives)}%</div>
+          <div style="width:${pct(detractors)}%;background:${BRAND.clay};display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;white-space:nowrap;">✕ Detractores · ${pct(detractors)}%</div>
+        </div>`
+          : `<p class="muted">Sin respuestas todavía.</p>`
+      }
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 12px;font-size:15px;">Comentarios abiertos (${comments.length})</h2>
+      ${
+        comments.length
+          ? comments
+              .map(
+                (c) => `
+        <div style="border:1px solid ${BRAND.border};border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+          <div style="font-size:12.5px;color:${BRAND.muted};margin-bottom:4px;">${esc(c.attendee_name)} · recomendación ${c.nps_score}/10</div>
+          <div style="font-size:13.5px;line-height:1.5;">${esc(c.comment)}</div>
+        </div>`
+              )
+              .join("")
+          : `<p class="muted">Todavía no hay comentarios.</p>`
+      }
+    </div>
+  </div>
+</body></html>`);
 });
 
 module.exports = router;

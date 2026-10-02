@@ -420,4 +420,93 @@ router.post("/attendee/:token/vote", (req, res) => {
   res.json({ ok: true });
 });
 
+
+// GET /api/speed-dating/attendee/:token/encuesta — datos para pintar la
+// pantalla de encuesta (nombre del evento, lugar, y si ya respondió antes,
+// para no mostrarle el formulario vacío dos veces si vuelve a abrir el
+// link). No depende del estado del evento (a diferencia de /estado) — el
+// correo de encuesta solo se manda una vez el evento ya está finalizado.
+router.get("/attendee/:token/encuesta", (req, res) => {
+  const attendee = loadAttendeeByToken(req.params.token);
+  if (!attendee) return res.status(404).json({ error: "No encontramos tu registro — revisa el link." });
+  const event = findEvent(attendee.event_id);
+  if (!event) return res.status(404).json({ error: "Evento no encontrado." });
+
+  const existing = db.prepare("SELECT * FROM sd_survey_responses WHERE attendee_id = ?").get(attendee.id);
+
+  res.json({
+    evento_nombre: event.name,
+    evento_fecha: event.event_date || null,
+    evento_lugar: event.venue_name || null,
+    mi_nombre: attendee.name,
+    ya_respondio: !!existing,
+    respuesta_previa: existing
+      ? {
+          rating_registro: existing.rating_registro,
+          rating_rondas: existing.rating_rondas,
+          rating_lugar: existing.rating_lugar,
+          rating_organizacion: existing.rating_organizacion,
+          nps_score: existing.nps_score,
+          comment: existing.comment || "",
+        }
+      : null,
+  });
+});
+
+// POST /api/speed-dating/attendee/:token/encuesta — { rating_registro,
+// rating_rondas, rating_lugar, rating_organizacion (1-5 cada una),
+// nps_score (0-10), comment (opcional) }. UNIQUE(attendee_id) en
+// sd_survey_responses: si ya había respondido, esto actualiza su respuesta
+// en vez de duplicarla (igual patrón que sd_votes).
+router.post("/attendee/:token/encuesta", (req, res) => {
+  const attendee = loadAttendeeByToken(req.params.token);
+  if (!attendee) return res.status(404).json({ error: "No encontramos tu registro." });
+  const event = findEvent(attendee.event_id);
+  if (!event) return res.status(404).json({ error: "Evento no encontrado." });
+
+  const body = req.body || {};
+  const ratingFields = ["rating_registro", "rating_rondas", "rating_lugar", "rating_organizacion"];
+  const ratings = {};
+  for (const field of ratingFields) {
+    const n = Number(body[field]);
+    if (!Number.isInteger(n) || n < 1 || n > 5) {
+      return res.status(400).json({ error: "Falta calificar alguna sección (1 a 5)." });
+    }
+    ratings[field] = n;
+  }
+
+  const nps = Number(body.nps_score);
+  if (!Number.isInteger(nps) || nps < 0 || nps > 10) {
+    return res.status(400).json({ error: "Falta la pregunta de recomendación (0 a 10)." });
+  }
+
+  const comment = typeof body.comment === "string" ? body.comment.trim().slice(0, 2000) : "";
+
+  db.prepare(
+    `INSERT INTO sd_survey_responses
+       (id, event_id, attendee_id, created_at, rating_registro, rating_rondas, rating_lugar, rating_organizacion, nps_score, comment)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(attendee_id) DO UPDATE SET
+       rating_registro = excluded.rating_registro,
+       rating_rondas = excluded.rating_rondas,
+       rating_lugar = excluded.rating_lugar,
+       rating_organizacion = excluded.rating_organizacion,
+       nps_score = excluded.nps_score,
+       comment = excluded.comment`
+  ).run(
+    crypto.randomUUID(),
+    event.id,
+    attendee.id,
+    new Date().toISOString(),
+    ratings.rating_registro,
+    ratings.rating_rondas,
+    ratings.rating_lugar,
+    ratings.rating_organizacion,
+    nps,
+    comment || null
+  );
+
+  res.json({ ok: true });
+});
+
 module.exports = router;

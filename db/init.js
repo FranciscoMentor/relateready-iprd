@@ -323,4 +323,39 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_sd_waitlist_event ON sd_waitlist(event_id);
 `);
 
+
+// ── Migración: encuesta de satisfacción (2026-10) ─────────────────────────
+// Correo automático enviado la mañana siguiente al evento (antes del
+// mediodía, hora de Ecuador — ver services/speedDatingSurveyScheduler.js),
+// distinto del correo de resultados/matches de 48h (services/
+// speedDatingScheduler.js): la encuesta solo pregunta por la experiencia
+// del evento (registro, rondas, lugar, organización) y una recomendación
+// — nunca por los matches, porque a esa hora todavía no se han calculado
+// ni enviado.
+//  - survey_email_status/error/sent_at en sd_attendees: mismo patrón que
+//    match_email_status — evita reenviar el correo dos veces al mismo
+//    asistente.
+//  - sd_survey_responses: una fila por asistente que respondió (UNIQUE en
+//    attendee_id — si abre el link dos veces, la segunda respuesta
+//    reemplaza a la primera en vez de duplicarse, igual que sd_votes).
+addSdAttendeesColumnIfMissing("survey_email_status", "survey_email_status TEXT");
+addSdAttendeesColumnIfMissing("survey_email_error", "survey_email_error TEXT");
+addSdAttendeesColumnIfMissing("survey_email_sent_at", "survey_email_sent_at TEXT");
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sd_survey_responses (
+    id TEXT PRIMARY KEY,
+    event_id TEXT NOT NULL,
+    attendee_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    rating_registro INTEGER NOT NULL,
+    rating_rondas INTEGER NOT NULL,
+    rating_lugar INTEGER NOT NULL,
+    rating_organizacion INTEGER NOT NULL,
+    nps_score INTEGER NOT NULL,
+    comment TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_sd_survey_responses_event ON sd_survey_responses(event_id);
+`);
+
 module.exports = db;
