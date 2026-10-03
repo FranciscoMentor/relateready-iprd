@@ -176,7 +176,7 @@ function speedDatingMatchEmail({ name, lang, eventName, matches }) {
           <p style="margin:0 0 4px;font-weight:700;font-size:15px;">${m.partnerName}</p>
           ${
             m.partnerPhone
-              ? `<p style="margin:0;font-size:14px;">Escríbele por WhatsApp para preguntarle si puede llamarte: <strong>${m.partnerPhone}</strong></p>`
+              ? `<p style="margin:0;font-size:14px;">Escríbele por WhatsApp para preguntarle si puedes llamarle: <strong>${m.partnerPhone}</strong></p>`
               : `<p style="margin:0;font-size:13.5px;color:${MUTED};">Esta persona no autorizó compartir su WhatsApp todavía — cuando ambos lo autoricen, se los enviaremos.</p>`
           }
         </div>`
