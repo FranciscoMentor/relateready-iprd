@@ -18,6 +18,7 @@ const { renumberGender } = require("../services/speedDatingAttendees");
 const { sendMail } = require("../services/graphMail");
 const { speedDatingMatchEmail } = require("../services/emailTemplates");
 const speedDatingReminderScheduler = require("../services/speedDatingReminderScheduler");
+const speedDatingScheduler = require("../services/speedDatingScheduler");
 
 // Paleta oficial de marca (la misma que ya usa el resto del sitio en
 // public/css/styles.css :root, y la que Francisco confirmó como paleta
@@ -435,6 +436,29 @@ router.get("/:eventId", (req, res) => {
   // se muestran aquí para invitarlos por WhatsApp al próximo evento.
   // openEvents alimenta el selector de "invitar a este evento" de esa
   // sección (cualquier otro evento que siga con registro abierto).
+  // Votos de respaldo (tarjetas de papel) que todavía faltan por cargar —
+  // se usa solo para la advertencia del botón "Enviar resultados ahora"
+  // (ver más abajo): si faltan votos, enviar ya mismo puede dejar fuera
+  // matches que todavía no se pueden calcular. Solo se calcula para
+  // eventos finalizados, que es cuando ese botón aparece.
+  let missingVotesCount = 0;
+  if (event.status === "finalizado") {
+    const finalPairings = db
+      .prepare("SELECT id FROM sd_pairings WHERE event_id = ? AND man_id IS NOT NULL")
+      .all(event.id);
+    if (finalPairings.length) {
+      const pairingIds = finalPairings.map((p) => p.id);
+      const voteRows = db
+        .prepare(`SELECT pairing_id, voter_attendee_id FROM sd_votes WHERE pairing_id IN (${pairingIds.map(() => "?").join(",")})`)
+        .all(...pairingIds);
+      const votedSet = new Set(voteRows.map((v) => `${v.pairing_id}:${v.voter_attendee_id}`));
+      for (const p of db.prepare("SELECT * FROM sd_pairings WHERE event_id = ? AND man_id IS NOT NULL").all(event.id)) {
+        if (!votedSet.has(`${p.id}:${p.woman_id}`)) missingVotesCount++;
+        if (!votedSet.has(`${p.id}:${p.man_id}`)) missingVotesCount++;
+      }
+    }
+  }
+
   const waitlist = db.prepare("SELECT * FROM sd_waitlist WHERE event_id = ? ORDER BY created_at ASC").all(event.id);
   const openEvents = db
     .prepare("SELECT id, name, event_date, event_time FROM sd_events WHERE status = 'registro' AND id != ? ORDER BY created_at DESC")
@@ -647,6 +671,20 @@ router.get("/:eventId", (req, res) => {
       <p class="muted" style="margin:0 0 12px;">Disponible en cualquier momento, incluso a mitad del evento — no depende del correo automático de 48h.</p>
       <a href="/admin/speed-dating/${event.id}/reporte" class="btn ghost">Ver informe de matching →</a>
     </div>
+
+    ${event.status === "finalizado" ? `
+    <div class="card">
+      <h2 style="margin:0 0 6px;font-size:15px;">Enviar resultados de matching ahora</h2>
+      <p class="muted" style="margin:0 0 12px;">El correo de resultados (quién tuvo match) se envía automáticamente 48 horas después de finalizar el evento, para dar tiempo a cargar votos de respaldo en papel si hiciera falta. Este botón es para un caso puntual: envía el correo de inmediato a quien todavía no lo haya recibido, sin esperar las 48h — pensado para usarse evento por evento, no para cambiar el tiempo de espera de todos los eventos futuros.${missingVotesCount > 0 ? ` <strong style="color:${BRAND.clay};">Atención: todavía faltan ${missingVotesCount} voto(s) de respaldo por cargar en este evento — si envías ahora, esos votos no se van a contar en los matches de hoy.</strong>` : ""}</p>
+      <form method="POST" action="/admin/speed-dating/${event.id}/enviar-resultados-ahora" onsubmit="return confirm(${JSON.stringify(
+        (missingVotesCount > 0
+          ? `Atención: todavía faltan ${missingVotesCount} voto(s) de respaldo por cargar — si envías ahora, esos votos no se van a contar.\n\n`
+          : "") +
+          "¿Enviar el correo de resultados (matches) ahora mismo a quien todavía no lo haya recibido, sin esperar las 48 horas? Esta acción no se puede deshacer."
+      )});">
+        <button type="submit" class="btn small danger">Enviar resultados ahora ⚠</button>
+      </form>
+    </div>` : ""}
 
     <div class="card">
       <h2 style="margin:0 0 6px;font-size:15px;">Completar votos de respaldo (tarjetas de papel)</h2>
@@ -1299,6 +1337,26 @@ router.post("/:eventId/attendees/:attendeeId/reenviar-correo", async (req, res) 
     }
   } catch (err) {
     console.error("[speedDatingAdmin] Error reenviando correo de resultados —", err.message);
+  }
+  res.redirect(backTo);
+});
+
+// ── Envío manual anticipado del correo de resultados (matching) ─────────
+// Botón de excepción puntual en el panel del evento (ver tarjeta arriba) —
+// a pedido de Francisco para el evento del 1 de octubre de 2026: permite
+// enviar el correo de resultados sin esperar las 48h automáticas de
+// services/speedDatingScheduler.js. Reutiliza exactamente la misma lógica
+// de envío (sendMatchResultsForEvent), que primero vuelve a calcular los
+// matches con persistMatches (para reflejar cualquier voto de respaldo ya
+// cargado) y luego envía solo a quien todavía tenga match_email_status
+// NULL — así que es seguro usarlo aunque el automático de 48h ya haya
+// corrido antes, o si se presiona el botón más de una vez.
+router.post("/:eventId/enviar-resultados-ahora", async (req, res) => {
+  const backTo = `/admin/speed-dating/${req.params.eventId}`;
+  try {
+    await speedDatingScheduler.sendMatchResultsForEvent(req.params.eventId);
+  } catch (err) {
+    console.error("[speedDatingAdmin] Error enviando resultados anticipados —", err.message);
   }
   res.redirect(backTo);
 });
