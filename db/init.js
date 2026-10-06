@@ -363,4 +363,21 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_sd_survey_responses_event ON sd_survey_responses(event_id);
 `);
 
+// ── Migración: invitaciones al test enviadas desde el panel (2026-10) ─────
+// Historial de los correos "te invito a hacer el test" que Francisco envía a
+// mano desde /panel-control (sección "Invitar"). email se guarda en
+// minúsculas para detectar invitaciones repetidas y cruzar con submissions.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS test_invitations (
+    id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    lang TEXT NOT NULL DEFAULT 'es',
+    status TEXT NOT NULL,
+    error TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_test_invitations_email ON test_invitations(email);
+`);
+
 module.exports = db;

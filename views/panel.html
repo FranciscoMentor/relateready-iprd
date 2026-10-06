@@ -108,6 +108,7 @@
   <nav>
     <button class="navlink active" data-nav="inicio">Inicio</button>
     <button class="navlink" data-nav="resultados">Resultados</button>
+    <button class="navlink" data-nav="invitar">Invitar</button>
     <button class="navlink" data-nav="referidos">Referidos</button>
     <button class="navlink" data-nav="calendario">Calendario</button>
     <a href="/admin" class="exit" style="text-decoration:none;">Admin básico</a>
@@ -161,6 +162,30 @@
   </section>
 
   <!-- ═══════════════════ REFERIDOS (Hueco 2) ═══════════════════ -->
+  <!-- ═══════════════════ INVITAR ═══════════════════ -->
+  <section class="section" id="sec-invitar">
+    <div class="card">
+      <h2 style="margin:0 0 4px;font-size:15px;">Invitar a una persona a hacer el test</h2>
+      <p class="muted" style="margin:0 0 16px;">Escribe el nombre y el correo de la persona: le llega un correo tuyo con una breve explicación del test y el enlace para hacerlo.</p>
+      <form id="inviteForm" style="max-width:440px;">
+        <div class="form-field"><label for="inviteName">Nombre</label><input type="text" id="inviteName" required maxlength="120" placeholder="Nombre de la persona"></div>
+        <div class="form-field"><label for="inviteEmail">Correo</label><input type="email" id="inviteEmail" required maxlength="200" placeholder="correo@ejemplo.com"></div>
+        <div class="form-field"><label for="inviteLang">Idioma del correo y del test</label><select id="inviteLang"><option value="es">Español</option><option value="en">Inglés</option></select></div>
+        <button type="submit" class="btn" id="inviteBtn">Enviar invitación</button>
+        <p id="inviteMsg" style="margin:12px 0 0;font-size:13px;display:none;"></p>
+      </form>
+    </div>
+    <div class="card">
+      <h2 style="margin:0 0 14px;font-size:15px;">Invitaciones enviadas</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Persona</th><th>Idioma</th><th>Estado</th><th>Fecha</th></tr></thead>
+          <tbody id="inviteBody"><tr><td colspan="4" style="text-align:center;color:#999;padding:30px;">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
   <section class="section" id="sec-referidos">
     <div class="card" id="referralsNotice" style="display:none;"></div>
     <div class="card">
@@ -271,12 +296,17 @@
 
   // ── Navegación entre secciones ──
   let referralsLoadedOnce = false;
+  let invitesLoadedOnce = false;
   document.querySelectorAll(".navlink").forEach(link=>{
     link.addEventListener("click", ()=>{
       document.querySelectorAll(".navlink").forEach(l=>l.classList.remove("active"));
       link.classList.add("active");
       document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
       document.getElementById("sec-"+link.dataset.nav).classList.add("active");
+      if (link.dataset.nav === "invitar" && !invitesLoadedOnce) {
+        invitesLoadedOnce = true;
+        loadInvitations();
+      }
       if (link.dataset.nav === "referidos" && !referralsLoadedOnce) {
         referralsLoadedOnce = true;
         loadReferrals();
@@ -312,6 +342,71 @@
       document.getElementById("resultsBody").innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:30px;">No se pudieron cargar los resultados.</td></tr>';
     }
   }
+
+  // ── Invitar a hacer el test ──
+  async function loadInvitations() {
+    const body = document.getElementById("inviteBody");
+    try {
+      const res = await fetch("/admin/api/invitations");
+      if (!res.ok) throw new Error();
+      const rows = await res.json();
+      body.innerHTML = rows.length
+        ? rows.map(r => `<tr>
+            <td>${esc(r.name)}<br><span class="muted">${esc(r.email)}</span></td>
+            <td>${r.lang === "en" ? "Inglés" : "Español"}</td>
+            <td>${r.status === "sent" ? '<span class="badge" style="background:#3F6B4F;">Enviada ✓</span>' : '<span class="badge" style="background:#9C3B2E;">No se envió</span>'}${r.took_test ? ' <span class="badge" style="background:#B5732A;">Ya hizo el test</span>' : ""}</td>
+            <td>${esc((r.created_at || "").slice(0, 16).replace("T", " "))}</td>
+          </tr>`).join("")
+        : '<tr><td colspan="4" style="text-align:center;color:#999;padding:30px;">Todavía no has enviado invitaciones.</td></tr>';
+    } catch (e) {
+      body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;padding:30px;">No se pudo cargar el historial.</td></tr>';
+    }
+  }
+
+  function showInviteMsg(text, color) {
+    const el = document.getElementById("inviteMsg");
+    el.style.display = text ? "block" : "none";
+    el.style.color = color;
+    el.textContent = text;
+  }
+
+  async function sendInvitation(force) {
+    const btn = document.getElementById("inviteBtn");
+    btn.disabled = true;
+    showInviteMsg("Enviando…", "var(--muted)");
+    try {
+      const res = await fetch("/admin/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: document.getElementById("inviteName").value,
+          email: document.getElementById("inviteEmail").value,
+          lang: document.getElementById("inviteLang").value,
+          force: !!force,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data.needsConfirm) {
+        btn.disabled = false;
+        if (confirm(data.message + "\n\n¿Enviar la invitación de todas formas?")) return sendInvitation(true);
+        showInviteMsg("Envío cancelado.", "var(--muted)");
+        return;
+      }
+      if (!res.ok) {
+        showInviteMsg(data.error || "No se pudo enviar la invitación.", "var(--bad)");
+        loadInvitations();
+        return;
+      }
+      showInviteMsg("Invitación enviada ✓", "var(--green)");
+      document.getElementById("inviteForm").reset();
+      loadInvitations();
+    } catch (e) {
+      showInviteMsg("No se pudo enviar la invitación. Revisa tu conexión e inténtalo de nuevo.", "var(--bad)");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  document.getElementById("inviteForm").addEventListener("submit", (e) => { e.preventDefault(); sendInvitation(false); });
 
   // ── Referidos (Hueco 2) ──
   async function loadReferrals() {

@@ -14,6 +14,8 @@ const { DIMENSIONS } = require("../data/dimensions");
 const { generatePdfForSubmission, sendExtendedReportEmail, triggerExtendedReportEmailOnce } = require("../services/extendedReport");
 const { listReferrals, GRAPH_REFERRALS_ENABLED } = require("../services/graphExcel");
 const { sendReminderNow } = require("../services/reminderScheduler");
+const { sendMail } = require("../services/graphMail");
+const { testInvitationEmail } = require("../services/emailTemplates");
 
 const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Number(process.env.EXTENDED_PRICE_CENTS) : 2499;
 
@@ -777,6 +779,74 @@ router.post("/api/results/:id/resend-summary-link", async (req, res) => {
   }
   const updated = db.prepare("SELECT * FROM submissions WHERE id = ?").get(req.params.id);
   res.json({ ok: true, submission: updated ? serializeSubmission(updated) : null });
+});
+
+// ── Invitar a una persona a hacer el test (2026-10) ─────────────────────────
+// Sección "Invitar" de /panel-control: Francisco escribe nombre y correo y se
+// envía el correo de invitación con el link del test (testInvitationEmail).
+// Cada intento queda en test_invitations (historial). Si ese correo ya fue
+// invitado o ya hizo el test, el servidor responde 409 con un aviso y el
+// panel pide confirmación antes de reenviar (force: true).
+router.get("/api/invitations", (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT i.id, i.created_at, i.name, i.email, i.lang, i.status, i.error,
+              EXISTS(SELECT 1 FROM submissions s WHERE LOWER(TRIM(s.email)) = i.email) AS took_test
+       FROM test_invitations i ORDER BY i.created_at DESC LIMIT 100`
+    )
+    .all();
+  res.json(rows.map((r) => ({ ...r, took_test: !!r.took_test })));
+});
+
+router.post("/api/invitations", express.json(), async (req, res) => {
+  const body = req.body || {};
+  const name = String(body.name || "").trim().slice(0, 120);
+  const email = String(body.email || "").trim().toLowerCase().slice(0, 200);
+  const lang = body.lang === "en" ? "en" : "es";
+  const force = body.force === true;
+
+  if (!name) return res.status(400).json({ error: "Escribe el nombre de la persona." });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "El correo no parece válido." });
+
+  if (!force) {
+    const previous = db
+      .prepare("SELECT created_at FROM test_invitations WHERE email = ? AND status = 'sent' ORDER BY created_at DESC LIMIT 1")
+      .get(email);
+    const alreadyTook = db.prepare("SELECT 1 FROM submissions WHERE LOWER(TRIM(email)) = ? LIMIT 1").get(email);
+    if (previous || alreadyTook) {
+      const parts = [];
+      if (previous) parts.push(`Ya invitaste a este correo el ${previous.created_at.slice(0, 10)}.`);
+      if (alreadyTook) parts.push("Esta persona ya hizo el test.");
+      return res.status(409).json({ needsConfirm: true, message: parts.join(" ") });
+    }
+  }
+
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const testUrl = lang === "en" ? `${baseUrl}/?lang=en` : `${baseUrl}/`;
+  const { subject, html } = testInvitationEmail({ name, lang, testUrl });
+
+  let result;
+  try {
+    result = await sendMail({ to: email, subject, html });
+  } catch (err) {
+    result = { sent: false, reason: "error", error: err.message };
+  }
+
+  const detail = result.sent ? null : result.reason === "error" ? result.error : result.reason || "desconocido";
+  const id = require("crypto").randomUUID();
+  db.prepare("INSERT INTO test_invitations (id, created_at, name, email, lang, status, error) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+    id, new Date().toISOString(), name, email, lang, result.sent ? "sent" : "failed", detail
+  );
+
+  if (!result.sent) {
+    console.error(`[admin] No se pudo enviar la invitación al test (${email}) —`, detail);
+    return res.status(502).json({
+      error: result.reason === "disabled"
+        ? "El correo automático (Microsoft Graph) no está configurado en este servidor."
+        : "No se pudo enviar el correo: " + detail,
+    });
+  }
+  res.json({ ok: true, id });
 });
 
 /**

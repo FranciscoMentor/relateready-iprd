@@ -828,6 +828,11 @@
   }
 
   restoreFromPayphoneReturn().then((restored) => {
+    // Link de invitación en inglés (/?lang=en) — ver testInvitationEmail en services/emailTemplates.js.
+    if (!restored && new URLSearchParams(window.location.search).get("lang") === "en") {
+      setLang("en");
+      return;
+    }
     loadMeta().then(() => {
       document.getElementById("btn-es").classList.toggle("active", state.lang === "es");
       document.getElementById("btn-en").classList.toggle("active", state.lang === "en");
