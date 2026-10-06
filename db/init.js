@@ -342,6 +342,11 @@ addSdAttendeesColumnIfMissing("survey_email_status", "survey_email_status TEXT")
 addSdAttendeesColumnIfMissing("survey_email_error", "survey_email_error TEXT");
 addSdAttendeesColumnIfMissing("survey_email_sent_at", "survey_email_sent_at TEXT");
 
+// Recordatorio de la encuesta (2026-10): envío manual desde el panel a quien
+// todavía no la contestó — esta marca evita enviarlo dos veces a la misma persona.
+addSdAttendeesColumnIfMissing("survey_reminder_sent_at", "survey_reminder_sent_at TEXT");
+addSdAttendeesColumnIfMissing("survey_reminder_error", "survey_reminder_error TEXT");
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS sd_survey_responses (
     id TEXT PRIMARY KEY,

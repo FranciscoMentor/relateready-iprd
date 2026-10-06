@@ -19,6 +19,7 @@ const { sendMail } = require("../services/graphMail");
 const { speedDatingMatchEmail } = require("../services/emailTemplates");
 const speedDatingReminderScheduler = require("../services/speedDatingReminderScheduler");
 const speedDatingScheduler = require("../services/speedDatingScheduler");
+const speedDatingSurveyScheduler = require("../services/speedDatingSurveyScheduler");
 
 // Paleta oficial de marca (la misma que ya usa el resto del sitio en
 // public/css/styles.css :root, y la que Francisco confirmó como paleta
@@ -459,6 +460,10 @@ router.get("/:eventId", (req, res) => {
     }
   }
 
+  // Cuántas personas recibirían el recordatorio de la encuesta (ver tarjeta
+  // "Recordatorio de encuesta" más abajo).
+  const surveyReminderPending = event.status === "finalizado" ? speedDatingSurveyScheduler.pendingSurveyReminderAttendees(event.id).length : 0;
+
   const waitlist = db.prepare("SELECT * FROM sd_waitlist WHERE event_id = ? ORDER BY created_at ASC").all(event.id);
   const openEvents = db
     .prepare("SELECT id, name, event_date, event_time FROM sd_events WHERE status = 'registro' AND id != ? ORDER BY created_at DESC")
@@ -697,6 +702,15 @@ router.get("/:eventId", (req, res) => {
       <p class="muted" style="margin:0 0 12px;">Se envía automáticamente por correo la mañana siguiente al evento, antes del mediodía (hora de Ecuador) — evalúa registro, rondas, lugar y organización, más una recomendación. No pregunta por matches (esos salen 48h después).</p>
       <a href="/admin/speed-dating/${event.id}/encuesta-resultados" class="btn ghost">Ver resultados de la encuesta →</a>
     </div>
+
+    ${event.status === "finalizado" ? `
+    <div class="card">
+      <h2 style="margin:0 0 6px;font-size:15px;">Recordatorio de encuesta</h2>
+      <p class="muted" style="margin:0 0 12px;">Envía un segundo correo a quien asistió y todavía no contestó la encuesta, pidiéndole que la complete y recordándole que el código VIP del Informe Extendido vence en 3 días (quien ya tiene su informe completo no ve ese recuadro). Si alguien ya recibió este recordatorio, no se le vuelve a enviar. Personas que lo recibirían ahora: <strong>${surveyReminderPending}</strong>.</p>
+      <form method="POST" action="/admin/speed-dating/${event.id}/enviar-recordatorio-encuesta" onsubmit="return confirm('¿Enviar el recordatorio de la encuesta a ${surveyReminderPending} persona(s) que todavía no la han contestado? Esta acción no se puede deshacer.');">
+        <button type="submit" class="btn small" ${surveyReminderPending === 0 ? "disabled" : ""}>Enviar recordatorio de encuesta</button>
+      </form>
+    </div>` : ""}
 
     <div class="card">
       <h2 style="margin:0 0 6px;font-size:15px;">Reenviar recordatorio de 1 día antes</h2>
@@ -1391,6 +1405,19 @@ router.post("/:eventId/recordatorio-mismo-dia", async (req, res) => {
   res.redirect(backTo);
 });
 
+
+// POST /:eventId/enviar-recordatorio-encuesta — recordatorio manual para quien
+// no ha contestado la encuesta (ver sendSurveyReminderForEvent en
+// services/speedDatingSurveyScheduler.js).
+router.post("/:eventId/enviar-recordatorio-encuesta", async (req, res) => {
+  const backTo = `/admin/speed-dating/${req.params.eventId}`;
+  try {
+    await speedDatingSurveyScheduler.sendSurveyReminderForEvent(req.params.eventId);
+  } catch (err) {
+    console.error("[speedDatingAdmin] Error enviando recordatorio de encuesta —", err.message);
+  }
+  res.redirect(backTo);
+});
 
 // ── Encuesta de satisfacción: tabulación con gráficos (2026-10) ──────────
 // Disponible en cualquier momento (no depende de que ya se haya enviado el

@@ -508,5 +508,53 @@ function speedDatingSurveyEmail({ name, eventName, venueName, surveyUrl }) {
   };
 }
 
-module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail, speedDatingSurveyEmail };
+// ── Recordatorio de encuesta (2026-10) ─────────────────────────────────────
+// Segundo correo, enviado a mano desde el panel, a quien asistió al evento y
+// todavía no contestó la encuesta. Además recuerda que el código VIP para
+// descargar gratis el Informe Extendido vence en una fecha límite.
+// vipMode: "results" = ya hizo el test (vipUrl = su enlace personal de
+// resultados, /?sid=...), "test" = todavía no lo ha hecho (vipUrl = página del
+// test), "none" = ya tiene su informe completo, no se le muestra el recuadro.
+function speedDatingSurveyReminderEmail({ name, eventName, eventDate, venueName, surveyUrl, vipMode, vipUrl, vipDeadlineText = "en 3 días" }) {
+  const firstName = firstNameOf(name, "es");
+  const dateText = eventDate
+    ? ` el ${new Date(`${eventDate}T00:00:00`).toLocaleDateString("es-EC", { day: "numeric", month: "long" })}`
+    : "";
+  const subjectPlace = venueName ? `la noche en ${venueName}` : eventName;
+
+  let vipHtml = "";
+  if (vipMode === "results" || vipMode === "test") {
+    const instruction =
+      vipMode === "results"
+        ? `Para usarlo, vuelve al enlace de tus resultados, el mismo donde viste el resumen de tu informe. Ahí ingresa tu código y descarga gratis tu informe completo.`
+        : `Todavía no hemos recibido tu Test RelateReady. Te toma pocos minutos: complétalo, ingresa tu código en la pantalla de resultados y descarga gratis tu informe completo.`;
+    const label = vipMode === "results" ? "Ir a mis resultados" : "Hacer el Test RelateReady";
+    vipHtml = `
+        <div style="background:#F7F1E4;border:1px solid #E7DFD2;border-radius:10px;padding:18px 20px;margin:26px 0 20px;">
+          <p style="font-size:15px;line-height:1.6;margin:0 0 12px;"><b>Un recordatorio importante</b></p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 12px;">Si eres una de las personas que ganó el <b>código VIP</b>, recuerda que vence <b>${vipDeadlineText}</b>.</p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 14px;">${instruction}</p>
+          <p style="margin:0;">${button(vipUrl, label)}</p>
+        </div>`;
+  }
+
+  return {
+    subject: `Tu opinión sobre ${subjectPlace} (2 minutos)`,
+    html: shell({
+      lang: "es",
+      bodyHtml: `
+        <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Espero que estés teniendo una buena semana. Quiero agradecerte de nuevo por haber sido parte de <b>${eventName}</b>${dateText}.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Vi que todavía no has respondido la encuesta de la noche. Sé que los días se llenan rápido, por eso te escribo personalmente: son solo <b>6 preguntas cortas</b> y te toman menos de 2 minutos.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Tu opinión es lo que nos permite cuidar y mejorar la calidad de la experiencia en los próximos eventos: qué funcionó bien y qué podemos hacer mejor. Cada respuesta cuenta.</p>
+        <p style="margin:24px 0 12px;">${button(surveyUrl, "Responder la encuesta")}</p>
+        <p style="font-size:13px;line-height:1.6;margin:0;color:${MUTED};">Tu respuesta es anónima para los demás asistentes y solo se usa para mejorar futuros eventos.</p>${vipHtml}
+        <p style="font-size:15px;line-height:1.6;margin:20px 0 16px;">Gracias por ayudarnos a construir encuentros cada vez más valiosos.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0;">Con aprecio,<br><b>Dr. Francisco Rosero</b><br><span style="font-size:13px;color:${MUTED};">RelateReady</span></p>
+      `,
+    }),
+  };
+}
+
+module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail, speedDatingSurveyEmail, speedDatingSurveyReminderEmail };
 

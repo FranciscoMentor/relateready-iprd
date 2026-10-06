@@ -22,7 +22,7 @@
 
 const db = require("../db/init");
 const { sendMail, GRAPH_MAIL_ENABLED } = require("./graphMail");
-const { speedDatingSurveyEmail } = require("./emailTemplates");
+const { speedDatingSurveyEmail, speedDatingSurveyReminderEmail } = require("./emailTemplates");
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // cada hora
 const FIRST_CHECK_DELAY_MS = 5 * 60 * 1000; // 5 min después de arrancar (3 min usa speedDatingScheduler, 4 min speedDatingReminderScheduler)
@@ -96,6 +96,77 @@ async function runOnce() {
   }
 }
 
+// ── Recordatorio manual de la encuesta (2026-10) ───────────────────────────
+// Lo dispara Francisco desde el panel (routes/speedDatingAdmin.js). Envía
+// SOLO a quien asistió (no canceló, tiene correo), todavía no contestó la
+// encuesta (sd_survey_responses) y todavía no recibió este recordatorio
+// (survey_reminder_sent_at) — por eso es seguro presionarlo dos veces.
+// El recuadro del código VIP depende de si la persona ya hizo el test:
+// "results" (enlace personal /?sid=...), "test" (página del test) o "none"
+// (ya descargó su informe completo, no se le recuerda). El test se busca por
+// correo (submissions.email), tomando el más reciente.
+function findSubmissionByEmail(email) {
+  return db
+    .prepare(
+      `SELECT id, payment_status, extended_generated_at FROM submissions
+       WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))
+       ORDER BY created_at DESC LIMIT 1`
+    )
+    .get(email);
+}
+
+function vipVariantFor(email) {
+  const sub = findSubmissionByEmail(email);
+  if (!sub) return { vipMode: "test", vipUrl: `${baseUrl()}/` };
+  const unlocked = Boolean(sub.extended_generated_at) || ["paid", "free", "simulated"].includes(sub.payment_status);
+  if (unlocked) return { vipMode: "none", vipUrl: null };
+  return { vipMode: "results", vipUrl: `${baseUrl()}/?sid=${sub.id}` };
+}
+
+function pendingSurveyReminderAttendees(eventId) {
+  return db
+    .prepare(
+      `SELECT * FROM sd_attendees a
+       WHERE a.event_id = ?
+         AND a.cancelled_at IS NULL
+         AND a.email IS NOT NULL AND TRIM(a.email) <> ''
+         AND a.survey_reminder_sent_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM sd_survey_responses r WHERE r.attendee_id = a.id)`
+    )
+    .all(eventId);
+}
+
+async function sendSurveyReminderForEvent(eventId, { vipDeadlineText = "en 3 días" } = {}) {
+  const event = db.prepare("SELECT id, name, venue_name, event_date FROM sd_events WHERE id = ?").get(eventId);
+  if (!event) return { ok: false, reason: "event_not_found" };
+
+  let sent = 0;
+  let failed = 0;
+  for (const attendee of pendingSurveyReminderAttendees(event.id)) {
+    const { vipMode, vipUrl } = vipVariantFor(attendee.email);
+    const { subject, html } = speedDatingSurveyReminderEmail({
+      name: attendee.name,
+      eventName: event.name,
+      eventDate: event.event_date,
+      venueName: event.venue_name,
+      surveyUrl: `${baseUrl()}/speed-dating/encuesta.html?token=${attendee.vote_token}`,
+      vipMode,
+      vipUrl,
+      vipDeadlineText,
+    });
+    const result = await sendMail({ to: attendee.email, subject, html });
+    if (result.sent) {
+      db.prepare("UPDATE sd_attendees SET survey_reminder_sent_at = ?, survey_reminder_error = NULL WHERE id = ?").run(new Date().toISOString(), attendee.id);
+      sent++;
+      console.log(`[speedDatingSurveyScheduler] Recordatorio de encuesta enviado a ${attendee.email} (evento ${event.name}, VIP: ${vipMode}).`);
+    } else {
+      db.prepare("UPDATE sd_attendees SET survey_reminder_error = ? WHERE id = ?").run(result.reason === "error" ? result.error : result.reason || "desconocido", attendee.id);
+      failed++;
+    }
+  }
+  return { ok: true, sent, failed };
+}
+
 function start() {
   if (!GRAPH_MAIL_ENABLED) {
     console.log("[speedDatingSurveyScheduler] Correo automático deshabilitado — la encuesta de satisfacción no se activa.");
@@ -106,4 +177,4 @@ function start() {
   console.log("[speedDatingSurveyScheduler] Activo — revisa cada hora si hay encuestas de satisfacción pendientes del día siguiente.");
 }
 
-module.exports = { start, runOnce };
+module.exports = { start, runOnce, sendSurveyReminderForEvent, pendingSurveyReminderAttendees };
