@@ -579,8 +579,8 @@ function testInvitationEmail({ name, lang, testUrl, repName }) {
           lang: "en",
           bodyHtml: `
         <p style="font-size:16px;margin:0 0 16px;">Hello ${firstName},</p>
-        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">I hope your week is going well. I'm writing on behalf of <b>${repHtml}</b>, a RelateReady Representative, who would like to invite you to take the <b>RelateReady Test</b>, a relationship-readiness tool that helps you see where you stand today when it comes to romantic relationships.</p>
-        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">It looks at 8 pillars, including attachment security, communication and repair, and clarity of values, and when you finish you instantly get a summary of your results. There are no right or wrong answers: it's about knowing yourself better and seeing clearly where you are strong and what you can keep developing.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">I hope your week is going well. I'm writing on behalf of <b>${repHtml}</b>, a RelateReady Representative, who would like to invite you to take the <b>RelateReady Test</b>, a relationship-readiness tool that helps you see where you stand today in every relationship.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">It looks at 8 pillars, including attachment security, communication and repair, and clarity of values, and when you finish you instantly get a summary of your results. There are no right or wrong answers: it's a well-rounded self-assessment that highlights strengths, acknowledges areas for improvement, and shows a clear plan for future growth.</p>
         <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">It only takes a few minutes.</p>
         <p style="margin:0 0 24px;">${button(testUrl, "Take the test")}</p>
         <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">If you have any questions, just reply to this email and ${repHtml} will get back to you.</p>
@@ -595,8 +595,8 @@ function testInvitationEmail({ name, lang, testUrl, repName }) {
         lang: "es",
         bodyHtml: `
         <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
-        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Espero que estés teniendo una buena semana. Te escribo de parte de <b>${repHtml}</b>, Representante de RelateReady, quien quiere invitarte a hacer el <b>Test RelateReady</b>, una herramienta de preparación relacional que te ayuda a conocer cómo estás hoy frente a las relaciones de pareja.</p>
-        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Evalúa 8 pilares, entre ellos la seguridad de apego, la comunicación y reparación, y la claridad de tus valores, y al terminar recibes de inmediato un resumen de tus resultados. No hay respuestas correctas o incorrectas: se trata de conocerte mejor y ver con claridad dónde estás fuerte y qué puedes seguir desarrollando.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Espero que estés teniendo una buena semana. Te escribo de parte de <b>${repHtml}</b>, Representante de RelateReady, quien quiere invitarte a hacer el <b>Test RelateReady</b>, una herramienta de preparación relacional que te ayuda a conocer cómo estás hoy en cada una de tus relaciones.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Evalúa 8 pilares, entre ellos la seguridad de apego, la comunicación y reparación, y la claridad de tus valores, y al terminar recibes de inmediato un resumen de tus resultados. No hay respuestas correctas o incorrectas: es una autoevaluación integral que destaca tus fortalezas, reconoce tus áreas de mejora y te muestra un plan claro para tu crecimiento futuro.</p>
         <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Te toma unos minutos.</p>
         <p style="margin:0 0 24px;">${button(testUrl, "Hacer el test")}</p>
         <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">Si tienes alguna duda, puedes responder este correo y ${repHtml} te escribirá.</p>
