@@ -379,5 +379,10 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_test_invitations_email ON test_invitations(email);
 `);
+// Invitaciones "a nombre de un representante" (2026-10): quién invita y a qué
+// correo llegan las respuestas.
+for (const [col, ddl] of [["rep_name", "rep_name TEXT"], ["rep_email", "rep_email TEXT"]]) {
+  try { db.exec(`ALTER TABLE test_invitations ADD COLUMN ${ddl}`); } catch (e) { /* ya existe */ }
+}
 
 module.exports = db;

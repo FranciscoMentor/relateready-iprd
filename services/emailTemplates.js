@@ -564,9 +564,47 @@ function escapeHtml(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-function testInvitationEmail({ name, lang, testUrl }) {
+function testInvitationEmail({ name, lang, testUrl, repName }) {
   const en = lang === "en";
   const firstName = escapeHtml(firstNameOf(name, en ? "en" : "es"));
+  // Variante "a nombre de un representante": el correo lo firma Francisco y
+  // presenta al representante, que recibe las respuestas (replyTo).
+  const rep = String(repName || "").replace(/[\r\n]+/g, " ").trim();
+  if (rep) {
+    const repHtml = escapeHtml(rep);
+    if (en) {
+      return {
+        subject: `${rep} invites you to take the RelateReady Test`,
+        html: shell({
+          lang: "en",
+          bodyHtml: `
+        <p style="font-size:16px;margin:0 0 16px;">Hello ${firstName},</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">I hope your week is going well. I'm writing on behalf of <b>${repHtml}</b>, a RelateReady Representative, who would like to invite you to take the <b>RelateReady Test</b>, a relationship-readiness tool that helps you see where you stand today when it comes to romantic relationships.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">It looks at 8 pillars, including attachment security, communication and repair, and clarity of values, and when you finish you instantly get a summary of your results. There are no right or wrong answers: it's about knowing yourself better and seeing clearly where you are strong and what you can keep developing.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">It only takes a few minutes.</p>
+        <p style="margin:0 0 24px;">${button(testUrl, "Take the test")}</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">If you have any questions, just reply to this email and ${repHtml} will get back to you.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0;">Warmly,<br><b>Dr. Francisco Rosero</b><br><span style="font-size:13px;color:${MUTED};">RelateReady</span></p>
+      `,
+        }),
+      };
+    }
+    return {
+      subject: `${rep} te invita a hacer el Test RelateReady`,
+      html: shell({
+        lang: "es",
+        bodyHtml: `
+        <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Espero que estés teniendo una buena semana. Te escribo de parte de <b>${repHtml}</b>, Representante de RelateReady, quien quiere invitarte a hacer el <b>Test RelateReady</b>, una herramienta de preparación relacional que te ayuda a conocer cómo estás hoy frente a las relaciones de pareja.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Evalúa 8 pilares, entre ellos la seguridad de apego, la comunicación y reparación, y la claridad de tus valores, y al terminar recibes de inmediato un resumen de tus resultados. No hay respuestas correctas o incorrectas: se trata de conocerte mejor y ver con claridad dónde estás fuerte y qué puedes seguir desarrollando.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Te toma unos minutos.</p>
+        <p style="margin:0 0 24px;">${button(testUrl, "Hacer el test")}</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">Si tienes alguna duda, puedes responder este correo y ${repHtml} te escribirá.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0;">Con aprecio,<br><b>Dr. Francisco Rosero</b><br><span style="font-size:13px;color:${MUTED};">RelateReady</span></p>
+      `,
+      }),
+    };
+  }
   if (en) {
     return {
       subject: "I'd like to invite you to take the RelateReady Test",

@@ -790,7 +790,7 @@ router.post("/api/results/:id/resend-summary-link", async (req, res) => {
 router.get("/api/invitations", (req, res) => {
   const rows = db
     .prepare(
-      `SELECT i.id, i.created_at, i.name, i.email, i.lang, i.status, i.error,
+      `SELECT i.id, i.created_at, i.name, i.email, i.lang, i.status, i.error, i.rep_name, i.rep_email,
               EXISTS(SELECT 1 FROM submissions s WHERE LOWER(TRIM(s.email)) = i.email) AS took_test
        FROM test_invitations i ORDER BY i.created_at DESC LIMIT 100`
     )
@@ -804,9 +804,15 @@ router.post("/api/invitations", express.json(), async (req, res) => {
   const email = String(body.email || "").trim().toLowerCase().slice(0, 200);
   const lang = body.lang === "en" ? "en" : "es";
   const force = body.force === true;
+  const repName = String(body.repName || "").replace(/[\r\n]+/g, " ").trim().slice(0, 120);
+  const repEmail = String(body.repEmail || "").trim().toLowerCase().slice(0, 200);
 
   if (!name) return res.status(400).json({ error: "Escribe el nombre de la persona." });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "El correo no parece válido." });
+  if (repName || repEmail) {
+    if (!repName) return res.status(400).json({ error: "Escribe el nombre del representante." });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(repEmail)) return res.status(400).json({ error: "El correo del representante no parece válido." });
+  }
 
   if (!force) {
     const previous = db
@@ -823,19 +829,20 @@ router.post("/api/invitations", express.json(), async (req, res) => {
 
   const baseUrl = `${req.protocol}://${req.get("host")}`;
   const testUrl = lang === "en" ? `${baseUrl}/?lang=en` : `${baseUrl}/`;
-  const { subject, html } = testInvitationEmail({ name, lang, testUrl });
+  const { subject, html } = testInvitationEmail({ name, lang, testUrl, repName });
 
   let result;
   try {
-    result = await sendMail({ to: email, subject, html });
+    result = await sendMail({ to: email, subject, html, replyTo: repName ? repEmail : undefined });
   } catch (err) {
     result = { sent: false, reason: "error", error: err.message };
   }
 
   const detail = result.sent ? null : result.reason === "error" ? result.error : result.reason || "desconocido";
   const id = require("crypto").randomUUID();
-  db.prepare("INSERT INTO test_invitations (id, created_at, name, email, lang, status, error) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
-    id, new Date().toISOString(), name, email, lang, result.sent ? "sent" : "failed", detail
+  db.prepare("INSERT INTO test_invitations (id, created_at, name, email, lang, status, error, rep_name, rep_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    id, new Date().toISOString(), name, email, lang, result.sent ? "sent" : "failed", detail,
+    repName || null, repName ? repEmail : null
   );
 
   if (!result.sent) {

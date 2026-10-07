@@ -170,6 +170,12 @@
       <form id="inviteForm" style="max-width:440px;">
         <div class="form-field"><label for="inviteName">Nombre</label><input type="text" id="inviteName" required maxlength="120" placeholder="Nombre de la persona"></div>
         <div class="form-field"><label for="inviteEmail">Correo</label><input type="email" id="inviteEmail" required maxlength="200" placeholder="correo@ejemplo.com"></div>
+        <div class="form-field" style="margin-top:6px;"><label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;"><input type="checkbox" id="inviteRepOn" style="width:auto;margin:0;"> Enviar a nombre de un representante</label></div>
+        <div id="inviteRepFields" style="display:none;">
+          <div class="form-field"><label for="inviteRepName">Nombre del representante</label><input type="text" id="inviteRepName" maxlength="120" placeholder="Nombre del representante de RelateReady"></div>
+          <div class="form-field"><label for="inviteRepEmail">Correo del representante (le llegan las respuestas)</label><input type="email" id="inviteRepEmail" maxlength="200" placeholder="representante@ejemplo.com"></div>
+          <p class="muted" style="margin:-4px 0 14px;font-size:12.5px;">El correo sale firmado por ti y dice que lo envías de parte del representante.</p>
+        </div>
         <div class="form-field"><label for="inviteLang">Idioma del correo y del test</label><select id="inviteLang"><option value="es">Español</option><option value="en">Inglés</option></select></div>
         <button type="submit" class="btn" id="inviteBtn">Enviar invitación</button>
         <p id="inviteMsg" style="margin:12px 0 0;font-size:13px;display:none;"></p>
@@ -352,7 +358,7 @@
       const rows = await res.json();
       body.innerHTML = rows.length
         ? rows.map(r => `<tr>
-            <td>${esc(r.name)}<br><span class="muted">${esc(r.email)}</span></td>
+            <td>${esc(r.name)}<br><span class="muted">${esc(r.email)}</span>${r.rep_name ? `<br><span class="muted">De parte de ${esc(r.rep_name)}</span>` : ""}</td>
             <td>${r.lang === "en" ? "Inglés" : "Español"}</td>
             <td>${r.status === "sent" ? '<span class="badge" style="background:#3F6B4F;">Enviada ✓</span>' : '<span class="badge" style="background:#9C3B2E;">No se envió</span>'}${r.took_test ? ' <span class="badge" style="background:#B5732A;">Ya hizo el test</span>' : ""}</td>
             <td>${esc((r.created_at || "").slice(0, 16).replace("T", " "))}</td>
@@ -382,6 +388,8 @@
           name: document.getElementById("inviteName").value,
           email: document.getElementById("inviteEmail").value,
           lang: document.getElementById("inviteLang").value,
+          repName: document.getElementById("inviteRepOn").checked ? document.getElementById("inviteRepName").value : "",
+          repEmail: document.getElementById("inviteRepOn").checked ? document.getElementById("inviteRepEmail").value : "",
           force: !!force,
         }),
       });
@@ -399,6 +407,7 @@
       }
       showInviteMsg("Invitación enviada ✓", "var(--green)");
       document.getElementById("inviteForm").reset();
+      document.getElementById("inviteRepFields").style.display = "none";
       loadInvitations();
     } catch (e) {
       showInviteMsg("No se pudo enviar la invitación. Revisa tu conexión e inténtalo de nuevo.", "var(--bad)");
@@ -406,6 +415,9 @@
       btn.disabled = false;
     }
   }
+  document.getElementById("inviteRepOn").addEventListener("change", (e) => {
+    document.getElementById("inviteRepFields").style.display = e.target.checked ? "block" : "none";
+  });
   document.getElementById("inviteForm").addEventListener("submit", (e) => { e.preventDefault(); sendInvitation(false); });
 
   // ── Referidos (Hueco 2) ──
