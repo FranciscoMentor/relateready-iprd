@@ -214,7 +214,7 @@ function speedDatingMatchEmail({ name, lang, eventName, matches }) {
         `
           : `
           <p style="font-size:16px;margin:0 0 16px;">Hi ${firstName},</p>
-          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thanks for joining ${eventName}. This time there wasn't a mutual match — sometimes the timing just isn't right, and that's completely normal in speed dating.</p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thanks for joining ${eventName}. This time there wasn't a mutual match — sometimes the timing just isn't right, and that's completely normal at a RelateReady Meetup.</p>
           <p style="font-size:15px;line-height:1.6;margin:0;">We hope to see you at the next RelateReady event!</p>
         `,
       }),
@@ -233,7 +233,7 @@ function speedDatingMatchEmail({ name, lang, eventName, matches }) {
       `
         : `
         <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
-        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Gracias por participar en ${eventName}. Esta vez no hubo un match mutuo — a veces simplemente no coincide el momento, y es completamente normal en el speed dating.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Gracias por participar en ${eventName}. Esta vez no hubo un match mutuo — a veces simplemente no coincide el momento, y es completamente normal en un Encuentro RelateReady.</p>
         <p style="font-size:15px;line-height:1.6;margin:0;">¡Esperamos verte en el próximo evento de RelateReady!</p>
       `,
     }),

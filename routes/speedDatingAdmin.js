@@ -115,7 +115,7 @@ function baseStyles() {
 function topbar() {
   return `
     <header class="topbar">
-      <div class="brand" style="letter-spacing:.03em;">RelateReady <span style="color:${BRAND.light};font-weight:400;">· Speed Dating</span></div>
+      <div class="brand" style="letter-spacing:.03em;">RelateReady <span style="color:${BRAND.light};font-weight:400;">· Encuentros</span></div>
       <nav>
         <a href="/admin/speed-dating">Eventos</a>
         <a href="/panel-control">Panel de control</a>
@@ -270,7 +270,7 @@ function renderCreateForm(values = {}, error = null) {
       <h2 style="margin:0 0 14px;font-size:16px;">Crear nuevo evento</h2>
       ${error ? `<div style="background:#FBEAE7;border:1px solid ${BRAND.clay};color:${BRAND.clay};border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;">${esc(error)}</div>` : ""}
       <form method="POST" action="/admin/speed-dating" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
-        <div><label class="muted" style="display:block;margin-bottom:4px;">Nombre</label><input type="text" name="name" value="${esc(v.name)}" placeholder="Ej. Mila Rooftop — 20 sep" required></div>
+        <div><label class="muted" style="display:block;margin-bottom:4px;">Nombre</label><input type="text" name="name" value="${esc(v.name)}" placeholder="Ej. Encuentro RelateReady — 20 sep" required></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Fecha</label><input type="date" name="event_date" value="${esc(v.event_date)}"></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Hora</label><input type="time" name="event_time" value="${esc(v.event_time)}" style="width:110px;"></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Aforo máximo</label><input type="number" name="capacity" value="${esc(v.capacity)}" min="2" max="60" style="width:90px;"></div>
@@ -313,13 +313,13 @@ function sendEventsListPage(res, { values, error } = {}) {
 
   res.send(`<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Speed Dating · RelateReady Admin</title><style>${baseStyles()}</style></head>
+<title>Encuentros · RelateReady Admin</title><style>${baseStyles()}</style></head>
 <body>
   ${topbar()}
   <div class="container">
     <div class="page-head">
       <span class="eyebrow">Panel del organizador</span>
-      <h1>Tus eventos de speed dating, <span class="accent-word">en vivo</span></h1>
+      <h1>Tus Encuentros RelateReady, <span class="accent-word">en vivo</span></h1>
       <p class="lede">Crea el evento, comparte el link de registro y controla las mesas y las rondas desde aquí — sin depender de nadie más el día del evento.</p>
     </div>
     ${renderCreateForm(values, error)}
@@ -547,7 +547,7 @@ router.get("/:eventId", (req, res) => {
 
   res.send(`<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(event.name)} · Speed Dating</title><style>${baseStyles()}</style></head>
+<title>${esc(event.name)} · Encuentro RelateReady</title><style>${baseStyles()}</style></head>
 <body>
   ${topbar()}
   <div class="container">
