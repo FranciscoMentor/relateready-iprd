@@ -382,6 +382,30 @@ function bookTeaserBlock(doc, lang) {
   doc.font("Helvetica").fillColor(INK);
 }
 
+// Párrafo + botón al final de la Introducción (después del texto de
+// bienvenida): una vez leído el informe, se recomienda revisarlo con un mentor
+// experto en la sesión de mentoría indagatoria gratuita (regalo incluido con el Informe
+// Extendido). Es un SEGUNDO camino para agendar, adicional a la sección "Tu
+// sesión de mentoría indagatoria gratuita" (que no se toca) — por eso
+// reutiliza BOOKING_LINKS.
+const MENTOR_REVIEW_COPY = {
+  es: {
+    body: "Una vez que hayas leído tu informe completo, te recomendamos revisarlo con un mentor experto durante tu sesión de mentoría indagatoria gratuita. Es un regalo incluido con tu Informe Extendido: 60 minutos para conversar sobre tus resultados, resolver tus dudas y diseñar tus siguientes pasos. Reserva tu sesión cuando quieras.",
+    btn: "Agendar mi sesión gratuita",
+  },
+  en: {
+    body: "Once you have read your full report, we recommend reviewing it with an expert mentor during your free intake mentoring session. It is a gift included with your Extended Report: 60 minutes to talk through your results, answer your questions, and design your next steps. Book your session whenever you are ready.",
+    btn: "Schedule my free session",
+  },
+};
+
+function mentorReviewBlock(doc, lang) {
+  const copy = MENTOR_REVIEW_COPY[lang] || MENTOR_REVIEW_COPY.es;
+  ensureSpace(doc, 110);
+  body(doc, copy.body);
+  linkButton(doc, copy.btn, BOOKING_LINKS[lang] || BOOKING_LINKS.es);
+}
+
 // Bloque de invitación al programa de referidos (Hueco 2): copy breve +
 // botón que abre el formulario de Microsoft Forms. Se coloca al final del
 // informe, después del bloque del libro gratuito — el lector ya recibió todo
@@ -760,6 +784,7 @@ function introPage(doc, lang, participant) {
       `Hi ${participant.name}. This report isn't here to tell you whether you're "fit" or "unfit" for love — no one is, once and for all. It's here to show you, as honestly as possible, which learned patterns you already have solidly built as strengths, and which ones are worth paying attention to before or during your next relationship. Think of it as a map, not a verdict.`
     )
   );
+  mentorReviewBlock(doc, lang);
 }
 
 function referralClosePage(doc, lang) {
