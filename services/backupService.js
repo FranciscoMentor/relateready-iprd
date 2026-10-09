@@ -7,7 +7,8 @@
 //
 //   - Cada domingo a las 03:00 (hora de Ecuador) genera una copia consistente
 //     de la base de datos y se la envía por correo a BACKUP_EMAIL_TO (por
-//     defecto, el mismo buzón remitente GRAPH_SENDER_MAILBOX).
+//     defecto, adamantinementor@outlook.com — el correo que Francisco tiene
+//     configurado en su computador).
 //   - El panel de control puede enviarla a demanda ("Enviar respaldo ahora")
 //     o descargarla directamente ("Descargar respaldo").
 //   - Cada intento queda en la tabla backup_log, y el panel muestra el estado
@@ -34,7 +35,8 @@ const { sendMail, GRAPH_MAIL_ENABLED } = require("./graphMail");
 
 const gzip = promisify(zlib.gzip);
 
-const BACKUP_TO = process.env.BACKUP_EMAIL_TO || process.env.GRAPH_SENDER_MAILBOX || "";
+const DEFAULT_BACKUP_TO = "adamantinementor@outlook.com";
+const BACKUP_TO = process.env.BACKUP_EMAIL_TO || DEFAULT_BACKUP_TO;
 const MAX_ATTACHMENT_BYTES = 2_900_000; // por debajo del límite de ~3 MB de Graph para adjuntos en línea
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // cada hora
 const FIRST_CHECK_DELAY_MS = 3 * 60 * 1000; // 3 min después de arrancar
@@ -126,7 +128,7 @@ async function sendBackupEmail(kind = "manual") {
   if (!GRAPH_MAIL_ENABLED || !BACKUP_TO) {
     const error = !GRAPH_MAIL_ENABLED
       ? "El correo automático (GRAPH_*) no está configurado."
-      : "No hay destinatario: define BACKUP_EMAIL_TO o GRAPH_SENDER_MAILBOX.";
+      : "No hay destinatario: define BACKUP_EMAIL_TO.";
     logAttempt(kind, "disabled", undefined, error);
     return { status: "disabled", error };
   }
