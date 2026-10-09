@@ -13,6 +13,13 @@ const db = require("../db/init");
 const { DIMENSIONS } = require("../data/dimensions");
 const { generatePdfForSubmission, sendExtendedReportEmail, triggerExtendedReportEmailOnce } = require("../services/extendedReport");
 const { listReferrals, GRAPH_REFERRALS_ENABLED } = require("../services/graphExcel");
+const {
+  createBackup,
+  backupFilename,
+  sendBackupEmail,
+  getStatus: getBackupStatus,
+  logDownload: logBackupDownload,
+} = require("../services/backupService");
 const { sendReminderNow } = require("../services/reminderScheduler");
 const { sendMail } = require("../services/graphMail");
 const { testInvitationEmail } = require("../services/emailTemplates");
@@ -904,6 +911,43 @@ router.get("/api/referrals", async (req, res) => {
   } catch (err) {
     console.error("[admin] Error leyendo referidos vía Graph —", err.message);
     res.status(502).json({ error: "No se pudo leer la tabla de referidos: " + err.message, enabled: true });
+  }
+});
+
+// ═══════════════════════ Respaldo de la base de datos ═══════════════════════
+// Ver services/backupService.js. Todo esto queda detrás de requireAuth (la
+// copia contiene datos personales de los clientes).
+
+/** Estado del respaldo para la tarjeta "Respaldo de datos" del panel. */
+router.get("/api/backup/status", (req, res) => {
+  res.json(getBackupStatus());
+});
+
+/** Genera y envía el respaldo por correo ahora mismo (botón del panel). */
+router.post("/api/backup/send-now", async (req, res) => {
+  const result = await sendBackupEmail("manual");
+  res.status(result.status === "sent" ? 200 : 400).json({ ...result, backup: getBackupStatus() });
+});
+
+/**
+ * Descarga directa de la copia (.sqlite.gz). Es una ruta fuera de /api a
+ * propósito: se abre como navegación normal del navegador, y si la sesión
+ * expiró redirige al login en vez de mostrar un JSON.
+ */
+router.get("/backup/download", async (req, res) => {
+  try {
+    const { gz, integrity } = await createBackup();
+    if (integrity !== "ok") {
+      return res.status(500).send("La copia generada no pasó la verificación de integridad: " + integrity);
+    }
+    logBackupDownload(gz.length);
+    res.setHeader("Content-Type", "application/gzip");
+    res.setHeader("Content-Disposition", `attachment; filename="${backupFilename()}"`);
+    res.setHeader("Content-Length", gz.length);
+    res.end(gz);
+  } catch (err) {
+    console.error("[admin] Error generando el respaldo para descarga —", err.message);
+    res.status(500).send("No se pudo generar el respaldo: " + err.message);
   }
 });
 

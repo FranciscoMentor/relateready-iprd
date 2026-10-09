@@ -10,6 +10,7 @@ const speedDatingAdminRoutes = require("./routes/speedDatingAdmin");
 const speedDatingPublicRoutes = require("./routes/speedDatingPublic");
 const db = require("./db/init");
 const reminderScheduler = require("./services/reminderScheduler");
+const backupService = require("./services/backupService");
 const speedDatingScheduler = require("./services/speedDatingScheduler");
 const speedDatingReminderScheduler = require("./services/speedDatingReminderScheduler");
 const speedDatingSurveyScheduler = require("./services/speedDatingSurveyScheduler");
@@ -108,6 +109,11 @@ app.listen(PORT, () => {
 // services/reminderScheduler.js) — se activa solo si el correo automático
 // está configurado (GRAPH_* en Environment).
 reminderScheduler.start();
+
+// Respaldo semanal de la base de datos por correo (domingos 03:00 hora de
+// Ecuador) — ver services/backupService.js. Mismo criterio: solo se activa
+// si el correo automático está configurado.
+backupService.start();
 
 // Correo de resultados a las 48h de finalizar un evento de speed dating
 // (ver services/speedDatingScheduler.js) — mismo criterio: solo se activa

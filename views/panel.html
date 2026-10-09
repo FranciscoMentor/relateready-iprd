@@ -137,6 +137,16 @@
       <h2 style="margin:0 0 14px;font-size:15px;">Envíos más recientes</h2>
       <div id="recentList"></div>
     </div>
+
+    <div class="card" id="backupCard">
+      <h2 style="margin:0 0 4px;font-size:15px;">Respaldo de datos</h2>
+      <p class="muted" style="margin:0 0 12px;">Copia completa de la base de datos (clientes, resultados, encuentros) enviada por correo cada semana, aparte del snapshot diario de Render.</p>
+      <div id="backupStatus"><span class="muted">Cargando…</span></div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn small" id="btnBackupSend">Enviar respaldo por correo ahora</button>
+        <a class="btn ghost small" id="btnBackupDownload" href="/admin/backup/download" style="text-decoration:none;">Descargar respaldo</a>
+      </div>
+    </div>
   </section>
 
   <!-- ═══════════════════ RESULTADOS ═══════════════════ -->
@@ -674,8 +684,53 @@
   function closeDetailModal(){ document.getElementById("detailModalOverlay").style.display = "none"; }
   document.getElementById("detailModalOverlay").addEventListener("click", (e)=>{ if (e.target.id==="detailModalOverlay") closeDetailModal(); });
 
+  // ── Respaldo de datos (ver services/backupService.js) ──
+  const BACKUP_KIND_LABEL = { weekly: "semanal automático", manual: "manual", download: "descarga" };
+  const BACKUP_STATUS_LABEL = { sent: "Enviado ✓", failed: "Falló", too_large: "Demasiado grande", disabled: "Correo desactivado", downloaded: "Descargado" };
+  const BACKUP_STATUS_COLOR = { sent: "#3F6B4F", failed: "#9C3B2E", too_large: "#9C3B2E", disabled: "#999", downloaded: "#6B6259" };
+  function fmtBackupDate(iso){ try { return new Date(iso).toLocaleString("es-EC", { timeZone:"America/Guayaquil", dateStyle:"medium", timeStyle:"short" }); } catch(e){ return iso; } }
+  function fmtBackupBytes(n){ if (n===null||n===undefined) return ""; return n>=1048576 ? (n/1048576).toFixed(2)+" MB" : Math.max(1,Math.round(n/1024))+" KB"; }
+  function renderBackupStatus(b) {
+    const box = document.getElementById("backupStatus");
+    let html = "";
+    if (b.needsAttention) {
+      const why = !b.lastSent ? "Todavía no se ha enviado ningún respaldo por correo."
+        : b.stale ? "El último respaldo enviado tiene más de 8 días."
+        : "El último intento de respaldo no se completó.";
+      html += `<div style="background:#F6E4E0;border:1px solid #9C3B2E;color:#9C3B2E;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;"><strong>Atención:</strong> ${esc(why)}${b.lastAttempt && b.lastAttempt.error ? "<br>"+esc(b.lastAttempt.error) : ""}</div>`;
+    }
+    html += `<p style="font-size:13px;margin:0 0 6px;"><strong>Último respaldo enviado:</strong> ${b.lastSent ? esc(fmtBackupDate(b.lastSent.created_at))+" · "+esc(BACKUP_KIND_LABEL[b.lastSent.kind]||b.lastSent.kind)+" · "+fmtBackupBytes(b.lastSent.bytes) : "ninguno todavía"}</p>`;
+    html += `<p style="font-size:13px;margin:0 0 6px;"><strong>Programación:</strong> ${esc(b.schedule)}${b.recipient ? " → "+esc(b.recipient) : ""}</p>`;
+    if (!b.enabled) html += `<p class="muted" style="margin:0 0 6px;">El correo automático no está configurado: el respaldo semanal por correo está desactivado (la descarga manual sí funciona).</p>`;
+    if (b.history && b.history.length) {
+      html += `<details style="margin-top:8px;"><summary class="muted" style="cursor:pointer;">Historial reciente</summary>` +
+        b.history.map(h=>`<div style="font-size:12px;margin-top:6px;"><span class="badge" style="background:${BACKUP_STATUS_COLOR[h.status]||'#999'}">${BACKUP_STATUS_LABEL[h.status]||esc(h.status)}</span> ${esc(fmtBackupDate(h.created_at))} · ${esc(BACKUP_KIND_LABEL[h.kind]||h.kind)} ${fmtBackupBytes(h.bytes)}${h.error ? '<br><span class="muted">'+esc(h.error)+'</span>' : ""}</div>`).join("") + `</details>`;
+    }
+    box.innerHTML = html;
+  }
+  async function loadBackupStatus() {
+    try {
+      const res = await fetch("/admin/api/backup/status");
+      if (!res.ok) throw new Error();
+      renderBackupStatus(await res.json());
+    } catch (e) { document.getElementById("backupStatus").innerHTML = '<span class="muted">No se pudo cargar el estado del respaldo.</span>'; }
+  }
+  document.getElementById("btnBackupSend").addEventListener("click", async (e)=>{
+    const btn = e.currentTarget;
+    btn.disabled = true; btn.textContent = "Generando y enviando…";
+    try {
+      const res = await fetch("/admin/api/backup/send-now", { method:"POST" });
+      const data = await res.json();
+      if (!res.ok) alert(data.error || "No se pudo enviar el respaldo.");
+      if (data.backup) renderBackupStatus(data.backup); else await loadBackupStatus();
+    } catch (err) { alert("No se pudo enviar el respaldo."); }
+    btn.disabled = false; btn.textContent = "Enviar respaldo por correo ahora";
+  });
+  document.getElementById("btnBackupDownload").addEventListener("click", ()=>{ setTimeout(loadBackupStatus, 4000); });
+
   loadKpis();
   loadResults();
+  loadBackupStatus();
 </script>
 <script>
   // ═══════════════════════ Calendario real: Microsoft 365 (MSAL + Graph) ═══════════════════════

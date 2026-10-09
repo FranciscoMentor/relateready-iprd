@@ -385,4 +385,22 @@ for (const [col, ddl] of [["rep_name", "rep_name TEXT"], ["rep_email", "rep_emai
   try { db.exec(`ALTER TABLE test_invitations ADD COLUMN ${ddl}`); } catch (e) { /* ya existe */ }
 }
 
+// ── Migración: historial de respaldos (2026-10) ───────────────────────────
+// Cada intento de respaldo de la base de datos (el envío semanal automático
+// por correo, el envío manual desde el panel y las descargas manuales) deja
+// una fila aquí, para que el panel de control muestre el estado REAL del
+// último respaldo y avise si falló — ver services/backupService.js.
+//   kind:   'weekly' | 'manual' | 'download'
+//   status: 'sent' | 'failed' | 'too_large' | 'disabled' | 'downloaded'
+db.exec(`
+  CREATE TABLE IF NOT EXISTS backup_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    status TEXT NOT NULL,
+    bytes INTEGER,
+    error TEXT
+  );
+`);
+
 module.exports = db;
