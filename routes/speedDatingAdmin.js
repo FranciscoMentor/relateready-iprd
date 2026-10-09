@@ -5,7 +5,7 @@
 // el calendario de rondas), controlar el avance de rondas en vivo, y
 // consultar el informe de matching en cualquier momento — sin depender del
 // correo automático de 48h (services/speedDatingScheduler.js). Se monta en
-// server.js bajo /admin/speed-dating, protegido con el mismo requireAuth de
+// server.js bajo /admin/encuentros, protegido con el mismo requireAuth de
 // sesión que el resto del panel (ver routes/admin.js).
 
 const express = require("express");
@@ -117,7 +117,7 @@ function topbar() {
     <header class="topbar">
       <div class="brand" style="letter-spacing:.03em;">RelateReady <span style="color:${BRAND.light};font-weight:400;">· Encuentros</span></div>
       <nav>
-        <a href="/admin/speed-dating">Eventos</a>
+        <a href="/admin/encuentros">Eventos</a>
         <a href="/panel-control">Panel de control</a>
         <a href="/admin/logout">Cerrar sesión</a>
       </nav>
@@ -209,7 +209,7 @@ function renderAttendeeEditPage({ event, attendee, values, error }) {
     </div>
     <div class="card">
       ${error ? `<p style="color:${BRAND.clay};font-weight:700;margin:0 0 16px;">${esc(error)}</p>` : ""}
-      <form method="POST" action="/admin/speed-dating/${event.id}/attendees/${attendee.id}/editar" style="display:flex;flex-direction:column;gap:16px;">
+      <form method="POST" action="/admin/encuentros/${event.id}/attendees/${attendee.id}/editar" style="display:flex;flex-direction:column;gap:16px;">
         <label>Nombre<br><input type="text" name="name" value="${esc(values.name)}" style="width:100%;margin-top:4px;" required></label>
         <label>Correo<br><input type="text" name="email" value="${esc(values.email)}" style="width:100%;margin-top:4px;" required></label>
         <label>Teléfono/WhatsApp<br><input type="text" name="phone" value="${esc(values.phone)}" style="width:100%;margin-top:4px;" required></label>
@@ -227,7 +227,7 @@ function renderAttendeeEditPage({ event, attendee, values, error }) {
         </label>
         <div style="display:flex;gap:10px;margin-top:6px;">
           <button type="submit" class="btn">Guardar cambios</button>
-          <a href="/admin/speed-dating/${event.id}" class="btn ghost">Cancelar</a>
+          <a href="/admin/encuentros/${event.id}" class="btn ghost">Cancelar</a>
         </div>
       </form>
     </div>
@@ -269,7 +269,7 @@ function renderCreateForm(values = {}, error = null) {
     <div class="card">
       <h2 style="margin:0 0 14px;font-size:16px;">Crear nuevo evento</h2>
       ${error ? `<div style="background:#FBEAE7;border:1px solid ${BRAND.clay};color:${BRAND.clay};border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;">${esc(error)}</div>` : ""}
-      <form method="POST" action="/admin/speed-dating" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+      <form method="POST" action="/admin/encuentros" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
         <div><label class="muted" style="display:block;margin-bottom:4px;">Nombre</label><input type="text" name="name" value="${esc(v.name)}" placeholder="Ej. Encuentro RelateReady — 20 sep" required></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Fecha</label><input type="date" name="event_date" value="${esc(v.event_date)}"></div>
         <div><label class="muted" style="display:block;margin-bottom:4px;">Hora</label><input type="time" name="event_time" value="${esc(v.event_time)}" style="width:110px;"></div>
@@ -302,11 +302,11 @@ function sendEventsListPage(res, { values, error } = {}) {
       const m = counts.find((c) => c.gender === "M");
       const ageLabel = e.min_age && e.max_age ? `${e.min_age}–${e.max_age} años` : e.min_age ? `${e.min_age}+ años` : e.max_age ? `hasta ${e.max_age} años` : "";
       return `<tr>
-        <td><a href="/admin/speed-dating/${e.id}" style="color:${BRAND.ink};font-weight:700;text-decoration:none;">${esc(e.name)}</a><br><span class="muted">${esc(e.event_date) || "sin fecha"}${e.event_time ? ", " + esc(formatEventTimeEs(e.event_time)) : ""}${e.venue_name ? " · " + esc(e.venue_name) : ""}${ageLabel ? " · " + ageLabel : ""}</span></td>
+        <td><a href="/admin/encuentros/${e.id}" style="color:${BRAND.ink};font-weight:700;text-decoration:none;">${esc(e.name)}</a><br><span class="muted">${esc(e.event_date) || "sin fecha"}${e.event_time ? ", " + esc(formatEventTimeEs(e.event_time)) : ""}${e.venue_name ? " · " + esc(e.venue_name) : ""}${ageLabel ? " · " + ageLabel : ""}</span></td>
         <td><span class="badge" style="background:${STATUS_COLOR[e.status] || "#999"}">${STATUS_LABEL[e.status] || e.status}</span></td>
         <td>${w ? w.n : 0} mujeres · ${m ? m.n : 0} hombres</td>
         <td>${esc((e.created_at || "").slice(0, 16).replace("T", " "))}</td>
-        <td><a href="/admin/speed-dating/${e.id}" class="btn small">Abrir →</a></td>
+        <td><a href="/admin/encuentros/${e.id}" class="btn small">Abrir →</a></td>
       </tr>`;
     })
     .join("");
@@ -380,7 +380,7 @@ router.post("/", express.urlencoded({ extended: true }), (req, res) => {
     minAge,
     maxAge
   );
-  res.redirect(`/admin/speed-dating/${id}`);
+  res.redirect(`/admin/encuentros/${id}`);
 });
 
 // ── Dashboard de un evento ───────────────────────────────────────────────
@@ -480,7 +480,7 @@ router.get("/:eventId", (req, res) => {
   const attendeeRows = attendees
     .map((a) => {
       const mesa = a.cancelled_at ? "—" : (a.gender === "F" ? `Mesa fija ${a.table_number}` : `Posición de rotación ${a.seat_index + 1}`);
-      const asistenteUrl = `${baseUrl}/speed-dating/asistente.html?token=${a.vote_token}`;
+      const asistenteUrl = `${baseUrl}/encuentro/asistente.html?token=${a.vote_token}`;
       const waDigits = waPhoneDigits(a.phone);
       const waUrl = waDigits ? `https://wa.me/${waDigits}?text=${encodeURIComponent(buildWhatsappMessage({ attendee: a, event, asistenteUrl }))}` : null;
       const phoneLooksSuspicious = !!a.phone && !looksLikeValidEcuadorMobile(waDigits);
@@ -496,14 +496,14 @@ router.get("/:eventId", (req, res) => {
         <td>${mesa}</td>
         <td>${a.share_phone_consent ? "Sí" : "No"}</td>
         <td>${a.match_email_status ? `<span class="badge" style="background:${a.match_email_status === "sent" ? BRAND.green : BRAND.clay}">${a.match_email_status}</span>` : '<span class="muted">—</span>'}
-          ${event.status === "finalizado" ? `<form class="inline" method="POST" action="/admin/speed-dating/${event.id}/attendees/${a.id}/reenviar-correo"><button type="submit" class="btn small ghost" style="margin-top:4px;">Reenviar correo</button></form>` : ""}
+          ${event.status === "finalizado" ? `<form class="inline" method="POST" action="/admin/encuentros/${event.id}/attendees/${a.id}/reenviar-correo"><button type="submit" class="btn small ghost" style="margin-top:4px;">Reenviar correo</button></form>` : ""}
         </td>
         <td>
           <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
             <button type="button" class="btn small ghost" onclick="navigator.clipboard.writeText('${asistenteUrl}').then(()=>{this.textContent='Copiado ✓';setTimeout(()=>this.textContent='Copiar link',1200);})">Copiar link</button>
             ${waUrl ? `<a href="${waUrl}" target="_blank" rel="noopener" class="btn small ghost">Enviar por WhatsApp</a>` : ""}
-            <a href="/admin/speed-dating/${event.id}/attendees/${a.id}/editar" class="btn small ghost">Editar</a>
-            ${event.status === "registro" ? `<form class="inline" method="POST" action="/admin/speed-dating/${event.id}/attendees/${a.id}/eliminar" onsubmit="return confirm('¿Eliminar a ${esc(a.name).replace(/'/g, "\\'")} de este evento? Esta acción no se puede deshacer.');"><button type="submit" class="btn small danger">Eliminar</button></form>` : ""}
+            <a href="/admin/encuentros/${event.id}/attendees/${a.id}/editar" class="btn small ghost">Editar</a>
+            ${event.status === "registro" ? `<form class="inline" method="POST" action="/admin/encuentros/${event.id}/attendees/${a.id}/eliminar" onsubmit="return confirm('¿Eliminar a ${esc(a.name).replace(/'/g, "\\'")} de este evento? Esta acción no se puede deshacer.');"><button type="submit" class="btn small danger">Eliminar</button></form>` : ""}
           </div>
         </td>
       </tr>`;
@@ -521,7 +521,7 @@ router.get("/:eventId", (req, res) => {
         <td>
           <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
             ${waDigits ? `<button type="button" class="btn small ghost wl-whatsapp-btn" data-wl-name="${esc(entry.name).replace(/"/g, "&quot;")}" data-wl-phone="${waDigits}">Enviar por WhatsApp</button>` : '<span class="muted">Sin teléfono válido</span>'}
-            <form class="inline" method="POST" action="/admin/speed-dating/${event.id}/waitlist/${entry.id}/marcar-contactado">
+            <form class="inline" method="POST" action="/admin/encuentros/${event.id}/waitlist/${entry.id}/marcar-contactado">
               <button type="submit" class="btn small ${entry.contacted_at ? "" : "ghost"}">${entry.contacted_at ? "Contactado ✓" : "Marcar como contactado"}</button>
             </form>
           </div>
@@ -551,7 +551,7 @@ router.get("/:eventId", (req, res) => {
 <body>
   ${topbar()}
   <div class="container">
-    <p><a href="/admin/speed-dating" class="muted" style="text-decoration:none;">← Todos los eventos</a></p>
+    <p><a href="/admin/encuentros" class="muted" style="text-decoration:none;">← Todos los eventos</a></p>
     <div class="page-head">
       <span class="eyebrow">${eyebrowLabel}</span>
       <h1>${esc(event.name)}</h1>
@@ -569,12 +569,12 @@ router.get("/:eventId", (req, res) => {
       <h2 style="margin:0 0 6px;font-size:15px;">Registro por género</h2>
       <p class="muted" style="margin:0 0 12px;font-size:13px;">Cierra el registro de un género en cualquier momento (sin tocar el aforo ni el otro género) — quien intente registrarse mientras está cerrado se guarda en la lista de espera, igual que cuando se llena el 60% automático.</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <form method="POST" action="/admin/speed-dating/${event.id}/registro-genero">
+        <form method="POST" action="/admin/encuentros/${event.id}/registro-genero">
           <input type="hidden" name="gender" value="M">
           <input type="hidden" name="closed" value="${event.closed_men ? "0" : "1"}">
           <button type="submit" class="btn ${event.closed_men ? "ghost" : ""}">${event.closed_men ? "Reabrir registro de hombres" : "Cerrar registro de hombres"}</button>
         </form>
-        <form method="POST" action="/admin/speed-dating/${event.id}/registro-genero">
+        <form method="POST" action="/admin/encuentros/${event.id}/registro-genero">
           <input type="hidden" name="gender" value="F">
           <input type="hidden" name="closed" value="${event.closed_women ? "0" : "1"}">
           <button type="submit" class="btn ${event.closed_women ? "ghost" : ""}">${event.closed_women ? "Reabrir registro de mujeres" : "Cerrar registro de mujeres"}</button>
@@ -587,7 +587,7 @@ router.get("/:eventId", (req, res) => {
     <div class="card">
       <details>
         <summary style="cursor:pointer;font-size:15px;font-weight:700;color:${BRAND.ink};">✎ Editar evento</summary>
-        <form method="POST" action="/admin/speed-dating/${event.id}/editar" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px;">
+        <form method="POST" action="/admin/encuentros/${event.id}/editar" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px;">
           <div><label class="muted" style="display:block;margin-bottom:4px;">Nombre</label><input type="text" name="name" value="${esc(event.name)}" required></div>
           <div><label class="muted" style="display:block;margin-bottom:4px;">Fecha</label><input type="date" name="event_date" value="${esc(event.event_date || "")}"></div>
           <div><label class="muted" style="display:block;margin-bottom:4px;">Hora</label><input type="time" name="event_time" value="${esc(event.event_time || "")}" style="width:110px;"></div>
@@ -624,19 +624,19 @@ router.get("/:eventId", (req, res) => {
         : `<p style="margin:0 0 14px;color:${BRAND.green};font-size:13px;">✓ Todos los que tienen mesa esta ronda ya votaron.</p>`
       ) : ""}
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <form method="POST" action="/admin/speed-dating/${event.id}/iniciar">
+        <form method="POST" action="/admin/encuentros/${event.id}/iniciar">
           <button type="submit" class="btn" ${canIniciar ? "" : "disabled"}>Cerrar registro e iniciar evento</button>
         </form>
-        <form method="POST" action="/admin/speed-dating/${event.id}/cerrar-ronda" id="form-cerrar-ronda">
+        <form method="POST" action="/admin/encuentros/${event.id}/cerrar-ronda" id="form-cerrar-ronda">
           <button type="submit" class="btn" ${canCerrarRonda ? "" : "disabled"}>Cerrar ronda actual</button>
         </form>
-        <form method="POST" action="/admin/speed-dating/${event.id}/reabrir-ronda" onsubmit="return confirm('¿Reabrir la ronda actual? Esto deshace el cierre y vuelve a mostrar los botones de Sí/No a quien todavía no haya votado en esta ronda. Úsalo solo si cerraste la ronda antes de tiempo.');">
+        <form method="POST" action="/admin/encuentros/${event.id}/reabrir-ronda" onsubmit="return confirm('¿Reabrir la ronda actual? Esto deshace el cierre y vuelve a mostrar los botones de Sí/No a quien todavía no haya votado en esta ronda. Úsalo solo si cerraste la ronda antes de tiempo.');">
           <button type="submit" class="btn ghost" ${canReabrirRonda ? "" : "disabled"}>↩ Reabrir ronda actual</button>
         </form>
-        <form method="POST" action="/admin/speed-dating/${event.id}/siguiente-ronda">
+        <form method="POST" action="/admin/encuentros/${event.id}/siguiente-ronda">
           <button type="submit" class="btn" ${canSiguienteRonda ? "" : "disabled"}>${isLastTransition ? "Finalizar evento" : "Iniciar ronda siguiente"}</button>
         </form>
-        <form method="POST" action="/admin/speed-dating/${event.id}/finalizar" onsubmit="return confirm('¿Finalizar el evento ahora? Esto calculará los matches y cerrará las rondas restantes.');">
+        <form method="POST" action="/admin/encuentros/${event.id}/finalizar" onsubmit="return confirm('¿Finalizar el evento ahora? Esto calculará los matches y cerrará las rondas restantes.');">
           <button type="submit" class="btn danger" ${canFinalizar ? "" : "disabled"}>Finalizar evento ahora</button>
         </form>
       </div>
@@ -674,14 +674,14 @@ router.get("/:eventId", (req, res) => {
     <div class="card">
       <h2 style="margin:0 0 12px;font-size:15px;">Informe de matching inmediato</h2>
       <p class="muted" style="margin:0 0 12px;">Disponible en cualquier momento, incluso a mitad del evento — no depende del correo automático de 48h.</p>
-      <a href="/admin/speed-dating/${event.id}/reporte" class="btn ghost">Ver informe de matching →</a>
+      <a href="/admin/encuentros/${event.id}/reporte" class="btn ghost">Ver informe de matching →</a>
     </div>
 
     ${event.status === "finalizado" ? `
     <div class="card">
       <h2 style="margin:0 0 6px;font-size:15px;">Enviar resultados de matching ahora</h2>
       <p class="muted" style="margin:0 0 12px;">El correo de resultados (quién tuvo match) se envía automáticamente 48 horas después de finalizar el evento, para dar tiempo a cargar votos de respaldo en papel si hiciera falta. Este botón es para un caso puntual: envía el correo de inmediato a quien todavía no lo haya recibido, sin esperar las 48h — pensado para usarse evento por evento, no para cambiar el tiempo de espera de todos los eventos futuros.${missingVotesCount > 0 ? ` <strong style="color:${BRAND.clay};">Atención: todavía faltan ${missingVotesCount} voto(s) de respaldo por cargar en este evento — si envías ahora, esos votos no se van a contar en los matches de hoy.</strong>` : ""}</p>
-      <form method="POST" action="/admin/speed-dating/${event.id}/enviar-resultados-ahora" onsubmit="return confirm(${JSON.stringify(
+      <form method="POST" action="/admin/encuentros/${event.id}/enviar-resultados-ahora" onsubmit="return confirm(${JSON.stringify(
         (missingVotesCount > 0
           ? `Atención: todavía faltan ${missingVotesCount} voto(s) de respaldo por cargar — si envías ahora, esos votos no se van a contar.\n\n`
           : "") +
@@ -694,20 +694,20 @@ router.get("/:eventId", (req, res) => {
     <div class="card">
       <h2 style="margin:0 0 6px;font-size:15px;">Completar votos de respaldo (tarjetas de papel)</h2>
       <p class="muted" style="margin:0 0 12px;">Si en alguna ronda se usaron las tarjetas físicas de Sí/No como respaldo (o algún voto del celular no alcanzó a registrarse), aquí puedes cargarlos manualmente. Solo se piden los votos que todavía faltan — los que ya están registrados desde el celular no se tocan — y al guardar se recalculan automáticamente los matches, incluyendo los que falten por el correo de 48h.</p>
-      <a href="/admin/speed-dating/${event.id}/completar-votos" class="btn ghost">Completar votos faltantes →</a>
+      <a href="/admin/encuentros/${event.id}/completar-votos" class="btn ghost">Completar votos faltantes →</a>
     </div>
 
     <div class="card">
       <h2 style="margin:0 0 6px;font-size:15px;">Encuesta de satisfacción</h2>
       <p class="muted" style="margin:0 0 12px;">Se envía automáticamente por correo la mañana siguiente al evento, antes del mediodía (hora de Ecuador) — evalúa registro, rondas, lugar y organización, más una recomendación. No pregunta por matches (esos salen 48h después).</p>
-      <a href="/admin/speed-dating/${event.id}/encuesta-resultados" class="btn ghost">Ver resultados de la encuesta →</a>
+      <a href="/admin/encuentros/${event.id}/encuesta-resultados" class="btn ghost">Ver resultados de la encuesta →</a>
     </div>
 
     ${event.status === "finalizado" ? `
     <div class="card">
       <h2 style="margin:0 0 6px;font-size:15px;">Recordatorio de encuesta</h2>
       <p class="muted" style="margin:0 0 12px;">Envía un segundo correo a quien asistió y todavía no contestó la encuesta, pidiéndole que la complete y recordándole que el código VIP del Informe Extendido vence en 3 días (quien ya tiene su informe completo no ve ese recuadro). Si alguien ya recibió este recordatorio, no se le vuelve a enviar. Personas que lo recibirían ahora: <strong>${surveyReminderPending}</strong>.</p>
-      <form method="POST" action="/admin/speed-dating/${event.id}/enviar-recordatorio-encuesta" onsubmit="return confirm('¿Enviar el recordatorio de la encuesta a ${surveyReminderPending} persona(s) que todavía no la han contestado? Esta acción no se puede deshacer.');">
+      <form method="POST" action="/admin/encuentros/${event.id}/enviar-recordatorio-encuesta" onsubmit="return confirm('¿Enviar el recordatorio de la encuesta a ${surveyReminderPending} persona(s) que todavía no la han contestado? Esta acción no se puede deshacer.');">
         <button type="submit" class="btn small" ${surveyReminderPending === 0 ? "disabled" : ""}>Enviar recordatorio de encuesta</button>
       </form>
     </div>` : ""}
@@ -715,7 +715,7 @@ router.get("/:eventId", (req, res) => {
     <div class="card">
       <h2 style="margin:0 0 6px;font-size:15px;">Reenviar recordatorio de 1 día antes</h2>
       <p class="muted" style="margin:0 0 12px;">Botón de emergencia: vuelve a enviar el recordatorio de 1 día antes a todos los asistentes activos con correo, con una nota de disculpa aclarando la fecha real del evento. Úsalo solo si el automático salió a la hora o el día equivocado.</p>
-      <form method="POST" action="/admin/speed-dating/${event.id}/reenviar-recordatorio-1d" onsubmit="return confirm('¿Reenviar el recordatorio de 1 día (con nota de disculpa) a todos los asistentes activos de este evento?');">
+      <form method="POST" action="/admin/encuentros/${event.id}/reenviar-recordatorio-1d" onsubmit="return confirm('¿Reenviar el recordatorio de 1 día (con nota de disculpa) a todos los asistentes activos de este evento?');">
         <button type="submit" class="btn small ghost">Reenviar recordatorio de 1 día (corregido) ⚠</button>
       </form>
     </div>
@@ -723,7 +723,7 @@ router.get("/:eventId", (req, res) => {
     <div class="card">
       <h2 style="margin:0 0 6px;font-size:15px;">Enviar recordatorio del mismo día</h2>
       <p class="muted" style="margin:0 0 12px;">Manda ahora mismo un recordatorio extra a todos los asistentes activos con correo que todavía no lo hayan recibido — mismos datos del evento (fecha, lugar, mesa, celular cargado), sin la nota de disculpa, y con un aviso para que tengan el correo a la mano y entren con el botón apenas empiece el evento. Úsalo el mismo día, unas horas antes.</p>
-      <form method="POST" action="/admin/speed-dating/${event.id}/recordatorio-mismo-dia" onsubmit="return confirm('¿Enviar el recordatorio del mismo día a todos los asistentes activos de este evento?');">
+      <form method="POST" action="/admin/encuentros/${event.id}/recordatorio-mismo-dia" onsubmit="return confirm('¿Enviar el recordatorio del mismo día a todos los asistentes activos de este evento?');">
         <button type="submit" class="btn small">Enviar recordatorio del mismo día</button>
       </form>
     </div>
@@ -731,7 +731,7 @@ router.get("/:eventId", (req, res) => {
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
         <h2 style="margin:0;font-size:15px;">Asistentes (${activeAttendees.length}${attendees.length !== activeAttendees.length ? ` · ${attendees.length - activeAttendees.length} canceló su cupo` : ""})</h2>
-        <a href="/admin/speed-dating/${event.id}/exportar" class="btn small ghost">Exportar a Excel ⬇</a>
+        <a href="/admin/encuentros/${event.id}/exportar" class="btn small ghost">Exportar a Excel ⬇</a>
       </div>
       <table>
         <thead><tr><th>Persona</th><th>Género</th><th>Mesa</th><th>Autorizó WhatsApp</th><th>Correo de resultados</th><th></th></tr></thead>
@@ -811,7 +811,7 @@ router.post("/:eventId/editar", express.urlencoded({ extended: true }), (req, re
     `UPDATE sd_events SET name = ?, event_date = ?, event_time = ?, capacity = ?, venue_name = ?, venue_address = ?, round_questions = ?, min_age = ?, max_age = ? WHERE id = ?`
   ).run(name, eventDate, eventTime, capacity, venueName, venueAddress, roundQuestions, minAge, maxAge, event.id);
 
-  res.redirect(`/admin/speed-dating/${event.id}`);
+  res.redirect(`/admin/encuentros/${event.id}`);
 });
 
 // POST /:eventId/registro-genero — cierra o reabre el registro público de
@@ -831,7 +831,7 @@ router.post("/:eventId/registro-genero", express.urlencoded({ extended: true }),
     db.prepare("UPDATE sd_events SET closed_women = ? WHERE id = ?").run(closed, event.id);
   }
 
-  res.redirect(`/admin/speed-dating/${event.id}`);
+  res.redirect(`/admin/encuentros/${event.id}`);
 });
 
 // ── Editar asistente: corrige datos de contacto, edad o género de un
@@ -910,7 +910,7 @@ router.post("/:eventId/attendees/:attendeeId/editar", express.urlencoded({ exten
     renumberGender(event.id, values.gender);
   }
 
-  res.redirect(`/admin/speed-dating/${event.id}`);
+  res.redirect(`/admin/encuentros/${event.id}`);
 });
 
 // ── Eliminar asistente: solo mientras el evento sigue en "registro" — una
@@ -921,7 +921,7 @@ router.post("/:eventId/attendees/:attendeeId/eliminar", (req, res) => {
   const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
   if (!event) return res.status(404).send("Evento no encontrado.");
   if (event.status !== "registro") {
-    return res.redirect(`/admin/speed-dating/${event.id}`);
+    return res.redirect(`/admin/encuentros/${event.id}`);
   }
   const attendee = db.prepare("SELECT * FROM sd_attendees WHERE id = ? AND event_id = ?").get(req.params.attendeeId, event.id);
   if (!attendee) return res.status(404).send("Asistente no encontrado.");
@@ -929,7 +929,7 @@ router.post("/:eventId/attendees/:attendeeId/eliminar", (req, res) => {
   db.prepare("DELETE FROM sd_attendees WHERE id = ?").run(attendee.id);
   renumberGender(event.id, attendee.gender);
 
-  res.redirect(`/admin/speed-dating/${event.id}`);
+  res.redirect(`/admin/encuentros/${event.id}`);
 });
 
 // ── Marcar/desmarcar a alguien de la lista de espera como ya contactado —
@@ -947,13 +947,13 @@ router.post("/:eventId/waitlist/:waitlistId/marcar-contactado", (req, res) => {
     entry.id
   );
 
-  res.redirect(`/admin/speed-dating/${event.id}`);
+  res.redirect(`/admin/encuentros/${event.id}`);
 });
 
 // ── Iniciar evento: cierra registro y genera el calendario de rondas ────
 router.post("/:eventId/iniciar", (req, res) => {
   const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
-  if (!event || event.status !== "registro") return res.redirect(`/admin/speed-dating/${req.params.eventId}`);
+  if (!event || event.status !== "registro") return res.redirect(`/admin/encuentros/${req.params.eventId}`);
 
   const attendees = db
     .prepare("SELECT * FROM sd_attendees WHERE event_id = ? AND cancelled_at IS NULL ORDER BY seat_index ASC")
@@ -961,7 +961,7 @@ router.post("/:eventId/iniciar", (req, res) => {
   const women = attendees.filter((a) => a.gender === "F");
   const men = attendees.filter((a) => a.gender === "M");
 
-  if (!women.length && !men.length) return res.redirect(`/admin/speed-dating/${event.id}`);
+  if (!women.length && !men.length) return res.redirect(`/admin/encuentros/${event.id}`);
 
   const { totalRounds, pairings } = generateSchedule(women, men);
 
@@ -978,14 +978,14 @@ router.post("/:eventId/iniciar", (req, res) => {
   });
   tx(pairings);
 
-  res.redirect(`/admin/speed-dating/${event.id}`);
+  res.redirect(`/admin/encuentros/${event.id}`);
 });
 
 router.post("/:eventId/cerrar-ronda", (req, res) => {
   db.prepare(
     `UPDATE sd_events SET round_state = 'cambio_de_mesa' WHERE id = ? AND status = 'en_curso' AND round_state = 'ronda_activa'`
   ).run(req.params.eventId);
-  res.redirect(`/admin/speed-dating/${req.params.eventId}`);
+  res.redirect(`/admin/encuentros/${req.params.eventId}`);
 });
 
 // Deshace un "Cerrar ronda actual" presionado por error. Solo funciona
@@ -996,14 +996,14 @@ router.post("/:eventId/reabrir-ronda", (req, res) => {
   db.prepare(
     `UPDATE sd_events SET round_state = 'ronda_activa' WHERE id = ? AND status = 'en_curso' AND round_state = 'cambio_de_mesa'`
   ).run(req.params.eventId);
-  res.redirect(`/admin/speed-dating/${req.params.eventId}`);
+  res.redirect(`/admin/encuentros/${req.params.eventId}`);
 });
 
 router.post("/:eventId/siguiente-ronda", (req, res) => {
   const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
-  if (!event || event.status !== "en_curso") return res.redirect(`/admin/speed-dating/${req.params.eventId}`);
+  if (!event || event.status !== "en_curso") return res.redirect(`/admin/encuentros/${req.params.eventId}`);
   if (event.round_state !== "esperando_inicio" && event.round_state !== "cambio_de_mesa") {
-    return res.redirect(`/admin/speed-dating/${event.id}`);
+    return res.redirect(`/admin/encuentros/${event.id}`);
   }
 
   if (event.round_state === "cambio_de_mesa" && event.current_round_number >= (event.total_rounds || 0)) {
@@ -1011,7 +1011,7 @@ router.post("/:eventId/siguiente-ronda", (req, res) => {
   } else {
     db.prepare(`UPDATE sd_events SET round_state = 'ronda_activa', current_round_number = current_round_number + 1 WHERE id = ?`).run(event.id);
   }
-  res.redirect(`/admin/speed-dating/${event.id}`);
+  res.redirect(`/admin/encuentros/${event.id}`);
 });
 
 function finalizeEvent(eventId) {
@@ -1024,7 +1024,7 @@ function finalizeEvent(eventId) {
 router.post("/:eventId/finalizar", (req, res) => {
   const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
   if (event && event.status === "en_curso") finalizeEvent(event.id);
-  res.redirect(`/admin/speed-dating/${req.params.eventId}`);
+  res.redirect(`/admin/encuentros/${req.params.eventId}`);
 });
 
 // ── Completar votos de respaldo (tarjetas de papel) ─────────────────────
@@ -1118,7 +1118,7 @@ router.get("/:eventId/completar-votos", (req, res) => {
 <body>
   ${topbar()}
   <div class="container">
-    <p><a href="/admin/speed-dating/${event.id}" class="muted" style="text-decoration:none;">← Volver al evento</a></p>
+    <p><a href="/admin/encuentros/${event.id}" class="muted" style="text-decoration:none;">← Volver al evento</a></p>
     <div class="page-head">
       <span class="eyebrow">Votos de respaldo</span>
       <h1>${esc(event.name)} — <span class="accent-word">completar votos faltantes</span></h1>
@@ -1130,7 +1130,7 @@ router.get("/:eventId/completar-votos", (req, res) => {
     <div class="card">
       <p style="margin:0;">Votos pendientes en total: <strong>${missingTotal}</strong>${missingTotal === 0 ? " — ya no falta nada 🎉" : ""}</p>
     </div>
-    ${missingTotal > 0 ? `<form method="POST" action="/admin/speed-dating/${event.id}/completar-votos">
+    ${missingTotal > 0 ? `<form method="POST" action="/admin/encuentros/${event.id}/completar-votos">
       ${roundsHtml}
       <button type="submit" class="btn" style="margin-top:4px;">Guardar votos</button>
     </form>` : ""}
@@ -1172,7 +1172,7 @@ router.post("/:eventId/completar-votos", express.urlencoded({ extended: true }),
   persistMatches(event.id);
   const afterCount = db.prepare("SELECT COUNT(*) AS c FROM sd_matches WHERE event_id = ?").get(event.id).c;
 
-  res.redirect(`/admin/speed-dating/${event.id}/completar-votos?guardado=${savedCount}&nuevos=${afterCount - beforeCount}`);
+  res.redirect(`/admin/encuentros/${event.id}/completar-votos?guardado=${savedCount}&nuevos=${afterCount - beforeCount}`);
 });
 
 // ── Informe de matching inmediato (disponible en cualquier momento) ─────
@@ -1198,7 +1198,7 @@ router.get("/:eventId/reporte", (req, res) => {
 <body>
   ${topbar()}
   <div class="container">
-    <p><a href="/admin/speed-dating/${event.id}" class="muted" style="text-decoration:none;">← Volver al evento</a></p>
+    <p><a href="/admin/encuentros/${event.id}" class="muted" style="text-decoration:none;">← Volver al evento</a></p>
     <div class="page-head">
       <span class="eyebrow">Informe de matching</span>
       <h1>${esc(event.name)} — <span class="accent-word">matches en vivo</span></h1>
@@ -1324,7 +1324,7 @@ router.get("/:eventId/exportar", async (req, res) => {
 router.post("/:eventId/attendees/:attendeeId/reenviar-correo", async (req, res) => {
   const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(req.params.eventId);
   const attendee = db.prepare("SELECT * FROM sd_attendees WHERE id = ? AND event_id = ?").get(req.params.attendeeId, req.params.eventId);
-  const backTo = `/admin/speed-dating/${req.params.eventId}`;
+  const backTo = `/admin/encuentros/${req.params.eventId}`;
   if (!event || !attendee || !attendee.email) return res.redirect(backTo);
 
   const isWoman = attendee.gender === "F";
@@ -1366,7 +1366,7 @@ router.post("/:eventId/attendees/:attendeeId/reenviar-correo", async (req, res) 
 // NULL — así que es seguro usarlo aunque el automático de 48h ya haya
 // corrido antes, o si se presiona el botón más de una vez.
 router.post("/:eventId/enviar-resultados-ahora", async (req, res) => {
-  const backTo = `/admin/speed-dating/${req.params.eventId}`;
+  const backTo = `/admin/encuentros/${req.params.eventId}`;
   try {
     await speedDatingScheduler.sendMatchResultsForEvent(req.params.eventId);
   } catch (err) {
@@ -1382,7 +1382,7 @@ router.post("/:eventId/enviar-resultados-ahora", async (req, res) => {
 // 2026-09-30). Resetea la marca de envío y reenvía de inmediato con nota
 // de disculpa.
 router.post("/:eventId/reenviar-recordatorio-1d", async (req, res) => {
-  const backTo = `/admin/speed-dating/${req.params.eventId}`;
+  const backTo = `/admin/encuentros/${req.params.eventId}`;
   try {
     await speedDatingReminderScheduler.resendReminder1dCorrected(req.params.eventId);
   } catch (err) {
@@ -1396,7 +1396,7 @@ router.post("/:eventId/reenviar-recordatorio-1d", async (req, res) => {
 // .js): no es automático, Francisco lo dispara a mano el mismo día del
 // evento, típicamente unas horas antes.
 router.post("/:eventId/recordatorio-mismo-dia", async (req, res) => {
-  const backTo = `/admin/speed-dating/${req.params.eventId}`;
+  const backTo = `/admin/encuentros/${req.params.eventId}`;
   try {
     await speedDatingReminderScheduler.sendSameDayReminder(req.params.eventId);
   } catch (err) {
@@ -1410,7 +1410,7 @@ router.post("/:eventId/recordatorio-mismo-dia", async (req, res) => {
 // no ha contestado la encuesta (ver sendSurveyReminderForEvent en
 // services/speedDatingSurveyScheduler.js).
 router.post("/:eventId/enviar-recordatorio-encuesta", async (req, res) => {
-  const backTo = `/admin/speed-dating/${req.params.eventId}`;
+  const backTo = `/admin/encuentros/${req.params.eventId}`;
   try {
     await speedDatingSurveyScheduler.sendSurveyReminderForEvent(req.params.eventId);
   } catch (err) {
@@ -1499,7 +1499,7 @@ router.get("/:eventId/encuesta-resultados", (req, res) => {
 <body>
   ${topbar()}
   <div class="container">
-    <p><a href="/admin/speed-dating/${event.id}" class="muted" style="text-decoration:none;">← Volver al evento</a></p>
+    <p><a href="/admin/encuentros/${event.id}" class="muted" style="text-decoration:none;">← Volver al evento</a></p>
     <div class="page-head">
       <span class="eyebrow">Encuesta de satisfacción</span>
       <h1>${esc(event.name)} — <span class="accent-word">cómo les fue</span></h1>

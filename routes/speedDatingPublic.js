@@ -201,7 +201,7 @@ router.post("/events/:eventId/registro", (req, res) => {
   // correo de resultados de 48h).
   try {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
-    const asistenteUrl = `${baseUrl}/speed-dating/asistente.html?token=${voteToken}`;
+    const asistenteUrl = `${baseUrl}/encuentro/asistente.html?token=${voteToken}`;
     const { subject, html } = speedDatingWelcomeEmail({
       name: name.trim(),
       lang: "es",

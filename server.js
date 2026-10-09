@@ -56,7 +56,21 @@ app.use("/admin", adminRoutes);
 // panel, ver routes/admin.js) y endpoints públicos del celular de cada
 // asistente bajo /api/speed-dating (sin login, protegidos por el
 // vote_token de cada persona en vez de una cuenta — ver routes/speedDatingPublic.js).
-app.use("/admin/speed-dating", adminRoutes.requireAuth, speedDatingAdminRoutes);
+// Direcciones nuevas (2026-10, nombre "Encuentro RelateReady"): panel en
+// /admin/encuentros y páginas públicas en /encuentro/. Las direcciones viejas
+// (/admin/speed-dating y /speed-dating/...) siguen funcionando: redirigen a
+// las nuevas conservando todo lo que viene después, incluido el token
+// personal (?token=...) de los enlaces ya enviados por correo.
+app.use("/admin/speed-dating", (req, res) => {
+  res.redirect(req.method === "GET" || req.method === "HEAD" ? 301 : 308, "/admin/encuentros" + req.url);
+});
+app.use("/speed-dating", (req, res) => {
+  const newPath = req.url === "/speed-dating.css" || req.url.startsWith("/speed-dating.css?")
+    ? req.url.replace("/speed-dating.css", "/encuentro.css")
+    : req.url;
+  res.redirect(301, "/encuentro" + newPath);
+});
+app.use("/admin/encuentros", adminRoutes.requireAuth, speedDatingAdminRoutes);
 app.use("/api/speed-dating", speedDatingPublicRoutes);
 
 // Link corto y fácil de compartir para el registro de un evento —
@@ -65,7 +79,7 @@ app.use("/api/speed-dating", speedDatingPublicRoutes);
 // /admin/speed-dating/:id) es "…/evento/<id>" en vez de la ruta interna del
 // archivo estático.
 app.get("/evento/:eventId", (req, res) => {
-  res.redirect(`/speed-dating/registro.html?evento=${encodeURIComponent(req.params.eventId)}`);
+  res.redirect(`/encuentro/registro.html?evento=${encodeURIComponent(req.params.eventId)}`);
 });
 
 // Panel de control completo (KPIs, resultados con detalle por persona,

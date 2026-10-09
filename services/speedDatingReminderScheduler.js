@@ -88,7 +88,7 @@ async function sendReminderToEvent(event, { column, buildEmail, extraEmailOption
   const testUrl = `${baseUrl()}/`;
 
   for (const attendee of attendees) {
-    const asistenteUrl = `${baseUrl()}/speed-dating/asistente.html?token=${attendee.vote_token}`;
+    const asistenteUrl = `${baseUrl()}/encuentro/asistente.html?token=${attendee.vote_token}`;
     const { subject, html } = buildEmail({
       name: attendee.name,
       eventName: event.name,

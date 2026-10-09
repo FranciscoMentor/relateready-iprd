@@ -72,7 +72,7 @@ async function runOnce() {
       .all(event.id);
 
     for (const attendee of attendees) {
-      const surveyUrl = `${baseUrl()}/speed-dating/encuesta.html?token=${attendee.vote_token}`;
+      const surveyUrl = `${baseUrl()}/encuentro/encuesta.html?token=${attendee.vote_token}`;
       const { subject, html } = speedDatingSurveyEmail({
         name: attendee.name,
         eventName: event.name,
@@ -149,7 +149,7 @@ async function sendSurveyReminderForEvent(eventId, { vipDeadlineText = "en 3 dí
       eventName: event.name,
       eventDate: event.event_date,
       venueName: event.venue_name,
-      surveyUrl: `${baseUrl()}/speed-dating/encuesta.html?token=${attendee.vote_token}`,
+      surveyUrl: `${baseUrl()}/encuentro/encuesta.html?token=${attendee.vote_token}`,
       vipMode,
       vipUrl,
       vipDeadlineText,
