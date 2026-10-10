@@ -27,7 +27,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
 <body class="sd-body">
   <div class="sd-wrap">
     <div class="sd-brand-row">
-      <img src="/assets/relateready-logo-crop.png" alt="RelateReady">
+      <img src="/assets/encuentros-relateready-logo.png" alt="Encuentros RelateReady" style="height:auto;max-height:52px;max-width:calc(100% - 90px);">
       <span class="sd-code-chip">Registro</span>
     </div>
 
@@ -41,6 +41,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
 
     <form id="registro-form" class="sd-hidden">
       <p class="sd-prompt" id="evento-nombre" style="font-size:19px;"></p>
+      <p class="sd-prompt" id="evento-fecha" style="font-size:19px;margin-top:0;display:none;"></p>
       <p class="sd-subtext" id="evento-lugar" style="display:none;"></p>
       <p class="sd-subtext" id="evento-edad" style="display:none;"></p>
       <p class="sd-subtext" id="form-intro">Completa tus datos para asignarte tu mesa (si eres mujer) o tu ronda de citas (si eres hombre).</p>
@@ -120,6 +121,27 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
   let soldOut = false;
   let generoAbierto = { F: true, M: true };
 
+  // "2026-10-17" -> "Sábado 17 de octubre" y "20:00" (lo que guardan
+  // sd_events.event_date / event_time) -> "8:00 p.m.". Misma lógica que
+  // asistente.html; si el evento no tiene fecha (eventos viejos) no se muestra.
+  function formatEventWhen(dateStr, timeStr) {
+    const parts = [];
+    if (dateStr) {
+      const d = new Date(`${dateStr}T00:00:00`);
+      if (!Number.isNaN(d.getTime())) {
+        const s = d.toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long' }).replace(',', '');
+        parts.push(s.charAt(0).toUpperCase() + s.slice(1));
+      }
+    }
+    if (timeStr) {
+      const [h, m] = timeStr.split(':').map(Number);
+      if (!Number.isNaN(h) && !Number.isNaN(m)) {
+        parts.push(`${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h >= 12 ? 'p.m.' : 'a.m.'}`);
+      }
+    }
+    return parts.join(' · ');
+  }
+
   function updateGenderNote() {
     const note = document.getElementById('gender-note');
     if (!soldOut && generoAbierto[gender] === false) {
@@ -168,6 +190,13 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       document.getElementById('evento-nombre').textContent = soldOut
         ? `${data.name} ya agotó su cupo`
         : `Bienvenida a ${data.name}`;
+      const cuando = formatEventWhen(data.eventDate, data.eventTime);
+      if (cuando) {
+        const fechaEl = document.getElementById('evento-fecha');
+        fechaEl.textContent = cuando;
+        fechaEl.style.display = '';
+        document.getElementById('evento-nombre').style.marginBottom = '0';
+      }
       document.getElementById('form-intro').textContent = soldOut
         ? 'Se agotaron los cupos para este evento, pero puedes dejarnos tus datos: te escribiremos por WhatsApp apenas tengamos fecha para el próximo. 🙌'
         : 'Completa tus datos para asignarte tu mesa (si eres mujer) o tu ronda de citas (si eres hombre).';

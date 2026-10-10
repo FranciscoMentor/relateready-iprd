@@ -79,6 +79,8 @@ router.get("/events/:eventId/meta", (req, res) => {
     venueAddress: event.venue_address || null,
     minAge: event.min_age || null,
     maxAge: event.max_age || null,
+    eventDate: event.event_date || null,
+    eventTime: event.event_time || null,
   });
 });
 
