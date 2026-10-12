@@ -215,3 +215,37 @@ body.sd-body {
 
 .sd-survey-thanks { text-align: center; padding: 30px 0; }
 .sd-survey-thanks .emoji { font-size: 44px; margin-bottom: 10px; }
+
+
+/* ── Registro: campo de edad (2026-10) ───────────────────────────────────
+   Campo de edad más ancho con "años" al lado, el rango permitido del evento
+   justo debajo de la etiqueta y el aviso de edad no permitida junto al
+   campo (antes salía como error al final, después de enviar). */
+.sd-field-hint { font-size: 16px; font-weight: 700; color: var(--accent-dark, var(--accent)); margin: -2px 0 10px; line-height: 1.4; }
+.sd-age-row { display: flex; align-items: center; gap: 10px; }
+.sd-age-row input[type="text"] { width: 120px; flex: 0 0 120px; font-size: 18px; font-weight: 600; text-align: center; }
+.sd-age-suffix { font-size: 16px; font-weight: 600; color: var(--muted); }
+.sd-field-error { font-size: 13.5px; font-weight: 600; color: var(--clay); margin: 8px 0 0; line-height: 1.4; }
+input.sd-invalid { border-color: var(--clay) !important; background: #FBEAE7 !important; }
+
+/* ── Confirmación "Ya estás dentro" (2026-10) ────────────────────────────
+   Tarjeta con fecha, hora, lugar y mesa en filas legibles, y el aviso de que
+   la confirmación también se envió por correo. */
+.sd-confirm-intro { max-width: 320px !important; font-size: 15px !important; line-height: 1.5; color: var(--ink) !important; }
+.sd-info-card {
+  width: 100%; background: #fff; border: 1px solid var(--border, #DDD6CE); border-radius: 16px;
+  padding: 6px 18px; text-align: left; margin-top: 4px;
+}
+.sd-info-row { padding: 13px 0; border-bottom: 1px solid var(--light); }
+.sd-info-row:last-child { border-bottom: none; }
+.sd-info-row .k { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-dark, var(--accent)); margin: 0 0 3px; }
+.sd-info-row .v { font-size: 16.5px; font-weight: 700; color: var(--ink); margin: 0; line-height: 1.35; }
+.sd-info-row .v2 { font-size: 13.5px; color: var(--muted); margin: 2px 0 0; line-height: 1.45; }
+.sd-center-col .sd-info-card p { max-width: none; }
+.sd-mail-note {
+  width: 100%; display: flex; gap: 11px; align-items: flex-start; text-align: left;
+  background: var(--accent-soft); border-radius: 14px; padding: 13px 15px;
+}
+.sd-mail-note svg { width: 22px; height: 22px; flex: 0 0 22px; color: var(--accent-dark, var(--accent)); margin-top: 1px; }
+.sd-center-col .sd-mail-note p { max-width: none; font-size: 13.5px; color: var(--ink); line-height: 1.5; }
+.sd-countdown { font-family: Georgia, "Times New Roman", serif; font-size: 17px !important; color: var(--ink) !important; font-weight: 700; }

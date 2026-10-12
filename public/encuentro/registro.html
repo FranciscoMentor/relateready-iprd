@@ -39,28 +39,32 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       <div class="sd-error-banner" id="error-text"></div>
     </div>
 
-    <form id="registro-form" class="sd-hidden">
+    <form id="registro-form" class="sd-hidden" autocomplete="off">
       <p class="sd-prompt" id="evento-nombre" style="font-size:19px;"></p>
       <p class="sd-prompt" id="evento-fecha" style="font-size:19px;margin-top:0;display:none;"></p>
       <p class="sd-subtext" id="evento-lugar" style="display:none;"></p>
-      <p class="sd-subtext" id="evento-edad" style="display:none;"></p>
       <p class="sd-subtext" id="form-intro">Completa tus datos para asignarte tu mesa (si eres mujer) o tu ronda de citas (si eres hombre).</p>
 
       <div class="field">
         <label>Nombre completo</label>
-        <input type="text" id="f-name" required>
+        <input type="text" id="f-name" required autocomplete="off" autocapitalize="words" spellcheck="false">
       </div>
       <div class="field">
         <label>Teléfono (WhatsApp)</label>
-        <input type="tel" id="f-phone" placeholder="+593 99 123 4567" required>
+        <input type="text" inputmode="tel" id="f-phone" placeholder="+593 99 123 4567" required autocomplete="off" autocorrect="off" spellcheck="false">
       </div>
       <div class="field">
         <label>Correo</label>
-        <input type="email" id="f-email" required>
+        <input type="text" inputmode="email" id="f-email" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
       </div>
       <div class="field">
-        <label>Edad</label>
-        <input type="number" id="f-age" min="1" max="120" required>
+        <label for="f-age">Edad</label>
+        <p class="sd-field-hint sd-hidden" id="age-hint"></p>
+        <div class="sd-age-row">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" id="f-age" required autocomplete="off" aria-describedby="age-hint age-error">
+          <span class="sd-age-suffix">años</span>
+        </div>
+        <p class="sd-field-error sd-hidden" id="age-error" role="alert"></p>
       </div>
       <div class="field">
         <label>Género</label>
@@ -120,6 +124,43 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
   let consent = 1;
   let soldOut = false;
   let generoAbierto = { F: true, M: true };
+  let minAge = null;
+  let maxAge = null;
+
+  // "de 25 a 45 años" / "de 25 años en adelante" / "hasta 45 años"
+  function ageRangeLabel() {
+    if (minAge && maxAge) return `de ${minAge} a ${maxAge} años`;
+    if (minAge) return `de ${minAge} años en adelante`;
+    if (maxAge) return `hasta ${maxAge} años`;
+    return '';
+  }
+
+  // Valida la edad escrita contra el rango del evento. Devuelve true si se
+  // puede continuar; si no, muestra el mensaje junto al campo (no al final).
+  function checkAge() {
+    const input = document.getElementById('f-age');
+    const errEl = document.getElementById('age-error');
+    const raw = input.value.trim();
+    const age = Number(raw);
+    let msg = '';
+    if (!raw || !Number.isInteger(age) || age < 1) {
+      msg = 'Escribe tu edad en números.';
+    } else if ((minAge && age < minAge) || (maxAge && age > maxAge)) {
+      msg = `No puedes registrarte con esa edad: este evento es para personas ${ageRangeLabel()}.`;
+    }
+    errEl.textContent = msg;
+    errEl.classList.toggle('sd-hidden', !msg);
+    input.classList.toggle('sd-invalid', !!msg);
+    return !msg;
+  }
+  const ageInput = document.getElementById('f-age');
+  ageInput.addEventListener('input', () => {
+    ageInput.value = ageInput.value.replace(/[^0-9]/g, '');
+    // Mientras escribe no se avisa (al teclear "2" de "25" aún no es un error);
+    // solo se vuelve a revisar si el aviso ya estaba visible.
+    if (!document.getElementById('age-error').classList.contains('sd-hidden')) checkAge();
+  });
+  ageInput.addEventListener('blur', () => { if (ageInput.value.trim()) checkAge(); });
 
   // "2026-10-17" -> "Sábado 17 de octubre" y "20:00" (lo que guardan
   // sd_events.event_date / event_time) -> "8:00 p.m.". Misma lógica que
@@ -208,14 +249,12 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
         lugarEl.textContent = [data.venueName, data.venueAddress].filter(Boolean).join(' — ');
         lugarEl.style.display = '';
       }
-      if (data.minAge || data.maxAge) {
-        const edadEl = document.getElementById('evento-edad');
-        edadEl.textContent = data.minAge && data.maxAge
-          ? `Este evento es para personas de ${data.minAge} a ${data.maxAge} años.`
-          : data.minAge
-          ? `Este evento es para personas de ${data.minAge} años en adelante.`
-          : `Este evento es para personas de hasta ${data.maxAge} años.`;
-        edadEl.style.display = '';
+      minAge = data.minAge || null;
+      maxAge = data.maxAge || null;
+      if (minAge || maxAge) {
+        const hintEl = document.getElementById('age-hint');
+        hintEl.textContent = `Este evento es para personas ${ageRangeLabel()}.`;
+        hintEl.classList.remove('sd-hidden');
       }
       form.classList.remove('sd-hidden');
     } catch (err) {
@@ -230,6 +269,14 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
     const submitBtn = document.getElementById('submit-btn');
     const formError = document.getElementById('form-error');
     formError.classList.add('sd-hidden');
+    if (!checkAge()) { ageInput.focus(); return; }
+    // El correo ya no es type="email" (para que el navegador del celular no
+    // ofrezca guardar los datos), así que se revisa aquí.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(document.getElementById('f-email').value.trim())) {
+      formError.textContent = 'El correo no es válido — revisa que esté bien escrito.';
+      formError.classList.remove('sd-hidden');
+      return;
+    }
     submitBtn.disabled = true;
     submitBtn.textContent = soldOut ? 'Guardando…' : 'Registrando…';
     try {

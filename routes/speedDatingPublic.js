@@ -122,7 +122,7 @@ router.post("/events/:eventId/registro", (req, res) => {
         : event.min_age
         ? `de ${event.min_age} años en adelante`
         : `hasta ${event.max_age} años`;
-    return res.status(400).json({ error: `Este evento es para personas ${rangeLabel}.` });
+    return res.status(400).json({ error: `No puedes registrarte con esa edad: este evento es para personas ${rangeLabel}.` });
   }
 
   const state = capacityState(event);
@@ -263,6 +263,12 @@ function pairingForRound(eventId, attendee, roundNumber) {
     .get(eventId, roundNumber, attendee.id);
 }
 
+function maskEmail(email) {
+  if (!email || typeof email !== "string" || !email.includes("@")) return null;
+  const [local, domain] = email.trim().split("@");
+  return `${local.slice(0, 2)}•••@${domain}`;
+}
+
 // GET /api/speed-dating/attendee/:token/estado — polling cada ~5s.
 router.get("/attendee/:token/estado", (req, res) => {
   const attendee = loadAttendeeByToken(req.params.token);
@@ -277,6 +283,10 @@ router.get("/attendee/:token/estado", (req, res) => {
     total_rondas: event.total_rounds,
     mi_nombre: attendee.name,
     mi_genero: attendee.gender,
+    // Correo con el que se registró, enmascarado ("rm•••@gmail.com"): la
+    // pantalla de confirmación dice a qué correo se envió la confirmación sin
+    // exponer la dirección completa a quien tenga el link.
+    mi_correo_enmascarado: maskEmail(attendee.email),
     evento_fecha: event.event_date || null,
     evento_hora: event.event_time || null,
     evento_lugar: event.venue_name || null,
