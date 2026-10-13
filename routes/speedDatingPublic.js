@@ -325,8 +325,29 @@ router.get("/attendee/:token/estado", (req, res) => {
   const isTransition = event.round_state === "cambio_de_mesa";
   const isLastTransition = isTransition && event.current_round_number >= (event.total_rounds || 0);
 
+  // Votación al cerrar la ronda: durante la conversación (ronda_activa) los
+  // botones Sí/No NO se ofrecen, para que nadie vote sentado frente a su
+  // pareja. Aparecen cuando el organizador cierra la ronda (cambio_de_mesa),
+  // con la instrucción de votar de pie (hombres) / esperar a que él se
+  // levante (mujeres). El voto es sobre la ronda que acaba de cerrar
+  // (current_round_number todavía no avanzó).
+  const votingPairing = pairingForRound(event.id, attendee, event.current_round_number);
+  const canVote = isTransition && !!votingPairing && !!votingPairing.man_id && !!votingPairing.woman_id;
+  let yaVote = false;
+  if (canVote) {
+    const existing = db
+      .prepare("SELECT 1 FROM sd_votes WHERE pairing_id = ? AND voter_attendee_id = ?")
+      .get(votingPairing.id, attendee.id);
+    yaVote = !!existing;
+  }
+  const voteInfo = {
+    puede_votar: canVote,
+    ya_vote: yaVote,
+    mesa_a_votar: canVote ? votingPairing.table_number : null,
+  };
+
   if (isLastTransition) {
-    return res.json({ ...base, evento_estado: "cambio_de_mesa", cierre_inminente: true, mi_mesa: null, descansa: false });
+    return res.json({ ...base, ...voteInfo, evento_estado: "cambio_de_mesa", cierre_inminente: true, mi_mesa: null, descansa: false });
   }
 
   // Mujeres: su mesa nunca cambia. Hombres: durante 'ronda_activa' se
@@ -347,21 +368,11 @@ router.get("/attendee/:token/estado", (req, res) => {
     descansa = true;
   }
 
-  let yaVote = false;
-  const votingPairing = pairingForRound(event.id, attendee, event.current_round_number);
-  if (event.round_state === "ronda_activa" && votingPairing) {
-    const existing = db
-      .prepare("SELECT 1 FROM sd_votes WHERE pairing_id = ? AND voter_attendee_id = ?")
-      .get(votingPairing.id, attendee.id);
-    yaVote = !!existing;
-  }
-
   res.json({
     ...base,
+    ...voteInfo,
     mi_mesa: miMesa,
     descansa,
-    ya_vote: yaVote,
-    pairing_id: event.round_state === "ronda_activa" ? (votingPairing ? votingPairing.id : null) : null,
     pregunta_ronda: event.round_state === "ronda_activa" ? roundQuestion(event, event.current_round_number) : null,
     pregunta_siguiente: isTransition ? roundQuestion(event, event.current_round_number + 1) : null,
   });
@@ -409,8 +420,8 @@ router.post("/attendee/:token/vote", (req, res) => {
   const attendee = loadAttendeeByToken(req.params.token);
   if (!attendee) return res.status(404).json({ error: "No encontramos tu registro." });
   const event = findEvent(attendee.event_id);
-  if (!event || event.status !== "en_curso" || event.round_state !== "ronda_activa") {
-    return res.status(400).json({ error: "En este momento no se puede votar — espera a que empiece la ronda." });
+  if (!event || event.status !== "en_curso" || event.round_state !== "cambio_de_mesa") {
+    return res.status(400).json({ error: "En este momento no se puede votar — espera a que el organizador cierre la ronda." });
   }
 
   const vote = req.body && req.body.vote;
@@ -419,7 +430,7 @@ router.post("/attendee/:token/vote", (req, res) => {
   }
 
   const pairing = pairingForRound(event.id, attendee, event.current_round_number);
-  if (!pairing) {
+  if (!pairing || !pairing.man_id || !pairing.woman_id) {
     return res.status(400).json({ error: "Esta ronda no te toca mesa — nada que votar." });
   }
 

@@ -399,18 +399,16 @@ router.get("/:eventId", (req, res) => {
   const women = activeAttendees.filter((a) => a.gender === "F");
   const men = activeAttendees.filter((a) => a.gender === "M");
 
-  // Quién falta por votar en la ronda actual — para que el organizador vea
-  // ANTES de presionar "Cerrar ronda actual" si hay gente que todavía no ha
-  // dado su voto Sí/No. Una vez cerrada la ronda, round_state pasa a
-  // 'cambio_de_mesa' y el endpoint de voto (routes/speedDatingPublic.js)
-  // deja de aceptar votos de esa ronda, así que a quien quedó pendiente ya
-  // no se le vuelve a mostrar el botón para esa ronda — por eso esta lista
-  // solo tiene sentido (y solo se calcula) mientras round_state sigue en
-  // 'ronda_activa'.
+  // Quién falta por votar sobre la ronda que acaba de cerrarse. Desde que la
+  // votación se abre AL CERRAR la ronda (round_state = 'cambio_de_mesa'; los
+  // botones Sí/No ya no se ofrecen mientras conversan), esta lista sirve para
+  // saber cuándo se puede abrir la ronda siguiente (o finalizar el evento).
+  // Una vez que se abre la siguiente ronda, esa ventana de voto se cierra.
   let pendingVoters = [];
-  if (event.status === "en_curso" && event.round_state === "ronda_activa") {
+  let votersTotal = 0;
+  if (event.status === "en_curso" && event.round_state === "cambio_de_mesa") {
     const currentPairings = db
-      .prepare("SELECT * FROM sd_pairings WHERE event_id = ? AND round_number = ? AND man_id IS NOT NULL")
+      .prepare("SELECT * FROM sd_pairings WHERE event_id = ? AND round_number = ? AND man_id IS NOT NULL AND woman_id IS NOT NULL")
       .all(event.id, event.current_round_number);
     if (currentPairings.length) {
       const pairingIds = currentPairings.map((p) => p.id);
@@ -423,6 +421,7 @@ router.get("/:eventId", (req, res) => {
         for (const attendeeId of [p.woman_id, p.man_id]) {
           const a = attendeeById.get(attendeeId);
           if (!a || a.cancelled_at) continue;
+          votersTotal += 1;
           if (!votedSet.has(`${p.id}:${attendeeId}`)) {
             pendingVoters.push({ name: a.name, gender: a.gender, mesa: p.table_number });
           }
@@ -431,6 +430,7 @@ router.get("/:eventId", (req, res) => {
       pendingVoters.sort((a, b) => a.mesa - b.mesa || a.name.localeCompare(b.name));
     }
   }
+  const votersDone = votersTotal - pendingVoters.length;
 
   // Lista de espera: gente que intentó registrarse cuando este evento ya
   // estaba lleno (routes/speedDatingPublic.js) — sus datos no se pierden,
@@ -616,24 +616,36 @@ router.get("/:eventId", (req, res) => {
     <div class="card">
       <h2 style="margin:0 0 12px;font-size:15px;">Control del evento en vivo</h2>
       <p style="margin:0 0 14px;">Estado actual: <span class="round-state">${isLastTransition ? "Cambio de mesa → cierre del evento" : ROUND_STATE_LABEL[event.round_state]}</span></p>
-      ${event.round_state === "ronda_activa" ? (pendingVoters.length
-        ? `<div style="background:#FBEEE0;border:1px solid ${BRAND.clay};border-radius:10px;padding:12px 14px;margin:0 0 14px;">
-             <p style="margin:0 0 6px;font-weight:700;font-size:13.5px;">⏳ Faltan por votar en esta ronda (${pendingVoters.length}):</p>
-             <p style="margin:0;font-size:13px;line-height:1.6;">${pendingVoters.map((v) => `Mesa ${v.mesa} · ${esc(v.name)}`).join("<br>")}</p>
-           </div>`
-        : `<p style="margin:0 0 14px;color:${BRAND.green};font-size:13px;">✓ Todos los que tienen mesa esta ronda ya votaron.</p>`
-      ) : ""}
+      ${event.status === "en_curso" && event.round_state === "ronda_activa" ? `
+        <p class="muted" style="margin:0 0 14px;font-size:13px;">Ronda en conversación: los participantes todavía no ven los botones Sí/No. Cuando presiones <strong>«Cerrar ronda e iniciar votación»</strong>, aquí te aparece lo que debes decir en voz alta.</p>` : ""}
+      ${event.status === "en_curso" && event.round_state === "cambio_de_mesa" ? `
+        <div style="background:#FBEEE0;border:2px solid ${BRAND.clay};border-radius:12px;padding:16px 18px;margin:0 0 14px;">
+          <p style="margin:0 0 8px;font-weight:800;font-size:15px;">📢 Ronda ${event.current_round_number} cerrada: di esto en voz alta</p>
+          <p style="margin:0 0 8px;font-size:15px;line-height:1.55;"><strong>Caballeros:</strong> levántense de la mesa y voten de pie, por privacidad.<br>
+          <strong>Damas:</strong> esperen a que su pareja se levante de la mesa para votar.</p>
+          ${isLastTransition
+            ? `<p style="margin:0;font-size:14px;line-height:1.5;">Es la <strong>última ronda</strong>: cuando todos hayan votado, presiona «Finalizar evento» para calcular los matches.</p>`
+            : `<p style="margin:0;font-size:14px;line-height:1.5;">Después de votar, los caballeros pasan a su siguiente mesa. Cuando todos hayan votado, abre la ronda ${event.current_round_number + 1}.</p>`}
+        </div>
+        ${votersTotal ? (pendingVoters.length
+          ? `<div style="background:#fff;border:1px solid ${BRAND.clay};border-radius:10px;padding:12px 14px;margin:0 0 14px;">
+               <p style="margin:0 0 6px;font-weight:700;font-size:13.5px;">⏳ Han votado ${votersDone} de ${votersTotal} · faltan ${pendingVoters.length}:</p>
+               <p style="margin:0;font-size:13px;line-height:1.6;">${pendingVoters.map((v) => `Mesa ${v.mesa} · ${esc(v.name)}`).join("<br>")}</p>
+               <p class="muted" style="margin:8px 0 0;font-size:12px;">Esta lista se actualiza sola cada pocos segundos.</p>
+             </div>`
+          : `<p style="margin:0 0 14px;color:${BRAND.green};font-size:13px;font-weight:700;">✓ Votaron ${votersDone} de ${votersTotal}: ya puedes continuar.</p>`
+        ) : ""}` : ""}
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <form method="POST" action="/admin/encuentros/${event.id}/iniciar">
           <button type="submit" class="btn" ${canIniciar ? "" : "disabled"}>Cerrar registro e iniciar evento</button>
         </form>
         <form method="POST" action="/admin/encuentros/${event.id}/cerrar-ronda" id="form-cerrar-ronda">
-          <button type="submit" class="btn" ${canCerrarRonda ? "" : "disabled"}>Cerrar ronda actual</button>
+          <button type="submit" class="btn" ${canCerrarRonda ? "" : "disabled"}>Cerrar ronda e iniciar votación</button>
         </form>
-        <form method="POST" action="/admin/encuentros/${event.id}/reabrir-ronda" onsubmit="return confirm('¿Reabrir la ronda actual? Esto deshace el cierre y vuelve a mostrar los botones de Sí/No a quien todavía no haya votado en esta ronda. Úsalo solo si cerraste la ronda antes de tiempo.');">
+        <form method="POST" action="/admin/encuentros/${event.id}/reabrir-ronda" onsubmit="return confirm('¿Reabrir la ronda actual? Esto deshace el cierre: los botones de Sí/No desaparecen de los celulares y vuelven a la conversación (los votos ya emitidos se conservan). Úsalo solo si cerraste la ronda antes de tiempo.');">
           <button type="submit" class="btn ghost" ${canReabrirRonda ? "" : "disabled"}>↩ Reabrir ronda actual</button>
         </form>
-        <form method="POST" action="/admin/encuentros/${event.id}/siguiente-ronda">
+        <form method="POST" action="/admin/encuentros/${event.id}/siguiente-ronda" id="form-siguiente-ronda">
           <button type="submit" class="btn" ${canSiguienteRonda ? "" : "disabled"}>${isLastTransition ? "Finalizar evento" : "Iniciar ronda siguiente"}</button>
         </form>
         <form method="POST" action="/admin/encuentros/${event.id}/finalizar" onsubmit="return confirm('¿Finalizar el evento ahora? Esto calculará los matches y cerrará las rondas restantes.');">
@@ -645,15 +657,21 @@ router.get("/:eventId", (req, res) => {
     <script>
       (function () {
         var PENDING_VOTERS = JSON.parse(${JSON.stringify(JSON.stringify([...pendingVoters])).replace(/</g, "\\u003c")});
-        var f = document.getElementById("form-cerrar-ronda");
+        var IS_LAST = ${isLastTransition ? "true" : "false"};
+        var f = document.getElementById("form-siguiente-ronda");
         if (f) {
           f.addEventListener("submit", function (e) {
             if (PENDING_VOTERS.length) {
-              var lines = PENDING_VOTERS.map(function (v) { return "Mesa " + v.mesa + " \u00b7 " + v.name; }).join("\n");
-              var msg = PENDING_VOTERS.length + " persona(s) todav\u00eda no han votado esta ronda:\n" + lines + "\n\n\u00bfCerrar la ronda de todos modos? Ya no van a poder votar en esta ronda (puedes reabrirla despu\u00e9s con \u00abReabrir ronda actual\u00bb si te equivocaste).";
+              var lines = PENDING_VOTERS.map(function (v) { return "Mesa " + v.mesa + " \u00b7 " + v.name; }).join("\\n");
+              var msg = PENDING_VOTERS.length + " persona(s) todav\u00eda no han votado esta ronda:\\n" + lines + "\\n\\n" +
+                (IS_LAST ? "\u00bfFinalizar el evento de todos modos? Se calcular\u00e1n los matches sin sus votos." : "\u00bfAbrir la siguiente ronda de todos modos? Ya no van a poder votar en esta ronda.");
               if (!confirm(msg)) e.preventDefault();
             }
           });
+        }
+        // Mientras la votación está abierta, refrescar la página para ver quién falta.
+        if (${event.status === "en_curso" && event.round_state === "cambio_de_mesa" && pendingVoters.length ? "true" : "false"}) {
+          setTimeout(function () { location.reload(); }, 8000);
         }
       })();
     </script>
@@ -767,7 +785,7 @@ router.get("/:eventId", (req, res) => {
         var select = document.getElementById('wl-target-event');
         var targetId = select ? select.value : '';
         var targetLabel = select && select.selectedOptions[0] ? select.selectedOptions[0].textContent : '';
-        var firstName = (name || '').trim().split(/\s+/)[0] || name;
+        var firstName = (name || '').trim().split(/\\s+/)[0] || name;
         var lines = ['Hola ' + firstName + ' 👋 Soy del equipo de RelateReady.', '', 'El evento al que querías ir se llenó, ¡pero ya tenemos el próximo!'];
         if (targetId) {
           lines.push('Aquí está tu link para registrarte a *' + targetLabel + '*:', location.origin + '/evento/' + targetId);
@@ -775,7 +793,7 @@ router.get("/:eventId", (req, res) => {
           lines.push('Apenas tengamos fecha confirmada para el próximo evento te compartimos aquí mismo el link para que te registres.');
         }
         lines.push('', '¡Te esperamos! 💛');
-        var url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(lines.join('\n'));
+        var url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(lines.join('\\n'));
         window.open(url, '_blank', 'noopener');
       });
     });

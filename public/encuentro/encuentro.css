@@ -249,3 +249,28 @@ input.sd-invalid { border-color: var(--clay) !important; background: #FBEAE7 !im
 .sd-mail-note svg { width: 22px; height: 22px; flex: 0 0 22px; color: var(--accent-dark, var(--accent)); margin-top: 1px; }
 .sd-center-col .sd-mail-note p { max-width: none; font-size: 13.5px; color: var(--ink); line-height: 1.5; }
 .sd-countdown { font-family: Georgia, "Times New Roman", serif; font-size: 17px !important; color: var(--ink) !important; font-weight: 700; }
+
+/* ── Votación al cerrar la ronda ────────────────────────────────────────
+   Instrucción de privacidad (hombres: votar de pie; mujeres: esperar a que
+   él se levante) y aviso de "respuesta guardada". */
+.sd-instruction {
+  display: flex; gap: 13px; align-items: flex-start; text-align: left;
+  background: var(--accent-soft); border: 1px solid rgba(181,115,42,0.35);
+  border-radius: 16px; padding: 15px 16px; margin: 4px 0 18px;
+}
+.sd-instruction .ico {
+  flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%;
+  background: #fff; color: var(--accent-dark, var(--accent));
+  display: flex; align-items: center; justify-content: center;
+}
+.sd-instruction .ico svg { width: 22px; height: 22px; }
+.sd-instruction .t { font-size: 17px; font-weight: 800; color: var(--ink); margin: 1px 0 4px; line-height: 1.3; }
+.sd-instruction .d { font-size: 14.5px; color: var(--ink); margin: 0; line-height: 1.5; }
+.sd-instruction .d strong { color: var(--accent-dark, var(--accent)); }
+.sd-vote-saved {
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+  background: var(--green-soft); color: var(--green); border-radius: 999px;
+  padding: 8px 14px; font-size: 14px; font-weight: 700;
+}
+.sd-vote-saved .ok { font-size: 16px; }
+.sd-vote-saved .sd-link-btn { margin: 0 0 0 4px; color: var(--green); }

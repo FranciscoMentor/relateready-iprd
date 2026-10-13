@@ -50,12 +50,16 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
     rotate: `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M78 33 A32 32 0 1 0 83 54"/><path d="M78 15 L78 33 L60 33"/></svg>`,
     flag: `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="M28 90 L28 12"/><path d="M28 16 L82 32 L28 48 Z" fill="currentColor" opacity="0.15"/><path d="M28 16 L82 32 L28 48"/><circle cx="66" cy="14" r="2.5" fill="currentColor" stroke="none"/><circle cx="76" cy="20" r="2" fill="currentColor" stroke="none"/><circle cx="70" cy="10" r="1.5" fill="currentColor" stroke="none"/></svg>`,
     mail: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 7.5 12 13.5l8.5-6"/></svg>`,
+    chat: `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 20 H86 V64 H48 L30 82 V64 H14 Z"/><path d="M30 36 H70 M30 48 H56"/></svg>`,
+    standUp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="4.2" r="2.1"/><path d="M8.5 7.6v6.4M5 10.4l3.5-1.4 3.5 1.4M8.5 14l-2.6 7M8.5 14l2.6 7"/><path d="M18.5 20V8.5M15 12l3.5-3.5L22 12"/></svg>`,
+    hourglass: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9"/></svg>`,
     leaf: `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 85 C20 45 45 15 85 15 C85 55 60 85 20 85 Z"/><path d="M22 83 C45 60 60 45 83 18"/></svg>`,
     hearts: `<svg viewBox="0 0 100 100" fill="none"><defs><path id="hshape" d="M50 88 C50 88 10 60 10 33 C10 17 22 7 36 7 C44 7 50 12 50 21 C50 12 56 7 64 7 C78 7 90 17 90 33 C90 60 50 88 50 88 Z"/></defs><use href="#hshape" fill="currentColor" opacity="0.55" transform="translate(-8,-4) scale(0.72)"/><use href="#hshape" fill="currentColor" transform="translate(14,10) scale(0.72)"/></svg>`,
   };
 
   let pollTimer = null;
   let voting = false;
+  let changingVote = false;
   let lastEstado = null;
 
   function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
@@ -209,36 +213,59 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
     }
 
     // en_curso
+    const roundPill = `<span class="sd-round-pill"><span class="dot"></span>Ronda ${estado.ronda_actual} de ${estado.total_rondas}</span>`;
+
+    // Ronda cerrada por el organizador: aquí (y solo aquí) aparecen los
+    // botones Sí/No, con la instrucción de privacidad según el género.
     if (estado.evento_estado === 'cambio_de_mesa') {
+      const mustVote = estado.puede_votar && (!estado.ya_vote || changingVote);
+      if (mustVote) {
+        renderVoteForm(estado, roundPill);
+        return;
+      }
+
+      const savedNote = estado.puede_votar && estado.ya_vote
+        ? `<div class="sd-vote-saved"><span class="ok">✓</span><span>Guardamos tu respuesta.</span><button class="sd-link-btn" id="change-vote-btn" type="button">Cambiar</button></div>`
+        : '';
+
       if (estado.cierre_inminente) {
         app.innerHTML = `
           <div class="sd-center-col">
             <div class="sd-big-icon accent">${ICONS.flag}</div>
             <h2>Eso fue todo por hoy</h2>
             <p>Completaste tus rondas. Te escribimos por correo en 48 horas con tus matches, si los hay.</p>
+            ${savedNote}
           </div>`;
+        attachChangeVoteHandler(estado);
         return;
       }
-      const mesaBlock = estado.descansa
-        ? `<div class="sd-big-icon" style="margin:0 auto 10px;">${ICONS.leaf}</div><p class="sd-subtext" style="text-align:center;">Esta ronda descansas.</p>`
-        : `<div class="sd-table-badge" style="margin-top:6px;"><div class="num">${estado.mi_mesa ?? '—'}</div><div class="label">Tu próxima mesa</div></div>`;
+
+      const isWoman = estado.mi_genero === 'F';
+      const mesaBlock = isWoman
+        ? ''
+        : (estado.descansa
+          ? `<div class="sd-big-icon" style="margin:0 auto 10px;">${ICONS.leaf}</div><p class="sd-subtext" style="text-align:center;">Esta ronda descansas.</p>`
+          : `<div class="sd-table-badge" style="margin-top:6px;"><div class="num">${estado.mi_mesa ?? '—'}</div><div class="label">Tu próxima mesa</div></div>`);
       const questionPreview = estado.pregunta_siguiente
         ? `<div class="sd-question-box preview" style="margin-top:16px;width:100%;"><p class="sd-question-label">Pregunta para tu próxima mesa</p><p class="sd-question-text">${esc(estado.pregunta_siguiente)}</p></div>`
         : '';
+      const intro = isWoman
+        ? `La ronda ${estado.ronda_actual} cerró. Quédate en tu mesa: tu próxima pareja llegará en un momento.`
+        : `La ronda ${estado.ronda_actual} cerró. Ve a tu próxima mesa antes de que el organizador abra la ronda ${estado.ronda_actual + 1}.`;
       app.innerHTML = `
         <div class="sd-center-col">
           <div class="sd-big-icon accent">${ICONS.rotate}</div>
           <h2>Cambio de mesa</h2>
-          <p>La ronda ${estado.ronda_actual} cerró. Ve a tu próxima mesa antes de que el organizador abra la ronda ${estado.ronda_actual + 1}.</p>
+          ${savedNote}
+          <p>${intro}</p>
           ${mesaBlock}
           ${questionPreview}
         </div>`;
+      attachChangeVoteHandler(estado);
       return;
     }
 
-    // ronda_activa
-    const roundPill = `<span class="sd-round-pill"><span class="dot"></span>Ronda ${estado.ronda_actual} de ${estado.total_rondas}</span>`;
-
+    // ronda_activa: solo conversación. NO hay botones de voto todavía.
     if (estado.descansa) {
       app.innerHTML = `
         ${roundPill}
@@ -251,31 +278,6 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
     }
 
     const tableLabel = estado.mi_genero === 'F' ? 'Tu mesa' : 'Tu mesa esta ronda';
-
-    if (estado.ya_vote) {
-      const questionBlock = estado.pregunta_ronda
-        ? `<div class="sd-question-box"><p class="sd-question-label">Pregunta para esta ronda</p><p class="sd-question-text">${esc(estado.pregunta_ronda)}</p></div>`
-        : '';
-      app.innerHTML = `
-        ${roundPill}
-        <div class="sd-table-badge"><div class="num">${estado.mi_mesa ?? '—'}</div><div class="label">${tableLabel}</div></div>
-        ${questionBlock}
-        <div class="sd-center-col">
-          <div class="sd-big-icon lg">${ICONS.checkHeart}</div>
-          <h2>Guardamos tu respuesta</h2>
-          <p>Mesa ${estado.mi_mesa ?? '—'} · Ronda ${estado.ronda_actual} de ${estado.total_rondas}. Puedes cambiarla si te arrepientes, hasta que cierre la ronda.</p>
-          <button class="sd-link-btn" id="change-vote-btn">Cambiar mi respuesta</button>
-        </div>`;
-      document.getElementById('change-vote-btn').addEventListener('click', () => renderVoteForm(estado));
-      return;
-    }
-
-    renderVoteForm(estado, roundPill, tableLabel);
-  }
-
-  function renderVoteForm(estado, roundPill, tableLabel) {
-    roundPill = roundPill || `<span class="sd-round-pill"><span class="dot"></span>Ronda ${estado.ronda_actual} de ${estado.total_rondas}</span>`;
-    tableLabel = tableLabel || (estado.mi_genero === 'F' ? 'Tu mesa' : 'Tu mesa esta ronda');
     const questionBlock = estado.pregunta_ronda
       ? `<div class="sd-question-box"><p class="sd-question-label">Pregunta para esta ronda</p><p class="sd-question-text">${esc(estado.pregunta_ronda)}</p></div>`
       : '';
@@ -283,8 +285,57 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       ${roundPill}
       <div class="sd-table-badge"><div class="num">${estado.mi_mesa ?? '—'}</div><div class="label">${tableLabel}</div></div>
       ${questionBlock}
-      <p class="sd-prompt">¿Te gustaría un <strong>match</strong> con la persona de tu mesa?</p>
-      <p class="sd-subtext">Responde antes de que termine la ronda. Puedes cambiar tu respuesta hasta entonces.</p>
+      <div class="sd-center-col" style="padding-top:8px;">
+        <div class="sd-big-icon accent">${ICONS.chat}</div>
+        <h2>Disfruta la conversación</h2>
+        <p>Cuando el organizador cierre la ronda, aquí te aparecerán las instrucciones para votar.</p>
+      </div>`;
+  }
+
+  function attachChangeVoteHandler(estado) {
+    const btn = document.getElementById('change-vote-btn');
+    if (btn) btn.addEventListener('click', () => { changingVote = true; render(estado); });
+  }
+
+  // Pantalla de votación (ronda cerrada). Instrucción de privacidad:
+  //  - Hombres: levantarse y votar de pie.
+  //  - Mujeres: esperar a que su pareja se levante antes de votar.
+  function renderVoteForm(estado, roundPill) {
+    roundPill = roundPill || `<span class="sd-round-pill"><span class="dot"></span>Ronda ${estado.ronda_actual} de ${estado.total_rondas}</span>`;
+    const isWoman = estado.mi_genero === 'F';
+    const isLast = !!estado.cierre_inminente;
+    const mesaLabel = isWoman ? 'Tu mesa' : 'Mesa de esta ronda';
+
+    let instruction;
+    if (isWoman) {
+      instruction = `
+        <div class="sd-instruction">
+          <div class="ico">${ICONS.hourglass}</div>
+          <div>
+            <p class="t">Espera a que se levante tu pareja</p>
+            <p class="d">Vota cuando él ya se haya levantado de la mesa, por privacidad.</p>
+          </div>
+        </div>`;
+    } else {
+      const next = !isLast && !estado.descansa && estado.mi_mesa
+        ? ` Después ve a tu próxima mesa: <strong>${esc(estado.mi_mesa)}</strong>.`
+        : '';
+      instruction = `
+        <div class="sd-instruction">
+          <div class="ico">${ICONS.standUp}</div>
+          <div>
+            <p class="t">Levántate de la mesa para votar</p>
+            <p class="d">Vota cuando estés de pie, por privacidad.${next}</p>
+          </div>
+        </div>`;
+    }
+
+    app.innerHTML = `
+      ${roundPill}
+      ${instruction}
+      <div class="sd-table-badge"><div class="num">${estado.mesa_a_votar ?? '—'}</div><div class="label">${mesaLabel}</div></div>
+      <p class="sd-prompt">¿Te gustaría un <strong>match</strong> con la persona de esta mesa?</p>
+      <p class="sd-subtext">Puedes cambiar tu respuesta hasta que el organizador abra la siguiente ronda.</p>
       <div class="sd-vote-row">
         <button class="sd-vote-btn no" data-vote="no"><span class="icon">✕</span>No</button>
         <button class="sd-vote-btn yes" data-vote="si"><span class="icon">♥</span>Sí</button>
@@ -354,6 +405,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'No se pudo guardar tu voto.');
+      changingVote = false;
       await poll();
     } catch (err) {
       alert(err.message);
