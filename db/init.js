@@ -381,7 +381,9 @@ db.exec(`
 `);
 // Invitaciones "a nombre de un representante" (2026-10): quién invita y a qué
 // correo llegan las respuestas.
-for (const [col, ddl] of [["rep_name", "rep_name TEXT"], ["rep_email", "rep_email TEXT"]]) {
+// Código VIP incluido en el correo (2026-10): uno de los FREE_ACCESS_CODES de
+// Render, para que la persona descargue el Informe Extendido sin pagar.
+for (const [col, ddl] of [["rep_name", "rep_name TEXT"], ["rep_email", "rep_email TEXT"], ["vip_code", "vip_code TEXT"]]) {
   try { db.exec(`ALTER TABLE test_invitations ADD COLUMN ${ddl}`); } catch (e) { /* ya existe */ }
 }
 

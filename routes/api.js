@@ -28,10 +28,7 @@ const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Numb
 // estos códigos en la pantalla de resultados desbloquea el Informe Extendido
 // sin pagar. No distingue mayúsculas/minúsculas. Vacío por defecto = nadie
 // puede canjear nada.
-const FREE_ACCESS_CODES = (process.env.FREE_ACCESS_CODES || "")
-  .split(",")
-  .map((c) => c.trim().toUpperCase())
-  .filter(Boolean);
+const { FREE_ACCESS_CODES } = require("../services/accessCodes");
 
 // GET /api/meta?lang=es — todo lo que el frontend necesita para renderizar el test.
 // No se exponen 'keying' ni 'dimension' de los ítems núcleo, para no sesgar

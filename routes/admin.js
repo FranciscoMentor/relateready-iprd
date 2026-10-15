@@ -23,6 +23,7 @@ const {
 const { sendReminderNow } = require("../services/reminderScheduler");
 const { sendMail } = require("../services/graphMail");
 const { testInvitationEmail } = require("../services/emailTemplates");
+const { FREE_ACCESS_CODES, normalizeCode, isValidAccessCode } = require("../services/accessCodes");
 
 const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Number(process.env.EXTENDED_PRICE_CENTS) : 2499;
 
@@ -797,7 +798,7 @@ router.post("/api/results/:id/resend-summary-link", async (req, res) => {
 router.get("/api/invitations", (req, res) => {
   const rows = db
     .prepare(
-      `SELECT i.id, i.created_at, i.name, i.email, i.lang, i.status, i.error, i.rep_name, i.rep_email,
+      `SELECT i.id, i.created_at, i.name, i.email, i.lang, i.status, i.error, i.rep_name, i.rep_email, i.vip_code,
               EXISTS(SELECT 1 FROM submissions s WHERE LOWER(TRIM(s.email)) = i.email) AS took_test
        FROM test_invitations i ORDER BY i.created_at DESC LIMIT 100`
     )
@@ -813,12 +814,23 @@ router.post("/api/invitations", express.json(), async (req, res) => {
   const force = body.force === true;
   const repName = String(body.repName || "").replace(/[\r\n]+/g, " ").trim().slice(0, 120);
   const repEmail = String(body.repEmail || "").trim().toLowerCase().slice(0, 200);
+  const vipCode = normalizeCode(body.vipCode).slice(0, 60);
 
   if (!name) return res.status(400).json({ error: "Escribe el nombre de la persona." });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "El correo no parece válido." });
   if (repName || repEmail) {
     if (!repName) return res.status(400).json({ error: "Escribe el nombre del representante." });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(repEmail)) return res.status(400).json({ error: "El correo del representante no parece válido." });
+  }
+
+  // Código VIP (opcional): debe ser uno de los FREE_ACCESS_CODES de Render; si
+  // no, la persona recibiría un código que no funciona.
+  if (vipCode && !isValidAccessCode(vipCode)) {
+    return res.status(400).json({
+      error: FREE_ACCESS_CODES.length
+        ? "Ese código VIP no está en tu lista de Render (variable FREE_ACCESS_CODES). Revisa cómo lo escribiste, o agrégalo allá primero."
+        : "Todavía no hay códigos VIP configurados en Render (variable FREE_ACCESS_CODES), así que no se puede incluir ninguno.",
+    });
   }
 
   if (!force) {
@@ -836,7 +848,7 @@ router.post("/api/invitations", express.json(), async (req, res) => {
 
   const baseUrl = `${req.protocol}://${req.get("host")}`;
   const testUrl = lang === "en" ? `${baseUrl}/?lang=en` : `${baseUrl}/`;
-  const { subject, html } = testInvitationEmail({ name, lang, testUrl, repName });
+  const { subject, html } = testInvitationEmail({ name, lang, testUrl, repName, vipCode });
 
   let result;
   try {
@@ -847,9 +859,9 @@ router.post("/api/invitations", express.json(), async (req, res) => {
 
   const detail = result.sent ? null : result.reason === "error" ? result.error : result.reason || "desconocido";
   const id = require("crypto").randomUUID();
-  db.prepare("INSERT INTO test_invitations (id, created_at, name, email, lang, status, error, rep_name, rep_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+  db.prepare("INSERT INTO test_invitations (id, created_at, name, email, lang, status, error, rep_name, rep_email, vip_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
     id, new Date().toISOString(), name, email, lang, result.sent ? "sent" : "failed", detail,
-    repName || null, repName ? repEmail : null
+    repName || null, repName ? repEmail : null, vipCode || null
   );
 
   if (!result.sent) {
@@ -861,6 +873,16 @@ router.post("/api/invitations", express.json(), async (req, res) => {
     });
   }
   res.json({ ok: true, id });
+});
+
+// Quita una invitación de la lista "Invitaciones enviadas". Solo borra el
+// registro del historial: NO cancela ni recupera el correo que ya se envió.
+// Como la lista alimenta el aviso "Ya invitaste a este correo", al borrarla
+// ese aviso deja de aparecer para ese correo.
+router.delete("/api/invitations/:id", (req, res) => {
+  const result = db.prepare("DELETE FROM test_invitations WHERE id = ?").run(req.params.id);
+  if (!result.changes) return res.status(404).json({ error: "Esa invitación ya no existe." });
+  res.json({ ok: true });
 });
 
 /**

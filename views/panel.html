@@ -187,6 +187,7 @@
           <p class="muted" style="margin:-4px 0 14px;font-size:12.5px;">El correo sale firmado por ti y dice que lo envías de parte del representante.</p>
         </div>
         <div class="form-field"><label for="inviteLang">Idioma del correo y del test</label><select id="inviteLang"><option value="es">Español</option><option value="en">Inglés</option></select></div>
+        <div class="form-field"><label for="inviteVip">Código VIP (opcional)</label><input type="text" id="inviteVip" maxlength="60" placeholder="Ej. PANEL2026" autocomplete="off" autocapitalize="characters" spellcheck="false"><p class="muted" style="font-size:12px;margin:4px 0 0;">Escribe uno de los códigos que tienes en Render (FREE_ACCESS_CODES). Va en el correo y le permite descargar el Informe Extendido sin pagar. Déjalo vacío si no quieres incluir ninguno.</p></div>
         <button type="submit" class="btn" id="inviteBtn">Enviar invitación</button>
         <p id="inviteMsg" style="margin:12px 0 0;font-size:13px;display:none;"></p>
       </form>
@@ -195,8 +196,8 @@
       <h2 style="margin:0 0 14px;font-size:15px;">Invitaciones enviadas</h2>
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Persona</th><th>Idioma</th><th>Estado</th><th>Fecha</th></tr></thead>
-          <tbody id="inviteBody"><tr><td colspan="4" style="text-align:center;color:#999;padding:30px;">Cargando…</td></tr></tbody>
+          <thead><tr><th>Persona</th><th>Idioma</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+          <tbody id="inviteBody"><tr><td colspan="5" style="text-align:center;color:#999;padding:30px;">Cargando…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -368,16 +369,35 @@
       const rows = await res.json();
       body.innerHTML = rows.length
         ? rows.map(r => `<tr>
-            <td>${esc(r.name)}<br><span class="muted">${esc(r.email)}</span>${r.rep_name ? `<br><span class="muted">De parte de ${esc(r.rep_name)}</span>` : ""}</td>
+            <td>${esc(r.name)}<br><span class="muted">${esc(r.email)}</span>${r.rep_name ? `<br><span class="muted">De parte de ${esc(r.rep_name)}</span>` : ""}${r.vip_code ? `<br><span class="badge" style="background:#B5732A;">Código VIP: ${esc(r.vip_code)}</span>` : ""}</td>
             <td>${r.lang === "en" ? "Inglés" : "Español"}</td>
             <td>${r.status === "sent" ? '<span class="badge" style="background:#3F6B4F;">Enviada ✓</span>' : '<span class="badge" style="background:#9C3B2E;">No se envió</span>'}${r.took_test ? ' <span class="badge" style="background:#B5732A;">Ya hizo el test</span>' : ""}</td>
             <td>${esc((r.created_at || "").slice(0, 16).replace("T", " "))}</td>
+            <td><button type="button" class="btn small ghost" data-del-invite="${esc(r.id)}" data-del-name="${esc(r.name)}">Eliminar</button></td>
           </tr>`).join("")
-        : '<tr><td colspan="4" style="text-align:center;color:#999;padding:30px;">Todavía no has enviado invitaciones.</td></tr>';
+        : '<tr><td colspan="5" style="text-align:center;color:#999;padding:30px;">Todavía no has enviado invitaciones.</td></tr>';
     } catch (e) {
-      body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;padding:30px;">No se pudo cargar el historial.</td></tr>';
+      body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:30px;">No se pudo cargar el historial.</td></tr>';
     }
   }
+
+  // Eliminar una invitación de la lista (no cancela el correo ya enviado).
+  document.getElementById("inviteBody").addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-del-invite]");
+    if (!btn) return;
+    const name = btn.dataset.delName || "esta persona";
+    if (!confirm("¿Eliminar a " + name + " de la lista de invitaciones?\n\nSolo se quita de esta lista: el correo que ya se envió no se puede recuperar. Si la vuelves a invitar, el panel ya no te avisará que la habías invitado antes.")) return;
+    btn.disabled = true;
+    try {
+      const res = await fetch("/admin/api/invitations/" + encodeURIComponent(btn.dataset.delInvite), { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error || "No se pudo eliminar la invitación."); btn.disabled = false; return; }
+      loadInvitations();
+    } catch (err) {
+      alert("No se pudo eliminar la invitación. Revisa tu conexión e inténtalo de nuevo.");
+      btn.disabled = false;
+    }
+  });
 
   function showInviteMsg(text, color) {
     const el = document.getElementById("inviteMsg");
@@ -400,6 +420,7 @@
           lang: document.getElementById("inviteLang").value,
           repName: document.getElementById("inviteRepOn").checked ? document.getElementById("inviteRepName").value : "",
           repEmail: document.getElementById("inviteRepOn").checked ? document.getElementById("inviteRepEmail").value : "",
+          vipCode: document.getElementById("inviteVip").value,
           force: !!force,
         }),
       });
