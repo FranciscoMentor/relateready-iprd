@@ -188,7 +188,10 @@
         </div>
         <div class="form-field"><label for="inviteLang">Idioma del correo y del test</label><select id="inviteLang"><option value="es">Español</option><option value="en">Inglés</option></select></div>
         <div class="form-field"><label for="inviteVip">Código VIP (opcional)</label><input type="text" id="inviteVip" maxlength="60" placeholder="Ej. PANEL2026" autocomplete="off" autocapitalize="characters" spellcheck="false"><p class="muted" style="font-size:12px;margin:4px 0 0;">Escribe uno de los códigos que tienes en Render (FREE_ACCESS_CODES). Va en el correo y le permite descargar el Informe Extendido sin pagar. Déjalo vacío si no quieres incluir ninguno.</p></div>
-        <button type="submit" class="btn" id="inviteBtn">Enviar invitación</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button type="submit" class="btn" id="inviteBtn">Enviar invitación</button>
+          <button type="button" class="btn ghost" id="inviteCopyWaBtn" title="Arma el mismo mensaje para pegarlo en WhatsApp. No envía el correo.">Copiar para WhatsApp</button>
+        </div>
         <p id="inviteMsg" style="margin:12px 0 0;font-size:13px;display:none;"></p>
       </form>
     </div>
@@ -367,13 +370,14 @@
       const res = await fetch("/admin/api/invitations");
       if (!res.ok) throw new Error();
       const rows = await res.json();
+      inviteRows = rows;
       body.innerHTML = rows.length
         ? rows.map(r => `<tr>
             <td>${esc(r.name)}<br><span class="muted">${esc(r.email)}</span>${r.rep_name ? `<br><span class="muted">De parte de ${esc(r.rep_name)}</span>` : ""}${r.vip_code ? `<br><span class="badge" style="background:#B5732A;">Código VIP: ${esc(r.vip_code)}</span>` : ""}</td>
             <td>${r.lang === "en" ? "Inglés" : "Español"}</td>
             <td>${r.status === "sent" ? '<span class="badge" style="background:#3F6B4F;">Enviada ✓</span>' : '<span class="badge" style="background:#9C3B2E;">No se envió</span>'}${r.took_test ? ' <span class="badge" style="background:#B5732A;">Ya hizo el test</span>' : ""}</td>
             <td>${esc((r.created_at || "").slice(0, 16).replace("T", " "))}</td>
-            <td><button type="button" class="btn small ghost" data-del-invite="${esc(r.id)}" data-del-name="${esc(r.name)}">Eliminar</button></td>
+            <td style="white-space:nowrap;"><button type="button" class="btn small ghost" data-wa-invite="${esc(r.id)}">Copiar WhatsApp</button> <button type="button" class="btn small ghost" data-del-invite="${esc(r.id)}" data-del-name="${esc(r.name)}">Eliminar</button></td>
           </tr>`).join("")
         : '<tr><td colspan="5" style="text-align:center;color:#999;padding:30px;">Todavía no has enviado invitaciones.</td></tr>';
     } catch (e) {
@@ -381,8 +385,62 @@
     }
   }
 
+  // ── Copiar el mensaje de invitación para pegarlo en WhatsApp ──
+  let inviteRows = [];
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+      document.body.removeChild(ta);
+      return ok;
+    }
+  }
+  async function copyWhatsappInvite(data, btn, doneLabel) {
+    const original = btn.textContent;
+    btn.disabled = true;
+    try {
+      const res = await fetch("/admin/api/invitations/whatsapp-text", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) { showInviteMsg(out.error || "No se pudo armar el mensaje.", "var(--bad)"); return; }
+      if (await copyText(out.text)) {
+        btn.textContent = "Copiado ✓";
+        showInviteMsg(doneLabel || "Mensaje copiado. Pégalo en WhatsApp: el enlace del test se toca directamente.", "var(--green)");
+        setTimeout(() => { btn.textContent = original; }, 2500);
+      } else {
+        showInviteMsg("No se pudo copiar automáticamente. Inténtalo de nuevo.", "var(--bad)");
+      }
+    } catch (err) {
+      showInviteMsg("No se pudo armar el mensaje. Revisa tu conexión e inténtalo de nuevo.", "var(--bad)");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  document.getElementById("inviteCopyWaBtn").addEventListener("click", (e) => {
+    const rep = document.getElementById("inviteRepOn").checked;
+    copyWhatsappInvite({
+      name: document.getElementById("inviteName").value,
+      lang: document.getElementById("inviteLang").value,
+      repName: rep ? document.getElementById("inviteRepName").value : "",
+      vipCode: document.getElementById("inviteVip").value,
+    }, e.currentTarget);
+  });
+
   // Eliminar una invitación de la lista (no cancela el correo ya enviado).
   document.getElementById("inviteBody").addEventListener("click", async (e) => {
+    const waBtn = e.target.closest("[data-wa-invite]");
+    if (waBtn) {
+      const r = inviteRows.find((x) => x.id === waBtn.dataset.waInvite);
+      if (r) copyWhatsappInvite({ name: r.name, lang: r.lang, repName: r.rep_name || "", vipCode: r.vip_code || "" }, waBtn);
+      return;
+    }
     const btn = e.target.closest("[data-del-invite]");
     if (!btn) return;
     const name = btn.dataset.delName || "esta persona";

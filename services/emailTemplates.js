@@ -659,5 +659,45 @@ function testInvitationEmail({ name, lang, testUrl, repName, vipCode }) {
   };
 }
 
-module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail, speedDatingSurveyEmail, speedDatingSurveyReminderEmail, testInvitationEmail };
+// Texto de la invitación al test para pegar en WhatsApp (mismo contenido que
+// el correo, en texto plano). WhatsApp no muestra botones ni enlaces con texto:
+// el enlace va completo en su propia línea y WhatsApp lo vuelve tocable solo;
+// las negritas usan la marca de WhatsApp (*texto*). Ver testInvitationEmail.
+function testInvitationWhatsappText({ name, lang, testUrl, repName, vipCode }) {
+  const en = lang === "en";
+  const first = firstNameOf(name, en ? "en" : "es");
+  const rep = String(repName || "").replace(/[\r\n]+/g, " ").trim();
+  const code = String(vipCode || "").trim();
+  const L = [];
+  if (en) {
+    L.push(`Hello ${first},`, "");
+    L.push("I hope your week is going well. " + (rep
+      ? `I'm writing on behalf of *${rep}*, a RelateReady Representative, who would like to invite you to take the *RelateReady Test*, a relationship-readiness tool that helps you see where you stand today in every relationship.`
+      : "I'd like to personally invite you to take the *RelateReady Test*, a relationship-readiness tool that helps you see where you stand today when it comes to romantic relationships."), "");
+    L.push(rep
+      ? "It looks at 8 pillars, including attachment security, communication and repair, and clarity of values, and when you finish you instantly get a summary of your results. There are no right or wrong answers: it's a well-rounded self-assessment that highlights strengths, acknowledges areas for improvement, and shows a clear plan for future growth."
+      : "It looks at 8 pillars, including attachment security, communication and repair, and clarity of values, and when you finish you instantly get a summary of your results. There are no right or wrong answers: it's about knowing yourself better and seeing clearly where you are strong and what you can keep developing.", "");
+    L.push("It only takes a few minutes.", "");
+    if (code) L.push(`*A gift for you:* your VIP code is *${code}*. With it you can download your *Extended Report* free of charge. When you see your results, tap “Have a free access code?”, enter the code and tap “Redeem code”.`, "");
+    L.push("Take the test here:", testUrl, "");
+    L.push("If you have any questions, just reply to this message.", "");
+    L.push("Warmly,", "*Dr. Francisco Rosero*", "RelateReady");
+  } else {
+    L.push(`Hola ${first},`, "");
+    L.push("Espero que estés teniendo una buena semana. " + (rep
+      ? `Te escribo de parte de *${rep}*, Representante de RelateReady, quien quiere invitarte a hacer el *Test RelateReady*, una herramienta de preparación relacional que te ayuda a conocer cómo estás hoy en cada una de tus relaciones.`
+      : "Quiero invitarte personalmente a hacer el *Test RelateReady*, una herramienta de preparación relacional que te ayuda a conocer cómo estás hoy frente a las relaciones de pareja."), "");
+    L.push(rep
+      ? "Evalúa 8 pilares, entre ellos la seguridad de apego, la comunicación y reparación, y la claridad de tus valores, y al terminar recibes de inmediato un resumen de tus resultados. No hay respuestas correctas o incorrectas: es una autoevaluación integral que destaca tus fortalezas, reconoce tus áreas de mejora y te muestra un plan claro para tu crecimiento futuro."
+      : "Evalúa 8 pilares, entre ellos la seguridad de apego, la comunicación y reparación, y la claridad de tus valores, y al terminar recibes de inmediato un resumen de tus resultados. No hay respuestas correctas o incorrectas: se trata de conocerte mejor y ver con claridad dónde estás fuerte y qué puedes seguir desarrollando.", "");
+    L.push("Te toma unos minutos.", "");
+    if (code) L.push(`*Un regalo para ti:* tu código VIP es *${code}*. Con él puedes descargar gratis tu *Informe Extendido*. Cuando veas tus resultados, toca «¿Tienes un código de acceso gratuito?», escribe el código y toca «Canjear código».`, "");
+    L.push("Haz el test aquí:", testUrl, "");
+    L.push("Si tienes alguna duda, escríbeme por aquí.", "");
+    L.push("Con aprecio,", "*Dr. Francisco Rosero*", "RelateReady");
+  }
+  return L.join("\n");
+}
+
+module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail, speedDatingSurveyEmail, speedDatingSurveyReminderEmail, testInvitationEmail, testInvitationWhatsappText };
 

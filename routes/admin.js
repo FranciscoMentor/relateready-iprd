@@ -22,7 +22,7 @@ const {
 } = require("../services/backupService");
 const { sendReminderNow } = require("../services/reminderScheduler");
 const { sendMail } = require("../services/graphMail");
-const { testInvitationEmail } = require("../services/emailTemplates");
+const { testInvitationEmail, testInvitationWhatsappText } = require("../services/emailTemplates");
 const { FREE_ACCESS_CODES, normalizeCode, isValidAccessCode } = require("../services/accessCodes");
 
 const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Number(process.env.EXTENDED_PRICE_CENTS) : 2499;
@@ -873,6 +873,29 @@ router.post("/api/invitations", express.json(), async (req, res) => {
     });
   }
   res.json({ ok: true, id });
+});
+
+// Texto de la invitación para copiar y pegar en WhatsApp (botón "Copiar para
+// WhatsApp"). No envía correo ni guarda nada: solo arma el mensaje con el mismo
+// contenido del correo, y el enlace del test completo en su propia línea
+// (WhatsApp lo vuelve tocable; no admite botones).
+router.post("/api/invitations/whatsapp-text", express.json(), (req, res) => {
+  const body = req.body || {};
+  const name = String(body.name || "").trim().slice(0, 120);
+  const lang = body.lang === "en" ? "en" : "es";
+  const repName = String(body.repName || "").replace(/[\r\n]+/g, " ").trim().slice(0, 120);
+  const vipCode = normalizeCode(body.vipCode).slice(0, 60);
+  if (!name) return res.status(400).json({ error: "Escribe el nombre de la persona." });
+  if (vipCode && !isValidAccessCode(vipCode)) {
+    return res.status(400).json({
+      error: FREE_ACCESS_CODES.length
+        ? "Ese código VIP no está en tu lista de Render (variable FREE_ACCESS_CODES). Revisa cómo lo escribiste, o agrégalo allá primero."
+        : "Todavía no hay códigos VIP configurados en Render (variable FREE_ACCESS_CODES), así que no se puede incluir ninguno.",
+    });
+  }
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const testUrl = lang === "en" ? `${baseUrl}/?lang=en` : `${baseUrl}/`;
+  res.json({ text: testInvitationWhatsappText({ name, lang, testUrl, repName, vipCode }) });
 });
 
 // Quita una invitación de la lista "Invitaciones enviadas". Solo borra el
