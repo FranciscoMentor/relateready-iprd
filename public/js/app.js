@@ -173,6 +173,20 @@
     },
   };
 
+  // Eventos del píxel de Meta (si el píxel no carga, no pasa nada).
+  function trackPixel(kind, name, data) {
+    try { if (typeof fbq === "function") fbq(kind, name, data || {}); } catch (e) {}
+  }
+  // Compra del Informe Extendido (solo pagos reales, una vez por envío).
+  function trackPurchaseOnce(sid) {
+    try {
+      const key = "rr_purchase_" + sid;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch (e) {}
+    trackPixel("track", "Purchase", { value: 14, currency: "USD" });
+  }
+
   // Enlaces de agendamiento para la sesión de mentoría gratuita de 60 min
   // incluida con el Informe Extendido (uno por idioma). Si Francisco necesita
   // cambiarlos en el futuro, basta con actualizar estas dos URLs.
@@ -546,7 +560,7 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Error");
-        if (typeof fbq === "function") fbq("track", "CompleteRegistration");
+        if (typeof fbq === "function") { fbq("track", "CompleteRegistration"); fbq("track", "Lead"); }
         state.submissionId = data.id;
         state.scoreSummary = data.scoreSummary;
         state.referralTriggered = data.referralTriggered;
@@ -649,7 +663,7 @@
       <div class="session-block">
         <h2>${t("scheduleSessionTitle")}</h2>
         <p>${t("scheduleSessionIntro")}</p>
-        <a class="primary" style="text-decoration:none;display:inline-block" href="${BOOKING_LINKS[state.lang] || BOOKING_LINKS.es}" target="_blank">${t("scheduleSessionBtn")}</a>
+        <a class="primary" style="text-decoration:none;display:inline-block" href="${BOOKING_LINKS[state.lang] || BOOKING_LINKS.es}" target="_blank" onclick="try{fbq('track','Schedule')}catch(e){}">${t("scheduleSessionBtn")}</a>
       </div>`;
 
     // Invitación a referir un amigo — solo aparece una vez pagado/liberado el
@@ -720,6 +734,7 @@
         msg.style.display = "none";
         btn.disabled = true;
         btn.textContent = t("paying");
+        trackPixel("track", "InitiateCheckout", { value: 14, currency: "USD" });
         try {
           const res = await fetch(`/api/payment/prepare/${state.submissionId}`, { method: "POST" });
           const data = await res.json();
@@ -744,6 +759,7 @@
           const res = await fetch(`/api/submission/${state.submissionId}/status`);
           const data = await res.json();
           if (data.paymentStatus === "paid" || data.paymentStatus === "simulated" || data.paymentStatus === "free") {
+            if (data.paymentStatus === "paid") trackPurchaseOnce(state.submissionId);
             state.paid = true;
             renderResults();
             return;
@@ -794,6 +810,7 @@
           });
           const data = await res.json();
           if (data.ok) {
+            trackPixel("trackCustom", "CodeRedeemed");
             state.paid = true;
             renderResults();
             return;
@@ -845,6 +862,7 @@
     state.scoreSummary = data.scoreSummary;
     state.referralTriggered = data.referralTriggered;
     state.paid = data.paymentStatus === "paid" || data.paymentStatus === "simulated" || data.paymentStatus === "free";
+    if (data.paymentStatus === "paid") trackPurchaseOnce(sid);
     state.step = "results";
     return true;
   }
