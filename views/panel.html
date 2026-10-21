@@ -110,6 +110,7 @@
     <button class="navlink" data-nav="resultados">Resultados</button>
     <button class="navlink" data-nav="invitar">Invitar</button>
     <button class="navlink" data-nav="referidos">Referidos</button>
+    <button class="navlink" data-nav="campana">Campañas con código</button>
     <button class="navlink" data-nav="calendario">Calendario</button>
     <a href="/admin" class="exit" style="text-decoration:none;">Admin básico</a>
     <a href="/admin/logout" class="exit">Cerrar sesión</a>
@@ -219,6 +220,41 @@
         </table>
       </div>
     </div>
+  </section>
+
+  <!-- ═══════════════════ CAMPAÑA TEST999 ═══════════════════ -->
+  <section class="section" id="sec-campana">
+    <div class="filters" id="campBar">
+      <select id="campSelect" style="min-width:280px;"></select>
+      <button type="button" class="btn" id="campNew">+ Nueva campaña</button>
+      <button type="button" class="btn ghost" id="campEditBtn">Editar</button>
+      <button type="button" class="btn ghost" id="campDelBtn">Eliminar</button>
+      <button type="button" class="btn ghost" id="campCsv">Descargar CSV</button>
+      <button type="button" class="btn ghost" id="campRefresh">↻ Actualizar</button>
+    </div>
+    <form class="card" id="campEditForm" style="display:none;">
+      <h2 style="margin:0 0 12px;font-size:15px;" id="campFormTitle">Nueva campaña</h2>
+      <div class="filters" style="margin-bottom:8px;">
+        <input type="text" id="cfName" placeholder="Nombre de la campaña" style="min-width:300px;" required>
+        <input type="text" id="cfCode" placeholder="Código (ej. TEST999)" style="width:170px;text-transform:uppercase;" required>
+        <label class="muted">Desde <input type="date" id="cfFrom" required></label>
+        <label class="muted">Hasta <input type="date" id="cfTo" required></label>
+      </div>
+      <p class="muted" style="margin:0 0 12px;">Para que un código nuevo funcione en el sitio, agrégalo también a la variable <b>FREE_ACCESS_CODES</b> en Render (separado por coma). Aquí solo se define qué código y qué fechas se analizan; no se borra ni cambia ningún dato.</p>
+      <p id="cfMsg" class="muted" style="color:var(--bad);margin:0 0 10px;"></p>
+      <button type="submit" class="btn">Guardar</button>
+      <button type="button" class="btn ghost" id="cfCancel">Cancelar</button>
+    </form>
+    <p class="muted" id="campRange" style="margin:0 0 14px;">Hora de Ecuador. Datos reales del sitio.</p>
+    <div class="stats" id="campCards" style="grid-template-columns:repeat(4,1fr);"></div>
+    <div class="card"><h2 style="margin:0 0 14px;font-size:15px;">Del test al informe y la sesión</h2><div id="campFunnel"></div></div>
+    <div class="card"><h2 style="margin:0 0 14px;font-size:15px;">Avance por día</h2><div class="table-scroll"><table><thead><tr><th>Día</th><th>Tests</th><th>Canjes</th></tr></thead><tbody id="campDays"></tbody></table></div></div>
+    <div class="card"><h2 style="margin:0 0 14px;font-size:15px;">Por campaña (utm_campaign)</h2><div class="table-scroll"><table><thead><tr><th>Campaña</th><th>Tests</th><th>Canjes</th><th>Tasa de canje</th><th>Sesiones</th></tr></thead><tbody id="campByCampaign"></tbody></table></div></div>
+    <div class="card"><h2 style="margin:0 0 14px;font-size:15px;">Por anuncio (utm_content)</h2><div class="table-scroll"><table><thead><tr><th>Anuncio</th><th>Tests</th><th>Canjes</th><th>Tasa de canje</th><th>Sesiones</th></tr></thead><tbody id="campByAd"></tbody></table></div></div>
+    <div class="card"><h2 style="margin:0 0 14px;font-size:15px;">Por fuente y medio</h2><div class="table-scroll"><table><thead><tr><th>Fuente / medio</th><th>Tests</th><th>Canjes</th><th>Tasa de canje</th><th>Sesiones</th></tr></thead><tbody id="campBySource"></tbody></table></div></div>
+    <div class="card"><h2 style="margin:0 0 14px;font-size:15px;">Por país</h2><div class="table-scroll"><table><thead><tr><th>País</th><th>Tests</th><th>Canjes</th><th>Tasa de canje</th><th>Sesiones</th></tr></thead><tbody id="campByCountry"></tbody></table></div></div>
+    <div class="card"><h2 style="margin:0 0 14px;font-size:15px;">Por idioma</h2><div class="table-scroll"><table><thead><tr><th>Idioma</th><th>Tests</th><th>Canjes</th><th>Tasa de canje</th><th>Sesiones</th></tr></thead><tbody id="campByLang"></tbody></table></div></div>
+    <p class="muted"><b>Cómo leer esto.</b> "Tests" son personas que terminaron el test en el rango de fechas y "Canjes" las que usaron el código. Quien llega sin parámetros utm (por ejemplo, desde el correo de invitación) aparece como "(directo o sin utm)". Las sesiones se cuentan solo si marcas el seguimiento de la persona (agendada, realizada o cliente) en Resultados; la agenda de Bookings no se lee automáticamente.</p>
   </section>
 
   <!-- ═══════════════════ CALENDARIO ═══════════════════ -->
@@ -331,6 +367,7 @@
         referralsLoadedOnce = true;
         loadReferrals();
       }
+      if (link.dataset.nav === "campana") loadCampaign();
     });
   });
 
@@ -543,6 +580,93 @@
     }
   }
   document.getElementById("btnRefreshReferrals").addEventListener("click", loadReferrals);
+
+  // ── Campaña del código gratuito (TEST999) ──
+  const campPct = (a, b) => (b ? (Math.round((a / b) * 1000) / 10) + "%" : "—");
+  function campGroupRows(id, groups) {
+    const el = document.getElementById(id);
+    if (!groups || !groups.length) { el.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:24px;">Todavía no hay datos.</td></tr>'; return; }
+    el.innerHTML = groups.map(g => `<tr><td>${esc(g.key)}</td><td>${g.tests}</td><td>${g.redeemed}</td><td>${campPct(g.redeemed, g.tests)}</td><td>${g.sessions}</td></tr>`).join("");
+  }
+  let campList = [];
+  let campId = null;
+  let campEditing = null;
+  function campQuery() { return new URLSearchParams({ campaign: campId || "" }).toString(); }
+  async function loadCampaignList(selectId) {
+    const res = await fetch("/admin/api/campana-codigo/list");
+    campList = await res.json();
+    if (selectId) campId = selectId;
+    if (!campList.find(c => String(c.id) === String(campId))) campId = campList.length ? campList[0].id : null;
+    document.getElementById("campSelect").innerHTML = campList.length
+      ? campList.map(c => `<option value="${c.id}" ${String(c.id)===String(campId)?"selected":""}>${esc(c.name)} · ${esc(c.code)}</option>`).join("")
+      : '<option value="">Todavía no hay campañas</option>';
+  }
+  function showCampForm(c) {
+    campEditing = c || null;
+    document.getElementById("campFormTitle").textContent = c ? "Editar campaña" : "Nueva campaña";
+    document.getElementById("cfName").value = c ? c.name : "";
+    document.getElementById("cfCode").value = c ? c.code : "";
+    document.getElementById("cfFrom").value = c ? c.from : new Date().toISOString().slice(0,10);
+    document.getElementById("cfTo").value = c ? c.to : "";
+    document.getElementById("cfMsg").textContent = "";
+    document.getElementById("campEditForm").style.display = "block";
+  }
+  async function loadCampaign() {
+    try {
+      if (!campList.length) { await loadCampaignList(); }
+      if (!campId) { document.getElementById("campRange").textContent = "Crea una campaña con el botón \"Nueva campaña\"."; return; }
+      const res = await fetch("/admin/api/campana-codigo?" + campQuery());
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Error");
+      const s = d.summary;
+      document.getElementById("campRange").textContent = `${d.campaign ? d.campaign.name + " · " : ""}Código ${d.code} · del ${d.from} al ${d.to} (hora de Ecuador). Datos reales del sitio.`;
+      const card = (n, l) => `<div class="stat-card"><div class="stat-num">${n}</div><div class="stat-label">${esc(l)}</div></div>`;
+      document.getElementById("campCards").innerHTML =
+        card(s.tests, "Tests completados") + card(s.redeemed + " · " + campPct(s.redeemed, s.tests), "Canjes de " + d.code) +
+        card(s.reportGenerated, "Informes generados") + card(s.emailSent, "Correos del informe enviados") +
+        card(s.sessions, "Sesiones marcadas") + card(s.paid, "Compras de $14") +
+        card(s.notConverted, "Sin canje ni pago") + card(s.fromMeta, "Llegaron de un anuncio de Meta");
+      const steps = [["Tests completados", s.tests], ["Canjearon " + d.code, s.redeemed], ["Informe generado", s.reportGenerated], ["Correo enviado", s.emailSent], ["Sesión marcada", s.sessions]];
+      const max = Math.max(1, s.tests);
+      document.getElementById("campFunnel").innerHTML = steps.map(([l, n]) => `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          <div style="width:190px;font-size:13px;">${esc(l)}</div>
+          <div style="flex:1;background:var(--light);border-radius:6px;height:18px;"><div style="width:${Math.round((n / max) * 100)}%;background:var(--accent);height:18px;border-radius:6px;"></div></div>
+          <div style="width:110px;font-size:13px;text-align:right;">${n} · ${campPct(n, s.tests)}</div>
+        </div>`).join("");
+      document.getElementById("campDays").innerHTML = d.byDay.length
+        ? d.byDay.map(x => `<tr><td>${esc(x.day)}</td><td>${x.tests}</td><td>${x.redeemed}</td></tr>`).join("")
+        : '<tr><td colspan="3" style="text-align:center;color:#999;padding:24px;">Todavía no hay datos.</td></tr>';
+      campGroupRows("campByCampaign", d.byCampaign);
+      campGroupRows("campByAd", d.byAd);
+      campGroupRows("campBySource", d.bySourceMedium);
+      campGroupRows("campByCountry", d.byCountry);
+      campGroupRows("campByLang", d.byLang);
+    } catch (e) {
+      document.getElementById("campRange").textContent = "No se pudo cargar la campaña. Recarga la página e inicia sesión de nuevo si es necesario.";
+    }
+  }
+  document.getElementById("campSelect").addEventListener("change", (e) => { campId = e.target.value; loadCampaign(); });
+  document.getElementById("campRefresh").addEventListener("click", loadCampaign);
+  document.getElementById("campNew").addEventListener("click", () => showCampForm(null));
+  document.getElementById("campEditBtn").addEventListener("click", () => { const c = campList.find(x => String(x.id) === String(campId)); if (c) showCampForm(c); });
+  document.getElementById("cfCancel").addEventListener("click", () => { document.getElementById("campEditForm").style.display = "none"; });
+  document.getElementById("campDelBtn").addEventListener("click", async () => {
+    const c = campList.find(x => String(x.id) === String(campId));
+    if (!c || !confirm('¿Eliminar la campaña "' + c.name + '"? Solo se borra su definición; los envíos y el código del sitio no cambian.')) return;
+    await fetch("/admin/api/campana-codigo/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: c.id }) });
+    campId = null; await loadCampaignList(); loadCampaign();
+  });
+  document.getElementById("campEditForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = { id: campEditing ? campEditing.id : undefined, name: document.getElementById("cfName").value, code: document.getElementById("cfCode").value, from: document.getElementById("cfFrom").value, to: document.getElementById("cfTo").value };
+    const res = await fetch("/admin/api/campana-codigo/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const d = await res.json();
+    if (!res.ok) { document.getElementById("cfMsg").textContent = d.error || "No se pudo guardar."; return; }
+    document.getElementById("campEditForm").style.display = "none";
+    await loadCampaignList(d.id); loadCampaign();
+  });
+  document.getElementById("campCsv").addEventListener("click", () => { if (campId) window.open("/admin/api/campana-codigo/export.csv?" + campQuery(), "_blank"); });
 
   function filteredResults() {
     const search = (document.getElementById("fSearch").value || "").toLowerCase();

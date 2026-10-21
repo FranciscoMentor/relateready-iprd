@@ -1,0 +1,194 @@
+// routes/campaignCode.js
+// Datos de análisis de una campaña con código gratuito (por ejemplo TEST999,
+// vigente hasta el 31 de octubre de 2026). Se monta en /admin/api/campana-codigo
+// (detrás del login de administrador) y alimenta la pestaña "Campaña TEST999" de /panel-control; muestra: cuántos tests se completaron,
+// cuántos canjearon el código, de qué anuncio/campaña llegó cada persona (por
+// los parámetros utm_* guardados al terminar el test), el avance diario y la
+// descarga del detalle en CSV. Solo lee datos; no modifica nada.
+//
+// Parámetros (todos opcionales): ?code=TEST999&from=2026-10-21&to=2026-10-31
+// Las fechas se interpretan en hora de Ecuador (UTC-5).
+
+const express = require("express");
+const router = express.Router();
+const db = require("../db/init");
+
+// Campañas guardadas (nombre, código, fechas). Cada campaña es solo una
+// "vista" de los envíos que canjearon ese código en ese rango: crear, editar o
+// borrar una campaña aquí NUNCA toca los envíos ni los códigos del sitio.
+// Para que un código nuevo funcione en el test hay que agregarlo también a la
+// variable FREE_ACCESS_CODES en Render.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS campaigns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    code TEXT NOT NULL,
+    date_from TEXT NOT NULL,
+    date_to TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+`);
+if (!db.prepare("SELECT COUNT(*) AS n FROM campaigns").get().n) {
+  db.prepare("INSERT INTO campaigns (name, code, date_from, date_to, created_at) VALUES (?,?,?,?,?)").run(
+    "Promoción TEST999 · todo gratis hasta el 31 de octubre", "TEST999", "2026-10-21", "2026-10-31", new Date().toISOString()
+  );
+}
+
+const TZ_OFFSET_HOURS = -5; // Ecuador
+const DEFAULT_CODE = "TEST999";
+const DEFAULT_FROM = "2026-10-21";
+const DEFAULT_TO = "2026-10-31";
+const SESSION_STATES = ["sesion_agendada", "sesion_realizada", "cliente_mentoring"];
+
+function validDate(s, fallback) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || "")) ? s : fallback; }
+function localDay(iso) {
+  const t = new Date(iso);
+  if (isNaN(t)) return "";
+  return new Date(t.getTime() + TZ_OFFSET_HOURS * 3600000).toISOString().slice(0, 10);
+}
+
+function loadCampaign(query) {
+  let saved = null;
+  if (query.campaign) saved = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(Number(query.campaign));
+  const code = String((saved ? saved.code : query.code) || DEFAULT_CODE).trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "") || DEFAULT_CODE;
+  const from = validDate(saved ? saved.date_from : query.from, DEFAULT_FROM);
+  const to = validDate(saved ? saved.date_to : query.to, DEFAULT_TO);
+  // Rango en UTC: inicio del día "from" y fin del día "to" en hora de Ecuador.
+  const startUtc = new Date(Date.parse(from + "T00:00:00Z") - TZ_OFFSET_HOURS * 3600000).toISOString();
+  const endUtc = new Date(Date.parse(to + "T00:00:00Z") + 86400000 - TZ_OFFSET_HOURS * 3600000).toISOString();
+
+  const rows = db
+    .prepare(
+      `SELECT id, created_at, name, email, phone, city, country, lang, payment_status, payment_reference,
+              code_redeemed_at, extended_generated_at, extended_email_status, follow_up_status,
+              utm_source, utm_medium, utm_campaign, utm_content, utm_term, from_meta_ad
+         FROM submissions WHERE created_at >= ? AND created_at < ? ORDER BY created_at ASC`
+    )
+    .all(startUtc, endUtc);
+
+  const isCode = (r) => r.payment_reference === "CODE:" + code;
+  const campaignOf = (r) => r.utm_campaign || (r.from_meta_ad ? "(anuncio de Meta sin utm)" : "(directo o sin utm)");
+
+  const redeemed = rows.filter(isCode);
+  const summary = {
+    tests: rows.length,
+    redeemed: redeemed.length,
+    paid: rows.filter((r) => r.payment_status === "paid").length,
+    notConverted: rows.filter((r) => r.payment_status === "pending").length,
+    reportGenerated: redeemed.filter((r) => r.extended_generated_at).length,
+    emailSent: redeemed.filter((r) => r.extended_email_status === "sent").length,
+    sessions: redeemed.filter((r) => SESSION_STATES.includes(r.follow_up_status)).length,
+    fromMeta: rows.filter((r) => r.from_meta_ad).length,
+  };
+
+  function groupBy(keyFn) {
+    const m = new Map();
+    for (const r of rows) {
+      const k = keyFn(r);
+      if (k === null) continue;
+      const g = m.get(k) || { key: k, tests: 0, redeemed: 0, sessions: 0 };
+      g.tests++;
+      if (isCode(r)) {
+        g.redeemed++;
+        if (SESSION_STATES.includes(r.follow_up_status)) g.sessions++;
+      }
+      m.set(k, g);
+    }
+    return [...m.values()].sort((a, b) => b.tests - a.tests);
+  }
+
+  // Avance diario: tests por día de creación y canjes por día de canje.
+  const days = new Map();
+  const dayRow = (d) => days.get(d) || days.set(d, { day: d, tests: 0, redeemed: 0 }).get(d);
+  rows.forEach((r) => { const d = localDay(r.created_at); if (d) dayRow(d).tests++; });
+  redeemed.forEach((r) => { const d = localDay(r.code_redeemed_at || r.created_at); if (d) dayRow(d).redeemed++; });
+  const byDay = [...days.values()].sort((a, b) => (a.day < b.day ? -1 : 1));
+
+  return {
+    campaign: saved ? { id: saved.id, name: saved.name } : null,
+    code, from, to, rows, summary, isCode,
+    byDay,
+    byCampaign: groupBy(campaignOf),
+    byAd: groupBy((r) => (r.utm_content ? r.utm_content : null)),
+    bySourceMedium: groupBy((r) => `${r.utm_source || "(sin source)"} / ${r.utm_medium || "(sin medium)"}`),
+    byCountry: groupBy((r) => (r.country ? r.country.trim() : "(sin país)")),
+    byLang: groupBy((r) => (r.lang === "en" ? "Inglés" : "Español")),
+  };
+}
+
+// Lista de campañas guardadas.
+router.get("/list", (req, res) => {
+  res.json(db.prepare("SELECT id, name, code, date_from AS \"from\", date_to AS \"to\" FROM campaigns ORDER BY id DESC").all());
+});
+
+// Crea o actualiza una campaña: { id?, name, code, from, to }.
+router.post("/save", (req, res) => {
+  const b = req.body || {};
+  const name = String(b.name || "").trim().slice(0, 120);
+  const code = String(b.code || "").trim().toUpperCase();
+  const from = String(b.from || "");
+  const to = String(b.to || "");
+  if (!name) return res.status(400).json({ error: "Escribe un nombre para la campaña." });
+  if (!/^[A-Z0-9_-]{3,30}$/.test(code)) return res.status(400).json({ error: "El código debe tener de 3 a 30 letras, números, guiones o guion bajo." });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) {
+    return res.status(400).json({ error: "Revisa las fechas: la fecha final no puede ser anterior a la inicial." });
+  }
+  if (b.id) {
+    const r = db.prepare("UPDATE campaigns SET name=?, code=?, date_from=?, date_to=? WHERE id=?").run(name, code, from, to, Number(b.id));
+    if (!r.changes) return res.status(404).json({ error: "No se encontró esa campaña." });
+    return res.json({ ok: true, id: Number(b.id) });
+  }
+  const r = db.prepare("INSERT INTO campaigns (name, code, date_from, date_to, created_at) VALUES (?,?,?,?,?)").run(name, code, from, to, new Date().toISOString());
+  res.json({ ok: true, id: Number(r.lastInsertRowid) });
+});
+
+// Borra solo la definición de la campaña (nunca los envíos).
+router.post("/delete", (req, res) => {
+  const id = Number((req.body || {}).id);
+  if (!id) return res.status(400).json({ error: "Falta la campaña." });
+  db.prepare("DELETE FROM campaigns WHERE id = ?").run(id);
+  res.json({ ok: true });
+});
+
+// JSON para la pestaña "Campaña TEST999" de /panel-control.
+router.get("/", (req, res) => {
+  const d = loadCampaign(req.query);
+  res.json({
+    campaign: d.campaign,
+    code: d.code,
+    from: d.from,
+    to: d.to,
+    summary: d.summary,
+    byDay: d.byDay,
+    byCampaign: d.byCampaign,
+    byAd: d.byAd,
+    bySourceMedium: d.bySourceMedium,
+    byCountry: d.byCountry,
+    byLang: d.byLang,
+  });
+});
+
+router.get("/export.csv", (req, res) => {
+  const d = loadCampaign(req.query);
+  const headers = ["Fecha del test", "Fecha del canje", "Nombre", "Correo", "Teléfono", "País", "Ciudad", "Idioma", "Canjeó el código", "Estado de pago", "Referencia", "Informe generado", "Correo del informe", "Seguimiento", "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "Clic de anuncio de Meta"];
+  const csvEscape = (v) => {
+    if (v === null || v === undefined) return "";
+    const s = String(v).replace(/"/g, '""');
+    return /[",\n]/.test(s) ? `"${s}"` : s;
+  };
+  const lines = [headers.join(",")];
+  d.rows.forEach((r) => {
+    lines.push([
+      r.created_at, r.code_redeemed_at, r.name, r.email, r.phone, r.country, r.city,
+      r.lang === "en" ? "Inglés" : "Español", d.isCode(r) ? "Sí" : "No", r.payment_status, r.payment_reference,
+      r.extended_generated_at ? "Sí" : "No", r.extended_email_status, r.follow_up_status,
+      r.utm_source, r.utm_medium, r.utm_campaign, r.utm_content, r.utm_term, r.from_meta_ad ? "Sí" : "No",
+    ].map(csvEscape).join(","));
+  });
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="relateready-campana-${d.code}-${d.from}-a-${d.to}.csv"`);
+  res.send("﻿" + lines.join("\n"));
+});
+
+module.exports = router;
+module.exports.loadCampaign = loadCampaign;

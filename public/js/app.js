@@ -1,6 +1,27 @@
 (function () {
   "use strict";
 
+  // ── Atribución de campaña (2026-10) ─────────────────────────────────────
+  // Guarda los parámetros utm_* del primer enlace con el que la persona llega
+  // (y si venía de un clic en un anuncio de Meta, fbclid) para enviarlos al
+  // terminar el test. Se guarda en el navegador; si no está disponible, no pasa nada.
+  function captureAttribution() {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const keys = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"];
+      const found = {};
+      keys.forEach((k) => { if (q.get(k)) found[k] = q.get(k); });
+      if (q.get("fbclid")) found.from_meta_ad = true;
+      if (Object.keys(found).length && !localStorage.getItem("rr_attr")) {
+        localStorage.setItem("rr_attr", JSON.stringify(found));
+      }
+    } catch (e) { /* sin almacenamiento: se omite */ }
+  }
+  function getAttribution() {
+    try { return JSON.parse(localStorage.getItem("rr_attr") || "{}"); } catch (e) { return {}; }
+  }
+  captureAttribution();
+
   const I18N = {
     es: {
       slogan: "<em>Listos por dentro. Listos en pareja:</em><br>la preparación empieza contigo, no con la otra persona.",
@@ -520,6 +541,7 @@
             desirabilityResponses: state.desirabilityResponses,
             vignetteResponses: state.vignetteResponses,
             qualitativeAnswers: state.qualitativeAnswers,
+            attribution: getAttribution(),
           }),
         });
         const data = await res.json();

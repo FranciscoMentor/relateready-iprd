@@ -78,6 +78,9 @@ function requireAuth(req, res, next) {
 
 router.use(requireAuth);
 
+// Análisis de la campaña del código gratuito (TEST999) — ver routes/campaignCode.js
+router.use("/api/campana-codigo", require("./campaignCode"));
+
 /** Formulario de login (página propia, no HTTP Basic Auth). */
 router.get("/login", (req, res) => {
   res.send(`<!doctype html>

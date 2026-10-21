@@ -83,6 +83,7 @@ router.post("/submit", (req, res) => {
       desirabilityResponses,
       vignetteResponses,
       qualitativeAnswers,
+      attribution,
     } = req.body;
 
     if (!name || typeof name !== "string" || !name.trim()) {
@@ -147,6 +148,18 @@ router.post("/submit", (req, res) => {
       JSON.stringify(scoreResult),
       referral.triggered ? 1 : 0
     );
+
+    // Atribución de campaña (utm_* y clic desde anuncio de Meta). Es opcional
+    // y nunca debe impedir guardar el test.
+    try {
+      const a = attribution && typeof attribution === "object" ? attribution : {};
+      const clean = (v) => (typeof v === "string" ? v.trim().slice(0, 120) : "");
+      db.prepare(
+        "UPDATE submissions SET utm_source=?, utm_medium=?, utm_campaign=?, utm_content=?, utm_term=?, from_meta_ad=? WHERE id=?"
+      ).run(clean(a.utm_source), clean(a.utm_medium), clean(a.utm_campaign), clean(a.utm_content), clean(a.utm_term), a.from_meta_ad ? 1 : 0, id);
+    } catch (e) {
+      console.error("[routes/api] No se pudo guardar la atribución —", e.message);
+    }
 
     res.json({
       id,
@@ -224,9 +237,10 @@ router.post("/payment/redeem/:id", (req, res) => {
   if (!code || !FREE_ACCESS_CODES.includes(code)) {
     return res.status(400).json({ error: "Código no válido." });
   }
-  db.prepare("UPDATE submissions SET payment_status = ?, payment_reference = ? WHERE id = ?").run(
+  db.prepare("UPDATE submissions SET payment_status = ?, payment_reference = ?, code_redeemed_at = ? WHERE id = ?").run(
     "free",
     `CODE:${code}`,
+    new Date().toISOString(),
     sub.id
   );
   // Dispara el PDF + correo de inmediato — no depende de que la persona

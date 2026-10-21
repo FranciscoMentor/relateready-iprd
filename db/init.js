@@ -88,6 +88,18 @@ addColumnIfMissing("country", "country TEXT");
 addColumnIfMissing("extended_email_status", "extended_email_status TEXT");
 addColumnIfMissing("extended_email_error", "extended_email_error TEXT");
 
+// ── Migración: seguimiento de la campaña del código TEST999 (2026-10) ──────
+// Guarda de qué anuncio/campaña llegó cada persona (parámetros utm_* y si
+// venía de un clic en un anuncio de Meta) y cuándo canjeó el código gratis.
+// Ver el panel /admin/campana-codigo. Seguro de ejecutar en cada arranque.
+addColumnIfMissing("utm_source", "utm_source TEXT");
+addColumnIfMissing("utm_medium", "utm_medium TEXT");
+addColumnIfMissing("utm_campaign", "utm_campaign TEXT");
+addColumnIfMissing("utm_content", "utm_content TEXT");
+addColumnIfMissing("utm_term", "utm_term TEXT");
+addColumnIfMissing("from_meta_ad", "from_meta_ad INTEGER NOT NULL DEFAULT 0");
+addColumnIfMissing("code_redeemed_at", "code_redeemed_at TEXT");
+
 
 // ═══════════════════════════════════════════════════════════════════════
 // Speed Dating (piloto Mila Rooftop, 2026-09) ─ tablas nuevas, propias del
