@@ -4,7 +4,7 @@
 // (detrás del login de administrador) y alimenta la pestaña "Campaña TEST999" de /panel-control; muestra: cuántos tests se completaron,
 // cuántos canjearon el código, de qué anuncio/campaña llegó cada persona (por
 // los parámetros utm_* guardados al terminar el test), el avance diario y la
-// descarga del detalle en CSV. Solo lee datos; no modifica nada.
+// descarga del detalle en CSV. Casi todo es lectura; la única escritura es /sync-sessions, que marca como "sesion_agendada" a quien agendó en Bookings.
 //
 // Parámetros (todos opcionales): ?code=TEST999&from=2026-10-21&to=2026-10-31
 // Las fechas se interpretan en hora de Ecuador (UTC-5).
@@ -115,6 +115,38 @@ function loadCampaign(query) {
     byLang: groupBy((r) => (r.lang === "en" ? "Inglés" : "Español")),
   };
 }
+
+// Sincroniza las sesiones agendadas en Outlook Bookings. El panel lee el
+// calendario (con la cuenta de Microsoft conectada en la pestaña Calendario)
+// y envía aquí los eventos con invitados: { events: [{ id, subject, start, emails: [] }] }.
+// Si el correo de un invitado coincide con el de un test, esa ficha pasa a
+// "sesion_agendada" (solo si estaba en nuevo o contactado: nunca se baja un estado posterior).
+router.post("/sync-sessions", (req, res) => {
+  const events = Array.isArray(req.body && req.body.events) ? req.body.events.slice(0, 1000) : [];
+  const find = db.prepare("SELECT id, name, email, follow_up_status, follow_up_notes FROM submissions WHERE lower(email) = ? ORDER BY id DESC LIMIT 1");
+  const upd = db.prepare("UPDATE submissions SET follow_up_status = 'sesion_agendada', follow_up_notes = ? WHERE id = ?");
+  const matched = [];
+  let alreadyKnown = 0, checked = 0;
+  for (const ev of events) {
+    const when = String(ev.start || "").slice(0, 16).replace("T", " ");
+    const tag = "Sesión agendada (Bookings): " + when + (ev.id ? " [" + String(ev.id).slice(-12) + "]" : "");
+    for (const raw of Array.isArray(ev.emails) ? ev.emails.slice(0, 10) : []) {
+      const email = String(raw || "").trim().toLowerCase();
+      if (!email || email.length > 200) continue;
+      checked++;
+      const row = find.get(email);
+      if (!row) continue;
+      if (row.follow_up_notes && ev.id && row.follow_up_notes.includes("[" + String(ev.id).slice(-12) + "]")) { alreadyKnown++; continue; }
+      if (row.follow_up_status === "nuevo" || row.follow_up_status === "contactado") {
+        upd.run((row.follow_up_notes ? row.follow_up_notes + "\n" : "") + tag, row.id);
+        matched.push({ name: row.name, email: row.email, start: when });
+      } else {
+        alreadyKnown++;
+      }
+    }
+  }
+  res.json({ ok: true, eventsRead: events.length, matched, alreadyKnown });
+});
 
 // Lista de campañas guardadas.
 router.get("/list", (req, res) => {

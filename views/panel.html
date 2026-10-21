@@ -230,8 +230,10 @@
       <button type="button" class="btn ghost" id="campEditBtn">Editar</button>
       <button type="button" class="btn ghost" id="campDelBtn">Eliminar</button>
       <button type="button" class="btn ghost" id="campCsv">Descargar CSV</button>
+      <button type="button" class="btn ghost" id="campSync">Sincronizar sesiones de Bookings</button>
       <button type="button" class="btn ghost" id="campRefresh">↻ Actualizar</button>
     </div>
+    <p class="muted" id="campSyncMsg" style="margin:6px 0 10px;font-size:12.5px;"></p>
     <form class="card" id="campEditForm" style="display:none;">
       <h2 style="margin:0 0 12px;font-size:15px;" id="campFormTitle">Nueva campaña</h2>
       <div class="filters" style="margin-bottom:8px;">
@@ -367,7 +369,7 @@
         referralsLoadedOnce = true;
         loadReferrals();
       }
-      if (link.dataset.nav === "campana") loadCampaign();
+      if (link.dataset.nav === "campana") { loadCampaign().then(() => campSyncSessions(true)); }
     });
   });
 
@@ -646,6 +648,23 @@
       document.getElementById("campRange").textContent = "No se pudo cargar la campaña. Recarga la página e inicia sesión de nuevo si es necesario.";
     }
   }
+  async function campSyncSessions(silent) {
+    const msg = document.getElementById("campSyncMsg");
+    if (typeof window.rrFetchCalendarEvents !== "function") { if (!silent) msg.textContent = "Primero conecta tu cuenta de Microsoft en la pestaña Calendario."; return; }
+    try {
+      msg.textContent = "Leyendo tu calendario…";
+      const from = new Date(Date.now() - 30 * 86400000).toISOString();
+      const to = new Date(Date.now() + 90 * 86400000).toISOString();
+      const events = await window.rrFetchCalendarEvents(from, to);
+      if (events === null) { msg.textContent = silent ? "" : "Conecta tu cuenta de Microsoft en la pestaña Calendario para contar las sesiones automáticamente."; return; }
+      const res = await fetch("/admin/api/campana-codigo/sync-sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ events }) });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Error");
+      msg.textContent = `Calendario revisado: ${d.eventsRead} citas con invitados. ` + (d.matched.length ? `Sesiones nuevas vinculadas: ${d.matched.map(m => m.name || m.email).join(", ")}.` : "No hay sesiones nuevas que vincular.");
+      if (d.matched.length) loadCampaign();
+    } catch (e) { msg.textContent = "No se pudo sincronizar el calendario. Reconecta tu cuenta en la pestaña Calendario."; }
+  }
+  document.getElementById("campSync").addEventListener("click", () => campSyncSessions(false));
   document.getElementById("campSelect").addEventListener("change", (e) => { campId = e.target.value; loadCampaign(); });
   document.getElementById("campRefresh").addEventListener("click", loadCampaign);
   document.getElementById("campNew").addEventListener("click", () => showCampForm(null));
@@ -1031,6 +1050,31 @@
       throw e;
     }
   }
+
+  // Para la pestaña "Campañas con código": devuelve las citas con invitados de
+  // todas las cuentas conectadas (o null si no hay ninguna conectada).
+  window.rrFetchCalendarEvents = async function (fromISO, toISO) {
+    if (!msalInstance || !connectedAccounts.length) return null;
+    const out = [];
+    for (const entry of connectedAccounts) {
+      const me = (entry.account.username || '').toLowerCase();
+      let token;
+      try { token = await getGraphToken(entry, false); } catch (e) { continue; }
+      let url = `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${encodeURIComponent(fromISO)}&endDateTime=${encodeURIComponent(toISO)}&$select=id,subject,start,attendees,isCancelled&$top=100`;
+      for (let page = 0; url && page < 5; page++) {
+        const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+        if (!resp.ok) break;
+        const json = await resp.json();
+        (json.value || []).forEach(ev => {
+          if (ev.isCancelled) return;
+          const emails = (ev.attendees || []).map(a => (a.emailAddress && a.emailAddress.address || '').toLowerCase()).filter(e => e && e !== me);
+          if (emails.length) out.push({ id: ev.id, subject: ev.subject || '', start: ev.start && ev.start.dateTime, emails });
+        });
+        url = json['@odata.nextLink'] || null;
+      }
+    }
+    return out;
+  };
 
   function renderSyncCard() {
     const box = document.getElementById('syncAccountsBox');
