@@ -628,7 +628,7 @@
         card(s.reportGenerated, "Informes generados") + card(s.emailSent, "Correos del informe enviados") +
         card(s.sessions, "Sesiones marcadas") + card(s.paid, "Compras de $14") +
         card(s.notConverted, "Sin canje ni pago") + card(s.fromMeta, "Llegaron de un anuncio de Meta");
-      const steps = [["Tests completados", s.tests], ["Canjearon " + d.code, s.redeemed], ["Informe generado", s.reportGenerated], ["Correo enviado", s.emailSent], ["Sesión marcada", s.sessions]];
+      const steps = [["Tests completados", s.tests], ["Resumen visto (con tarjeta)", s.summaryViewed || 0], ["Pulsó \"Desbloquear\"", s.unlockClicked || 0], ["Canjearon " + d.code, s.redeemed], ["Informe generado", s.reportGenerated], ["Correo enviado", s.emailSent], ["Sesión marcada", s.sessions]];
       const max = Math.max(1, s.tests);
       document.getElementById("campFunnel").innerHTML = steps.map(([l, n]) => `
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">

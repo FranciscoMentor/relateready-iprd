@@ -99,6 +99,11 @@ addColumnIfMissing("utm_content", "utm_content TEXT");
 addColumnIfMissing("utm_term", "utm_term TEXT");
 addColumnIfMissing("from_meta_ad", "from_meta_ad INTEGER NOT NULL DEFAULT 0");
 addColumnIfMissing("code_redeemed_at", "code_redeemed_at TEXT");
+// Embudo del relanzamiento (2026-10): cuándo se mostró el resumen con la
+// tarjeta de desbloqueo y cuándo se pulsó el botón de un clic. Una sola vez
+// por envío (ver POST /api/funnel/:id en routes/api.js).
+addColumnIfMissing("summary_viewed_at", "summary_viewed_at TEXT");
+addColumnIfMissing("unlock_clicked_at", "unlock_clicked_at TEXT");
 
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -665,6 +665,25 @@
       state.promoLoaded = true;
     });
   }
+  // Eventos del embudo, una sola vez por sesión del navegador y envío:
+  // SummaryViewed (se muestra el resumen con la tarjeta) y UnlockClicked
+  // (se pulsa el botón de un clic). Van al píxel de Meta y al servidor.
+  function trackFunnelOnce(pixelName, serverEvent) {
+    try {
+      const key = "rr_ev_" + pixelName + "_" + state.submissionId;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch (e) { /* sin sessionStorage: puede repetirse, no es grave */ }
+    trackPixel("trackCustom", pixelName);
+    try {
+      fetch(`/api/funnel/${encodeURIComponent(state.submissionId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event: serverEvent }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch (e) {}
+  }
   function promoEligible() {
     if (state.paid || !state.promo || !state.promo.active) return false;
     const src = String(getAttribution().utm_source || "").toLowerCase();
@@ -791,8 +810,10 @@
     // (el código no viaja al navegador). Misma pantalla final que el canje manual.
     const promoBtn = document.getElementById("btn-promo-unlock");
     if (promoBtn) {
+      trackFunnelOnce("SummaryViewed", "summary_viewed");
       promoBtn.addEventListener("click", async () => {
         if (promoBtn.disabled) return;
+        trackFunnelOnce("UnlockClicked", "unlock_clicked");
         const msg = document.getElementById("promo-msg");
         msg.style.display = "none";
         promoBtn.disabled = true;

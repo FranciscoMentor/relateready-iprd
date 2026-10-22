@@ -276,6 +276,20 @@ router.get("/promo/status", (req, res) => {
   res.json({ active: promoActive(), until: promoActive() ? PROMO_UNTIL_LABEL : null });
 });
 
+// POST /api/funnel/:id — marca (una sola vez por envío) que se mostró el
+// resumen con la tarjeta de desbloqueo o que se pulsó el botón de un clic.
+// Body: { event: "summary_viewed" | "unlock_clicked" }. Solo alimenta el embudo
+// del panel; nunca bloquea nada si falla.
+const FUNNEL_FIELDS = { summary_viewed: "summary_viewed_at", unlock_clicked: "unlock_clicked_at" };
+const funnelIpLimit = makeRateLimiter(60, 60 * 1000);
+router.post("/funnel/:id", (req, res) => {
+  const field = FUNNEL_FIELDS[String((req.body || {}).event || "")];
+  if (!field) return res.status(400).json({ error: "Evento no válido." });
+  if (!funnelIpLimit("ip:" + req.ip)) return res.status(429).json({ error: "Demasiadas peticiones." });
+  const r = db.prepare(`UPDATE submissions SET ${field} = ? WHERE id = ? AND ${field} IS NULL`).run(new Date().toISOString(), String(req.params.id));
+  res.json({ ok: true, recorded: r.changes > 0 });
+});
+
 // POST /api/promo/redeem — canje de un clic con el código promocional vigente.
 // Body: { submissionId }. Reutiliza applyAccessCode (misma lógica que el canje
 // manual). El código nunca viaja al navegador. Límite: 8 intentos por minuto
