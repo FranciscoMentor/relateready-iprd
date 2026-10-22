@@ -12,6 +12,8 @@
       const found = {};
       keys.forEach((k) => { if (q.get(k)) found[k] = q.get(k); });
       if (q.get("fbclid")) found.from_meta_ad = true;
+      // ?promo=1 → muestra la tarjeta de desbloqueo con un clic (ver renderResults).
+      if (q.get("promo") === "1") { try { localStorage.setItem("rr_promo", "1"); } catch (e2) {} }
       if (Object.keys(found).length && !localStorage.getItem("rr_attr")) {
         localStorage.setItem("rr_attr", JSON.stringify(found));
       }
@@ -82,6 +84,11 @@
       paymentError: "No se pudo iniciar el pago. Intenta de nuevo en unos momentos.",
       paying: "Procesando...",
       downloadExtended: "Descargar mi Informe Extendido (PDF)",
+      promoTitle: "Tu informe completo es gratis hasta el 31 de octubre",
+      promoText: "Desbloquea tu Informe Extendido, tu plan de acción de 3 semanas y una sesión de mentoría gratuita de 60 minutos.",
+      promoBtn: "Desbloquear mi informe gratis",
+      promoWorking: "Desbloqueando...",
+      promoError: "No pudimos desbloquearlo en este momento. Puedes intentarlo de nuevo o escribir tu código abajo.",
       haveCode: "¿Tienes un código de acceso gratuito?",
       codePlaceholder: "Código de acceso",
       redeemBtn: "Canjear código",
@@ -156,6 +163,11 @@
       paymentError: "Couldn't start the payment. Please try again in a moment.",
       paying: "Processing...",
       downloadExtended: "Download my Extended Report (PDF)",
+      promoTitle: "Your full report is free through October 31",
+      promoText: "Unlock your Extended Report, your 3-week action plan and a free 60-minute mentoring session.",
+      promoBtn: "Unlock my free report",
+      promoWorking: "Unlocking...",
+      promoError: "We couldn't unlock it right now. You can try again or type your code below.",
       haveCode: "Have a free access code?",
       codePlaceholder: "Access code",
       redeemBtn: "Redeem code",
@@ -230,6 +242,8 @@
     scoreSummary: null,
     referralTriggered: false,
     paid: false,
+    promo: null,        // { active, until } desde /api/promo/status
+    promoLoaded: false,
   };
 
   const app = document.getElementById("app");
@@ -250,10 +264,14 @@
     state.lang = lang;
     document.getElementById("btn-es").classList.toggle("active", lang === "es");
     document.getElementById("btn-en").classList.toggle("active", lang === "en");
+    applyStaticTexts();
+    loadMeta().then(render);
+  }
+  // Textos fijos de la cabecera y el pie en el idioma actual.
+  function applyStaticTexts() {
     document.querySelector('[data-i18n="footerBefore"]').textContent = t("footerBefore");
     document.querySelector('[data-i18n="footerAfter"]').textContent = t("footerAfter");
     document.querySelector('[data-i18n="slogan"]').innerHTML = t("slogan");
-    loadMeta().then(render);
   }
   document.getElementById("btn-es").addEventListener("click", () => setLang("es"));
   document.getElementById("btn-en").addEventListener("click", () => setLang("en"));
@@ -633,7 +651,36 @@
     ctx.stroke();
   }
 
+  // ── Promoción: informe gratis con un clic ─────────────────────────────────
+  // La tarjeta se muestra solo si hay promoción activa (el servidor lo dice,
+  // sin revelar el código) y la persona llegó desde un anuncio de Meta
+  // (utm_source instagram/facebook) o con ?promo=1.
+  function loadPromoStatus() {
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 2500));
+    const req = fetch("/api/promo/status", { cache: "no-store" })
+      .then((r) => r.json())
+      .catch(() => null);
+    return Promise.race([req, timeout]).then((data) => {
+      state.promo = data && data.active ? data : { active: false };
+      state.promoLoaded = true;
+    });
+  }
+  function promoEligible() {
+    if (state.paid || !state.promo || !state.promo.active) return false;
+    const src = String(getAttribution().utm_source || "").toLowerCase();
+    if (["instagram", "facebook", "ig", "fb"].includes(src)) return true;
+    try { if (localStorage.getItem("rr_promo") === "1") return true; } catch (e) {}
+    return false;
+  }
+
   function renderResults() {
+    if (!state.promoLoaded && !state.paid) {
+      // Primero se consulta si hay promoción activa, para pintar la pantalla
+      // una sola vez y sin que la tarjeta aparezca de golpe después.
+      loadPromoStatus().then(renderResults);
+      return;
+    }
+    const showPromo = promoEligible();
     const dims = state.scoreSummary.dimensions;
     const codes = state.meta.dimensions.map((d) => d.code);
     const bandClass = { f: "band-f", m: "band-m", d: "band-d" };
@@ -684,19 +731,30 @@
     // + agendamiento de la sesión gratuita), Payphone real activo (botón de
     // pago real + verificación manual de respaldo), o modo simulado (sin
     // Payphone configurado todavía).
+    const promoCardHtml = showPromo
+      ? `<div class="card promo-card">
+        <h2>${t("promoTitle")}</h2>
+        <p>${t("promoText")}</p>
+        <button type="button" class="primary promo-btn" id="btn-promo-unlock">${t("promoBtn")}</button>
+        <p class="error" id="promo-msg" style="display:none"></p>
+      </div>`
+      : "";
+    const payBtnClass = showPromo ? "secondary" : "primary";
+
     const payAreaHtml = state.paid
       ? `<a class="primary" style="text-decoration:none;display:inline-block" href="/api/report/extended/${state.submissionId}" target="_blank">${t("downloadExtended")}</a>
          ${sessionBlockHtml}`
       : state.meta.payphoneEnabled
-      ? `<button class="primary" id="btn-pay">${t("payBtnRealLabel")} — $${priceStr}</button>
+      ? `<button class="${payBtnClass}" id="btn-pay">${t("payBtnRealLabel")} — $${priceStr}</button>
          <p class="hint">${t("payHint")}</p>
          <button class="secondary" id="btn-verify">${t("verifyBtn")}</button>
          <p class="error" id="pay-msg" style="display:none"></p>
          ${codeBlockHtml}`
-      : `<button class="primary" id="btn-pay">${t("payBtnLabel")} — $${priceStr} (${t("simulatedTag")})</button>
+      : `<button class="${payBtnClass}" id="btn-pay">${t("payBtnLabel")} — $${priceStr} (${t("simulatedTag")})</button>
          ${codeBlockHtml}`;
 
     app.innerHTML = `
+      ${promoCardHtml}
       <div class="card">
         <h1>${t("resultsTitle")}</h1>
         <p>${t("resultsIntro")}</p>
@@ -728,6 +786,44 @@
       }`;
 
     drawRadar(document.getElementById("radarCanvas"), dims, codes);
+
+    // Botón de un clic: pide al servidor el canje con el código promocional
+    // (el código no viaja al navegador). Misma pantalla final que el canje manual.
+    const promoBtn = document.getElementById("btn-promo-unlock");
+    if (promoBtn) {
+      promoBtn.addEventListener("click", async () => {
+        if (promoBtn.disabled) return;
+        const msg = document.getElementById("promo-msg");
+        msg.style.display = "none";
+        promoBtn.disabled = true;
+        promoBtn.textContent = t("promoWorking");
+        try {
+          const res = await fetch("/api/promo/redeem", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ submissionId: state.submissionId }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.ok) {
+            trackPixel("trackCustom", "CodeRedeemed", { method: "one_click" });
+            state.paid = true;
+            renderResults();
+            return;
+          }
+          if (data.reason === "already_unlocked") { state.paid = true; renderResults(); return; }
+          if (data.reason === "promo_inactive") { state.promo = { active: false }; renderResults(); return; }
+          throw new Error(data.reason || "failed");
+        } catch (err) {
+          msg.textContent = t("promoError");
+          msg.style.display = "block";
+          // Deja visible el campo manual como respaldo.
+          const codeForm = document.getElementById("code-form");
+          if (codeForm) codeForm.style.display = "block";
+          promoBtn.disabled = false;
+          promoBtn.textContent = t("promoBtn");
+        }
+      });
+    }
 
     if (state.paid) {
       // Ya está pagado — el enlace de descarga ya se muestra arriba, nada más que hacer.
@@ -878,6 +974,7 @@
       return;
     }
     loadMeta().then(() => {
+      applyStaticTexts(); // p. ej. al volver del pago en inglés, la cabecera y el pie también quedan en inglés
       document.getElementById("btn-es").classList.toggle("active", state.lang === "es");
       document.getElementById("btn-en").classList.toggle("active", state.lang === "en");
       render();

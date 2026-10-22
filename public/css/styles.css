@@ -123,3 +123,10 @@ button.secondary, a.secondary {
 .vignette-option.selected { border-color: var(--accent); background: var(--light); }
 footer.foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 44px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 footer.foot img.adamantine-full-logo { height: 40px; width: auto; margin: 2px 0; }
+
+/* Tarjeta de desbloqueo con un clic (promoción). Móvil primero: texto ≥ 18 px y botón ≥ 48 px. */
+.promo-card { background: #FFF7E8; border: 2px solid var(--accent); text-align: center; }
+.promo-card h2 { color: var(--accent-dark); font-size: 23px; line-height: 1.25; margin: 0 0 10px; }
+.promo-card p { font-size: 18px; line-height: 1.45; margin: 0 0 16px; }
+.promo-card p.error { font-size: 18px; margin: 14px 0 0; }
+button.primary.promo-btn { width: 100%; min-height: 56px; font-size: 19px; padding: 14px 18px; }

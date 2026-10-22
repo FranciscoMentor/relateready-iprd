@@ -28,6 +28,7 @@ const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Numb
 // sin pagar. No distingue mayúsculas/minúsculas. Vacío por defecto = nadie
 // puede canjear nada.
 const { FREE_ACCESS_CODES } = require("../services/accessCodes");
+const { PROMO_CODE, PROMO_UNTIL_LABEL, promoActive, makeRateLimiter } = require("../services/promo");
 
 // GET /api/meta?lang=es — todo lo que el frontend necesita para renderizar el test.
 // No se exponen 'keying' ni 'dimension' de los ítems núcleo, para no sesgar
@@ -235,15 +236,10 @@ router.get("/submission/:id/status", (req, res) => {
   });
 });
 
-// POST /api/payment/redeem/:id — código de acceso gratuito (paneles de prueba).
-// Ver FREE_ACCESS_CODES arriba.
-router.post("/payment/redeem/:id", (req, res) => {
-  const sub = loadSubmission(req.params.id);
-  if (!sub) return res.status(404).json({ error: "No encontrado." });
-  const code = String((req.body || {}).code || "").trim().toUpperCase();
-  if (!code || !FREE_ACCESS_CODES.includes(code)) {
-    return res.status(400).json({ error: "Código no válido." });
-  }
+// Aplica un código de acceso gratuito a un envío: mismo estado de pago, misma
+// marca code_redeemed_at y mismo disparo del PDF + correo, sea cual sea el
+// camino (código escrito a mano o botón de un clic de la promoción).
+function applyAccessCode(sub, code, req) {
   db.prepare("UPDATE submissions SET payment_status = ?, payment_reference = ?, code_redeemed_at = ? WHERE id = ?").run(
     "free",
     `CODE:${code}`,
@@ -258,6 +254,48 @@ router.post("/payment/redeem/:id", (req, res) => {
   triggerExtendedReportEmailOnce(sub.id, baseUrl).catch((err) =>
     console.error("[routes/api] Error generando/enviando el Informe Extendido tras canjear código —", err.message)
   );
+}
+
+// POST /api/payment/redeem/:id — código de acceso gratuito escrito a mano
+// (paneles de prueba). Ver FREE_ACCESS_CODES arriba.
+router.post("/payment/redeem/:id", (req, res) => {
+  const sub = loadSubmission(req.params.id);
+  if (!sub) return res.status(404).json({ error: "No encontrado." });
+  const code = String((req.body || {}).code || "").trim().toUpperCase();
+  if (!code || !FREE_ACCESS_CODES.includes(code)) {
+    return res.status(400).json({ error: "Código no válido." });
+  }
+  applyAccessCode(sub, code, req);
+  res.json({ ok: true });
+});
+
+// GET /api/promo/status — ¿hay promoción activa y hasta cuándo? NUNCA revela
+// el código. El cliente lo usa para decidir si muestra la tarjeta de un clic.
+router.get("/promo/status", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ active: promoActive(), until: promoActive() ? PROMO_UNTIL_LABEL : null });
+});
+
+// POST /api/promo/redeem — canje de un clic con el código promocional vigente.
+// Body: { submissionId }. Reutiliza applyAccessCode (misma lógica que el canje
+// manual). El código nunca viaja al navegador. Límite: 8 intentos por minuto
+// por IP y 4 por minuto por envío.
+const promoIpLimit = makeRateLimiter(8, 60 * 1000);
+const promoSubLimit = makeRateLimiter(4, 60 * 1000);
+router.post("/promo/redeem", (req, res) => {
+  const submissionId = String((req.body || {}).submissionId || "");
+  if (!promoIpLimit("ip:" + req.ip) || !promoSubLimit("sub:" + submissionId)) {
+    return res.status(429).json({ error: "Demasiados intentos. Espera un minuto.", reason: "rate_limited" });
+  }
+  if (!promoActive()) {
+    return res.status(410).json({ error: "La promoción ya no está activa.", reason: "promo_inactive" });
+  }
+  const sub = submissionId ? loadSubmission(submissionId) : null;
+  if (!sub) return res.status(404).json({ error: "No encontrado.", reason: "not_found" });
+  if (sub.payment_status && sub.payment_status !== "pending") {
+    return res.status(409).json({ error: "Este informe ya está desbloqueado.", reason: "already_unlocked" });
+  }
+  applyAccessCode(sub, PROMO_CODE, req);
   res.json({ ok: true });
 });
 
