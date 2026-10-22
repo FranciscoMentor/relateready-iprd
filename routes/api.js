@@ -28,7 +28,7 @@ const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Numb
 // sin pagar. No distingue mayúsculas/minúsculas. Vacío por defecto = nadie
 // puede canjear nada.
 const { FREE_ACCESS_CODES } = require("../services/accessCodes");
-const { PROMO_CODE, PROMO_UNTIL_LABEL, promoActive, makeRateLimiter } = require("../services/promo");
+const { getActivePromo, makeRateLimiter } = require("../services/promo");
 
 // GET /api/meta?lang=es — todo lo que el frontend necesita para renderizar el test.
 // No se exponen 'keying' ni 'dimension' de los ítems núcleo, para no sesgar
@@ -273,7 +273,8 @@ router.post("/payment/redeem/:id", (req, res) => {
 // el código. El cliente lo usa para decidir si muestra la tarjeta de un clic.
 router.get("/promo/status", (req, res) => {
   res.set("Cache-Control", "no-store");
-  res.json({ active: promoActive(), until: promoActive() ? PROMO_UNTIL_LABEL : null });
+  const promo = getActivePromo();
+  res.json({ active: !!promo, until: promo ? promo.until : null });
 });
 
 // POST /api/funnel/:id — marca (una sola vez por envío) que se mostró el
@@ -301,7 +302,8 @@ router.post("/promo/redeem", (req, res) => {
   if (!promoIpLimit("ip:" + req.ip) || !promoSubLimit("sub:" + submissionId)) {
     return res.status(429).json({ error: "Demasiados intentos. Espera un minuto.", reason: "rate_limited" });
   }
-  if (!promoActive()) {
+  const promo = getActivePromo();
+  if (!promo) {
     return res.status(410).json({ error: "La promoción ya no está activa.", reason: "promo_inactive" });
   }
   const sub = submissionId ? loadSubmission(submissionId) : null;
@@ -309,7 +311,7 @@ router.post("/promo/redeem", (req, res) => {
   if (sub.payment_status && sub.payment_status !== "pending") {
     return res.status(409).json({ error: "Este informe ya está desbloqueado.", reason: "already_unlocked" });
   }
-  applyAccessCode(sub, PROMO_CODE, req);
+  applyAccessCode(sub, promo.code, req);
   res.json({ ok: true });
 });
 

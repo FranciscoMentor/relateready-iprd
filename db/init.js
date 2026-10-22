@@ -88,7 +88,7 @@ addColumnIfMissing("country", "country TEXT");
 addColumnIfMissing("extended_email_status", "extended_email_status TEXT");
 addColumnIfMissing("extended_email_error", "extended_email_error TEXT");
 
-// ── Migración: seguimiento de la campaña del código TEST999 (2026-10) ──────
+// ── Migración: seguimiento de campañas con código gratuito (2026-10) ───────
 // Guarda de qué anuncio/campaña llegó cada persona (parámetros utm_* y si
 // venía de un clic en un anuncio de Meta) y cuándo canjeó el código gratis.
 // Ver el panel /admin/campana-codigo. Seguro de ejecutar en cada arranque.
@@ -104,6 +104,33 @@ addColumnIfMissing("code_redeemed_at", "code_redeemed_at TEXT");
 // por envío (ver POST /api/funnel/:id en routes/api.js).
 addColumnIfMissing("summary_viewed_at", "summary_viewed_at TEXT");
 addColumnIfMissing("unlock_clicked_at", "unlock_clicked_at TEXT");
+
+// ── Campañas / promociones (pestaña "Campañas con código" del panel) ───────
+// Cada fila es una promoción: nombre, código gratuito, fechas (hora de
+// Ecuador) y si muestra el botón de un clic. Es la ÚNICA fuente de fechas y
+// de código de la promoción: no hay fechas ni códigos fijos en el programa
+// (ver services/promo.js). Para una promoción nueva basta crear aquí otra
+// campaña y agregar su código a FREE_ACCESS_CODES en Render.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS campaigns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    code TEXT NOT NULL,
+    date_from TEXT NOT NULL,
+    date_to TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+`);
+{
+  const campCols = db.prepare("PRAGMA table_info(campaigns)").all().map((c) => c.name);
+  if (!campCols.includes("one_click")) {
+    // one_click = 1 → mientras la campaña esté vigente, quien llega de Meta ve
+    // el botón "Desbloquear mi informe gratis". Las campañas que ya existían
+    // (la promoción en curso) quedan activadas una sola vez, al crear la columna.
+    db.exec("ALTER TABLE campaigns ADD COLUMN one_click INTEGER NOT NULL DEFAULT 0");
+    db.exec("UPDATE campaigns SET one_click = 1");
+  }
+}
 
 
 // ═══════════════════════════════════════════════════════════════════════

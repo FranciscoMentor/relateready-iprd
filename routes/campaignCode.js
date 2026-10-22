@@ -1,12 +1,12 @@
 // routes/campaignCode.js
-// Datos de análisis de una campaña con código gratuito (por ejemplo TEST999,
-// vigente hasta el 31 de octubre de 2026). Se monta en /admin/api/campana-codigo
-// (detrás del login de administrador) y alimenta la pestaña "Campaña TEST999" de /panel-control; muestra: cuántos tests se completaron,
+// Datos de análisis de una campaña con código gratuito (cada campaña tiene su
+// propio código y fechas, y se crea desde el panel). Se monta en /admin/api/campana-codigo
+// (detrás del login de administrador) y alimenta la pestaña "Campañas con código" de /panel-control; muestra: cuántos tests se completaron,
 // cuántos canjearon el código, de qué anuncio/campaña llegó cada persona (por
 // los parámetros utm_* guardados al terminar el test), el avance diario y la
 // descarga del detalle en CSV. Casi todo es lectura; la única escritura es /sync-sessions, que marca como "sesion_agendada" a quien agendó en Bookings.
 //
-// Parámetros (todos opcionales): ?code=TEST999&from=2026-10-21&to=2026-10-31
+// Parámetros (todos opcionales): ?campaign=<id> o ?code=<CODIGO>&from=AAAA-MM-DD&to=AAAA-MM-DD
 // Las fechas se interpretan en hora de Ecuador (UTC-5).
 
 const express = require("express");
@@ -18,26 +18,14 @@ const db = require("../db/init");
 // borrar una campaña aquí NUNCA toca los envíos ni los códigos del sitio.
 // Para que un código nuevo funcione en el test hay que agregarlo también a la
 // variable FREE_ACCESS_CODES en Render.
-db.exec(`
-  CREATE TABLE IF NOT EXISTS campaigns (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    code TEXT NOT NULL,
-    date_from TEXT NOT NULL,
-    date_to TEXT NOT NULL,
-    created_at TEXT NOT NULL
-  );
-`);
-if (!db.prepare("SELECT COUNT(*) AS n FROM campaigns").get().n) {
-  db.prepare("INSERT INTO campaigns (name, code, date_from, date_to, created_at) VALUES (?,?,?,?,?)").run(
-    "Promoción TEST999 · todo gratis hasta el 31 de octubre", "TEST999", "2026-10-21", "2026-10-31", new Date().toISOString()
-  );
-}
+// (La tabla campaigns y su columna one_click se crean en db/init.js. Ya no se
+// siembra ninguna campaña: las promociones se crean desde el panel.)
 
 const TZ_OFFSET_HOURS = -5; // Ecuador
-const DEFAULT_CODE = "TEST999";
-const DEFAULT_FROM = "2026-10-21";
-const DEFAULT_TO = "2026-10-31";
+// Sin campaña seleccionada no hay código ni fechas fijas: se usa el último mes.
+const DEFAULT_CODE = "";
+const defaultTo = () => localDay(new Date().toISOString());
+const defaultFrom = () => localDay(new Date(Date.now() - 30 * 86400000).toISOString());
 const SESSION_STATES = ["sesion_agendada", "sesion_realizada", "cliente_mentoring"];
 
 function validDate(s, fallback) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || "")) ? s : fallback; }
@@ -51,8 +39,8 @@ function loadCampaign(query) {
   let saved = null;
   if (query.campaign) saved = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(Number(query.campaign));
   const code = String((saved ? saved.code : query.code) || DEFAULT_CODE).trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "") || DEFAULT_CODE;
-  const from = validDate(saved ? saved.date_from : query.from, DEFAULT_FROM);
-  const to = validDate(saved ? saved.date_to : query.to, DEFAULT_TO);
+  const from = validDate(saved ? saved.date_from : query.from, defaultFrom());
+  const to = validDate(saved ? saved.date_to : query.to, defaultTo());
   // Rango en UTC: inicio del día "from" y fin del día "to" en hora de Ecuador.
   const startUtc = new Date(Date.parse(from + "T00:00:00Z") - TZ_OFFSET_HOURS * 3600000).toISOString();
   const endUtc = new Date(Date.parse(to + "T00:00:00Z") + 86400000 - TZ_OFFSET_HOURS * 3600000).toISOString();
@@ -154,27 +142,28 @@ router.post("/sync-sessions", (req, res) => {
 
 // Lista de campañas guardadas.
 router.get("/list", (req, res) => {
-  res.json(db.prepare("SELECT id, name, code, date_from AS \"from\", date_to AS \"to\" FROM campaigns ORDER BY id DESC").all());
+  res.json(db.prepare("SELECT id, name, code, date_from AS \"from\", date_to AS \"to\", one_click AS oneClick FROM campaigns ORDER BY id DESC").all());
 });
 
-// Crea o actualiza una campaña: { id?, name, code, from, to }.
+// Crea o actualiza una campaña: { id?, name, code, from, to, oneClick }.
 router.post("/save", (req, res) => {
   const b = req.body || {};
   const name = String(b.name || "").trim().slice(0, 120);
   const code = String(b.code || "").trim().toUpperCase();
   const from = String(b.from || "");
   const to = String(b.to || "");
+  const oneClick = b.oneClick ? 1 : 0;
   if (!name) return res.status(400).json({ error: "Escribe un nombre para la campaña." });
   if (!/^[A-Z0-9_-]{3,30}$/.test(code)) return res.status(400).json({ error: "El código debe tener de 3 a 30 letras, números, guiones o guion bajo." });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) {
     return res.status(400).json({ error: "Revisa las fechas: la fecha final no puede ser anterior a la inicial." });
   }
   if (b.id) {
-    const r = db.prepare("UPDATE campaigns SET name=?, code=?, date_from=?, date_to=? WHERE id=?").run(name, code, from, to, Number(b.id));
+    const r = db.prepare("UPDATE campaigns SET name=?, code=?, date_from=?, date_to=?, one_click=? WHERE id=?").run(name, code, from, to, oneClick, Number(b.id));
     if (!r.changes) return res.status(404).json({ error: "No se encontró esa campaña." });
     return res.json({ ok: true, id: Number(b.id) });
   }
-  const r = db.prepare("INSERT INTO campaigns (name, code, date_from, date_to, created_at) VALUES (?,?,?,?,?)").run(name, code, from, to, new Date().toISOString());
+  const r = db.prepare("INSERT INTO campaigns (name, code, date_from, date_to, one_click, created_at) VALUES (?,?,?,?,?,?)").run(name, code, from, to, oneClick, new Date().toISOString());
   res.json({ ok: true, id: Number(r.lastInsertRowid) });
 });
 
@@ -186,7 +175,7 @@ router.post("/delete", (req, res) => {
   res.json({ ok: true });
 });
 
-// JSON para la pestaña "Campaña TEST999" de /panel-control.
+// JSON para la pestaña "Campañas con código" de /panel-control.
 router.get("/", (req, res) => {
   const d = loadCampaign(req.query);
   res.json({

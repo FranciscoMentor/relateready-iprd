@@ -226,7 +226,7 @@
     </div>
   </section>
 
-  <!-- ═══════════════════ CAMPAÑA TEST999 ═══════════════════ -->
+  <!-- ═══════════════════ CAMPAÑAS CON CÓDIGO ═══════════════════ -->
   <section class="section" id="sec-campana">
     <div class="filters" id="campBar">
       <select id="campSelect" style="min-width:280px;"></select>
@@ -242,11 +242,12 @@
       <h2 style="margin:0 0 12px;font-size:15px;" id="campFormTitle">Nueva campaña</h2>
       <div class="filters" style="margin-bottom:8px;">
         <input type="text" id="cfName" placeholder="Nombre de la campaña" style="min-width:300px;" required>
-        <input type="text" id="cfCode" placeholder="Código (ej. TEST999)" style="width:170px;text-transform:uppercase;" required>
+        <input type="text" id="cfCode" placeholder="Código (ej. PROMO2026)" style="width:170px;text-transform:uppercase;" required>
         <label class="muted">Desde <input type="date" id="cfFrom" required></label>
         <label class="muted">Hasta <input type="date" id="cfTo" required></label>
       </div>
-      <p class="muted" style="margin:0 0 12px;">Para que un código nuevo funcione en el sitio, agrégalo también a la variable <b>FREE_ACCESS_CODES</b> en Render (separado por coma). Aquí solo se define qué código y qué fechas se analizan; no se borra ni cambia ningún dato.</p>
+      <label style="display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13.5px;"><input type="checkbox" id="cfOneClick"> <span><b>Botón de un clic:</b> mientras la campaña esté vigente (hora de Ecuador, fechas inclusive), quien llegue desde un anuncio de Meta verá el botón "Desbloquear mi informe gratis".</span></label>
+      <p class="muted" style="margin:0 0 12px;">Para una promoción nueva: 1) agrega el código a la variable <b>FREE_ACCESS_CODES</b> en Render (separado por coma); 2) crea aquí la campaña con ese código y las fechas; 3) publica el anuncio en Meta. No hay que subir código. Si quitas el código de Render, el botón se apaga aunque la fecha no haya pasado. Guardar una campaña no borra ni cambia ningún dato.</p>
       <p id="cfMsg" class="muted" style="color:var(--bad);margin:0 0 10px;"></p>
       <button type="submit" class="btn">Guardar</button>
       <button type="button" class="btn ghost" id="cfCancel">Cancelar</button>
@@ -587,7 +588,7 @@
   }
   document.getElementById("btnRefreshReferrals").addEventListener("click", loadReferrals);
 
-  // ── Campaña del código gratuito (TEST999) ──
+  // ── Campañas / promociones con código gratuito ──
   const campPct = (a, b) => (b ? (Math.round((a / b) * 1000) / 10) + "%" : "—");
   function campGroupRows(id, groups) {
     const el = document.getElementById(id);
@@ -604,7 +605,7 @@
     if (selectId) campId = selectId;
     if (!campList.find(c => String(c.id) === String(campId))) campId = campList.length ? campList[0].id : null;
     document.getElementById("campSelect").innerHTML = campList.length
-      ? campList.map(c => `<option value="${c.id}" ${String(c.id)===String(campId)?"selected":""}>${esc(c.name)} · ${esc(c.code)}</option>`).join("")
+      ? campList.map(c => `<option value="${c.id}" ${String(c.id)===String(campId)?"selected":""}>${esc(c.name)} · ${esc(c.code)}${c.oneClick ? " · botón de un clic" : ""}</option>`).join("")
       : '<option value="">Todavía no hay campañas</option>';
   }
   function showCampForm(c) {
@@ -614,6 +615,7 @@
     document.getElementById("cfCode").value = c ? c.code : "";
     document.getElementById("cfFrom").value = c ? c.from : new Date().toISOString().slice(0,10);
     document.getElementById("cfTo").value = c ? c.to : "";
+    document.getElementById("cfOneClick").checked = c ? !!c.oneClick : true;
     document.getElementById("cfMsg").textContent = "";
     document.getElementById("campEditForm").style.display = "block";
   }
@@ -682,7 +684,7 @@
   });
   document.getElementById("campEditForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const body = { id: campEditing ? campEditing.id : undefined, name: document.getElementById("cfName").value, code: document.getElementById("cfCode").value, from: document.getElementById("cfFrom").value, to: document.getElementById("cfTo").value };
+    const body = { id: campEditing ? campEditing.id : undefined, name: document.getElementById("cfName").value, code: document.getElementById("cfCode").value, from: document.getElementById("cfFrom").value, to: document.getElementById("cfTo").value, oneClick: document.getElementById("cfOneClick").checked };
     const res = await fetch("/admin/api/campana-codigo/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await res.json();
     if (!res.ok) { document.getElementById("cfMsg").textContent = d.error || "No se pudo guardar."; return; }

@@ -1,30 +1,52 @@
 // services/promo.js
 //
-// Promoción vigente del Informe Extendido gratis con un clic (relanzamiento de
-// la campaña, 26 de octubre de 2026). El código promocional NUNCA sale del
-// servidor: el navegador solo sabe si hay promoción activa y hasta cuándo, y
-// pide el canje con un clic (POST /api/promo/redeem); el servidor aplica el
-// código aquí.
+// Promoción vigente del Informe Extendido gratis con un clic. NO hay códigos ni
+// fechas escritos en el programa: todo sale de la pestaña "Campañas con código"
+// del panel (tabla campaigns). Una promoción está vigente cuando:
+//   1. la campaña tiene activado "Botón de un clic" (one_click),
+//   2. hoy (hora de Ecuador, UTC-5, la misma que usa el panel) está entre su
+//      fecha "Desde" y su fecha "Hasta", ambas inclusive, y
+//   3. su código sigue en FREE_ACCESS_CODES (variable de Render). Si quitas el
+//      código de Render, la promoción se apaga sola aunque la fecha no haya pasado.
+// El código NUNCA sale del servidor: el navegador solo sabe si hay promoción
+// activa, y pide el canje con un clic (POST /api/promo/redeem). Esta variable
+// de Render solo se lee, nunca se modifica desde aquí.
 //
-// La promoción está activa solo si se cumplen las dos condiciones:
-//   1. el código promocional sigue en FREE_ACCESS_CODES (variable de Render:
-//      al quitar TEST999 el 1 de noviembre la promoción se apaga sola), y
-//   2. la fecha actual no pasa del final del 31 de octubre de 2026.
-// Esta variable NO se modifica desde aquí; solo se lee.
+// Para una promoción nueva: (1) agrega el código nuevo a FREE_ACCESS_CODES en
+// Render, (2) crea una campaña en el panel con ese código, las fechas y el
+// botón de un clic activado, y (3) publica el anuncio en Meta. No hay que
+// cambiar ni subir código.
 
+const db = require("../db/init");
 const { isValidAccessCode, normalizeCode } = require("./accessCodes");
 
-// Código de la promoción. Se puede cambiar con la variable PROMO_CODE (opcional);
-// por defecto, TEST999.
-const PROMO_CODE = normalizeCode(process.env.PROMO_CODE || "TEST999");
+const TZ_OFFSET_HOURS = -5; // Ecuador, igual que routes/campaignCode.js
 
-// Fin de la promoción: 31 de octubre de 2026 a las 23:59 hora del Pacífico de
-// EE. UU. (el último huso del mercado), es decir, 1 de noviembre 08:00 UTC.
-const PROMO_ENDS_AT = Date.parse(process.env.PROMO_ENDS_AT || "2026-11-01T08:00:00Z");
-const PROMO_UNTIL_LABEL = "2026-10-31";
+function todayEcuador(now = Date.now()) {
+  return new Date(now + TZ_OFFSET_HOURS * 3600000).toISOString().slice(0, 10);
+}
+
+/** Devuelve { code, until, name } de la promoción vigente, o null si no hay ninguna. */
+function getActivePromo(now = Date.now()) {
+  let rows;
+  try {
+    rows = db.prepare("SELECT name, code, date_from, date_to FROM campaigns WHERE one_click = 1 ORDER BY id DESC").all();
+  } catch (e) {
+    console.error("[promo] No se pudo leer la tabla campaigns —", e.message);
+    return null;
+  }
+  const today = todayEcuador(now);
+  for (const r of rows) {
+    const code = normalizeCode(r.code);
+    if (code && isValidAccessCode(code) && today >= r.date_from && today <= r.date_to) {
+      return { code, until: r.date_to, name: r.name };
+    }
+  }
+  return null;
+}
 
 function promoActive(now = Date.now()) {
-  return isValidAccessCode(PROMO_CODE) && Number.isFinite(PROMO_ENDS_AT) && now < PROMO_ENDS_AT;
+  return !!getActivePromo(now);
 }
 
 // Límite de peticiones muy básico en memoria: máximo `max` por ventana, por clave.
@@ -41,4 +63,4 @@ function makeRateLimiter(max, windowMs) {
   };
 }
 
-module.exports = { PROMO_CODE, PROMO_UNTIL_LABEL, promoActive, makeRateLimiter };
+module.exports = { getActivePromo, promoActive, makeRateLimiter };
