@@ -94,7 +94,7 @@
       of: "de",
       otherSpecify: "Especifica tu situación",
       referralTitle: "¿Conoces a alguien a quien esto pueda ayudarle?",
-      referralBody: "Si crees que este proceso puede ser valioso para alguien que conoces — tu pareja, un amigo, un familiar — te invitamos a compartírselo. Solo te toma un minuto, y podría ser justo lo que esa persona necesita en este momento.",
+      referralBody: "Si crees que este proceso puede ser valioso para alguien que conoces — un amigo, un familiar, alguien cercano — te invitamos a compartírselo. Solo te toma un minuto, y podría ser justo lo que esa persona necesita en este momento.",
       referralBtn: "Recomienda RelateReady a un amigo/a",
     },
     en: {
@@ -168,7 +168,7 @@
       of: "of",
       otherSpecify: "Specify your situation",
       referralTitle: "Know someone this could help?",
-      referralBody: "If you think this process could be valuable for someone you know — your partner, a friend, a family member — we invite you to share it with them. It only takes a minute, and it might be exactly what that person needs right now.",
+      referralBody: "If you think this process could be valuable for someone you know — a friend, a family member, someone close to you — we invite you to share it with them. It only takes a minute, and it might be exactly what that person needs right now.",
       referralBtn: "Refer RelateReady to a friend",
     },
   };
@@ -238,7 +238,11 @@
   }
 
   async function loadMeta() {
-    const res = await fetch(`/api/meta?lang=${state.lang}`);
+    // Con la situación relacional ya elegida (paso de datos), el servidor
+    // devuelve viñetas, ítems y preguntas cualitativas con la redacción
+    // adaptada a esa situación (en pareja, separado/a, divorciado/a, etc.).
+    const ctx = state.relationshipContextCode ? `&context=${encodeURIComponent(state.relationshipContextCode)}` : "";
+    const res = await fetch(`/api/meta?lang=${state.lang}${ctx}`);
     state.meta = await res.json();
   }
 
@@ -359,7 +363,7 @@
       state.relationshipContextText = contextText;
       state.step = "vignettes";
       state.vignetteIndex = 0;
-      render();
+      loadMeta().then(render).catch(() => render());
     });
   }
 

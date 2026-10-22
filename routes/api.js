@@ -4,16 +4,15 @@ const router = express.Router();
 
 const db = require("../db/init");
 const { DIMENSIONS } = require("../data/dimensions");
-const { VIGNETTES } = require("../data/vignettes");
-const { RELATIONSHIP_CONTEXTS } = require("../data/relationshipContexts");
-const { buildFlatCoreItems, buildFlatDesirabilityItems, buildFlatQualitativeItems } = require("../data/items");
+const { vignettesForGroup } = require("../data/vignettes");
+const { RELATIONSHIP_CONTEXTS, contextGroup } = require("../data/relationshipContexts");
+const { buildFlatCoreItems, buildFlatDesirabilityItems, coreItemsForGroup, qualitativeItemsForGroup } = require("../data/items");
 const { scoreTest, checkReferralProtocol } = require("../services/scoring");
 const { preparePayment, confirmPayment, PAYPHONE_ENABLED } = require("../services/payphone");
 const { generatePdfForSubmission, sendExtendedReportEmail, triggerExtendedReportEmailOnce, pdfFilename } = require("../services/extendedReport");
 
 const CORE_ITEMS_FLAT = buildFlatCoreItems();
 const DESIRABILITY_ITEMS_FLAT = buildFlatDesirabilityItems();
-const QUALITATIVE_ITEMS_FLAT = buildFlatQualitativeItems();
 
 // Precio del Informe Extendido, en centavos. Por defecto $24.99 (ver
 // IPRD_estrategia_mercado_y_precio.docx), pero se puede cambiar en cualquier
@@ -33,23 +32,31 @@ const { FREE_ACCESS_CODES } = require("../services/accessCodes");
 // GET /api/meta?lang=es — todo lo que el frontend necesita para renderizar el test.
 // No se exponen 'keying' ni 'dimension' de los ítems núcleo, para no sesgar
 // las respuestas de la persona que hace el test.
+//
+// Parámetro opcional ?context=<código de situación relacional>: tras el paso
+// de datos personales el frontend lo vuelve a pedir con el contexto elegido
+// y recibe viñetas, ítems y preguntas cualitativas con la redacción adaptada
+// a esa situación (en pareja, separado/a, divorciado/a, viudo/a, buscando…).
+// Los ids de los ítems no cambian, así que el puntaje se calcula igual.
 router.get("/meta", (req, res) => {
   const lang = req.query.lang === "en" ? "en" : "es";
+  const group = req.query.context ? contextGroup(String(req.query.context)) : "buscando";
+  const coreItems = coreItemsForGroup(CORE_ITEMS_FLAT, group);
   res.json({
     lang,
     payphoneEnabled: PAYPHONE_ENABLED,
     extendedPriceCents: EXTENDED_PRICE_CENTS,
     dimensions: DIMENSIONS.map((d) => ({ code: d.code, label: d[lang] })),
     relationshipContexts: RELATIONSHIP_CONTEXTS.map((c) => ({ code: c.code, label: c[lang] })),
-    vignettes: VIGNETTES.map((v) => ({
+    vignettes: vignettesForGroup(group).map((v) => ({
       id: v.id,
       escenario: v.escenario[lang],
       pregunta: v.pregunta[lang],
       opciones: v.opciones.map((o) => ({ key: o.key, text: o[lang] })),
     })),
-    coreItems: CORE_ITEMS_FLAT.map((i) => ({ id: i.id, text: i[lang] })),
+    coreItems: coreItems.map((i) => ({ id: i.id, text: i[lang] })),
     desirabilityItems: DESIRABILITY_ITEMS_FLAT.map((i) => ({ id: i.id, text: i[lang] })),
-    qualitativeItems: QUALITATIVE_ITEMS_FLAT.map((i) => ({ id: i.id, text: i[lang] })),
+    qualitativeItems: qualitativeItemsForGroup(group).map((i) => ({ id: i.id, text: i[lang] })),
   });
 });
 

@@ -2,6 +2,7 @@
 const PDFDocument = require("pdfkit");
 const path = require("path");
 const { dimensionLabel, DIMENSION_CODES } = require("../data/dimensions");
+const { contextGroup } = require("../data/relationshipContexts");
 const { getBandContent, SOCIAL_DESIRABILITY_NOTE, REFERRAL_MESSAGE } = require("../data/reportContent");
 
 // Set de 8 íconos de marca (uno por pilar/dimensión), aprobado por Francisco
@@ -103,12 +104,12 @@ const FRIEND_REFERRAL_FORM_LINK =
 const FRIEND_REFERRAL_COPY = {
   es: {
     title: "¿Conoces a alguien a quien esto pueda ayudarle?",
-    body: "Si crees que este proceso puede ser valioso para alguien que conoces — tu pareja, un amigo, un familiar — te invitamos a compartírselo. Solo te toma un minuto, y podría ser justo lo que esa persona necesita en este momento.",
+    body: "Si crees que este proceso puede ser valioso para alguien que conoces — un amigo, un familiar, alguien cercano — te invitamos a compartírselo. Solo te toma un minuto, y podría ser justo lo que esa persona necesita en este momento.",
     btn: "Recomienda RelateReady a un amigo/a",
   },
   en: {
     title: "Know someone this could help?",
-    body: "If you think this process could be valuable for someone you know — your partner, a friend, a family member — we invite you to share it with them. It only takes a minute, and it might be exactly what that person needs right now.",
+    body: "If you think this process could be valuable for someone you know — a friend, a family member, someone close to you — we invite you to share it with them. It only takes a minute, and it might be exactly what that person needs right now.",
     btn: "Refer RelateReady to a friend",
   },
 };
@@ -449,7 +450,10 @@ function bulletList(doc, items, opts = {}) {
 function stripInlineMarkdown(s) {
   return String(s || "")
     .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/(^|\s)\*(\S(?:.*?\S)?)\*(?=\s|$)/g, "$1$2")
+    // Cursiva *texto*: también cuando el cierre va pegado a puntuación o a una
+    // raya (p. ej. *"Necesito decir no"*—), caso que antes dejaba asteriscos
+    // literales en el PDF (informe real en inglés, 2026-10-22).
+    .replace(/\*([^*\n]+?)\*/g, "$1")
     .trim();
 }
 
@@ -702,7 +706,10 @@ function coverPage(doc, lang, participant) {
     .text(
       T(
         lang,
-        "Listos por dentro. Listos en pareja: la preparación empieza contigo, no con la otra persona.",
+        // Eslogan de marca; en femenino para quien se identificó como mujer.
+        participant && participant.gender === "F"
+          ? "Listas por dentro. Listas en pareja: la preparación empieza contigo, no con la otra persona."
+          : "Listos por dentro. Listos en pareja: la preparación empieza contigo, no con la otra persona.",
         "Ready Within. Ready Together — readiness starts with you, not the other person."
       ),
       70,
@@ -773,15 +780,40 @@ function coverPage(doc, lang, participant) {
   doc.font("Helvetica");
 }
 
+// Cierre de la frase de la introducción según la situación relacional que la
+// persona declaró en el intake (grupo de data/relationshipContexts.js). Para
+// "buscando" se conserva el texto original; las demás situaciones ya no
+// asumen que la persona está soltera y buscando un "próximo vínculo".
+const INTRO_FOCUS = {
+  buscando: {
+    es: "antes o durante tu próximo vínculo",
+    en: "before or during your next relationship",
+  },
+  en_pareja: {
+    es: "en la relación que vives hoy",
+    en: "in the relationship you are in today",
+  },
+  reconstruyendo: {
+    es: "mientras te reconstruyes y decides cómo quieres vivir tus vínculos de aquí en adelante",
+    en: "as you rebuild and decide how you want to live your relationships from here on",
+  },
+  abierto: {
+    es: "en los vínculos que vives hoy y en los que vengan",
+    en: "in the relationships you live today and in those to come",
+  },
+};
+
 function introPage(doc, lang, participant) {
   doc.addPage();
   h1(doc, T(lang, "Introducción", "Introduction"));
+  const focus = INTRO_FOCUS[contextGroup(participant.contextCode)];
   body(
     doc,
     T(
       lang,
-      `Hola ${participant.name}. Este informe no busca decirte si eres "apto" o "no apto" para el amor — nadie lo es de una vez y para siempre. Busca mostrarte, con la mayor honestidad posible, qué patrones aprendidos tienes ya consolidados como fortalezas, y en cuáles conviene poner atención antes o durante tu próximo vínculo. Tómalo como un mapa, no como una sentencia.`,
-      `Hi ${participant.name}. This report isn't here to tell you whether you're "fit" or "unfit" for love — no one is, once and for all. It's here to show you, as honestly as possible, which learned patterns you already have solidly built as strengths, and which ones are worth paying attention to before or during your next relationship. Think of it as a map, not a verdict.`
+      // Sin "apto/no apto" (forma masculina): el informe no es un examen.
+      `Hola ${participant.name}. Este informe no es un examen que se aprueba o se reprueba — nadie "califica" para el amor de una vez y para siempre. Busca mostrarte, con la mayor honestidad posible, qué patrones aprendidos tienes ya consolidados como fortalezas, y en cuáles conviene poner atención ${focus.es}. Tómalo como un mapa, no como una sentencia.`,
+      `Hi ${participant.name}. This report isn't an exam you pass or fail — no one "qualifies" for love once and for all. It's here to show you, as honestly as possible, which learned patterns you already have solidly built as strengths, and which ones are worth paying attention to ${focus.en}. Think of it as a map, not a verdict.`
     )
   );
   mentorReviewBlock(doc, lang);
@@ -833,7 +865,7 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
     doc,
     T(
       lang,
-      "RelateReady no te da una sola nota. Te muestra tu preparación en 8 áreas distintas de la vida en pareja, cada una con su propio resultado.",
+      "RelateReady no te da una sola nota. Te muestra tu preparación en 8 áreas distintas de tus vínculos de pareja, cada una con su propio resultado.",
       "RelateReady doesn't give you a single score. It shows your readiness across 8 different areas of relationship life, each with its own result."
     )
   );

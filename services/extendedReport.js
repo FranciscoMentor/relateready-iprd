@@ -57,6 +57,7 @@ async function generatePdfForSubmission(sub) {
     name: sub.name,
     lang: sub.lang,
     gender: sub.gender,
+    relationshipContextCode: sub.relationship_context_code,
     relationshipContextLabel: contextLabel,
     relationshipContextText: sub.relationship_context_text,
     scoreResult: sub.scoreResult,
@@ -65,7 +66,7 @@ async function generatePdfForSubmission(sub) {
   });
 
   return generateExtendedReportPDF({
-    participant: { name: sub.name, lang: sub.lang, gender: sub.gender },
+    participant: { name: sub.name, lang: sub.lang, gender: sub.gender, contextCode: sub.relationship_context_code },
     scoreResult: sub.scoreResult,
     referral: { triggered: !!sub.referral_triggered },
     aiSections,

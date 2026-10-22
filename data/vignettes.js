@@ -51,11 +51,42 @@ const VIGNETTES = [
     },
     opciones: [
       { key: "a", pattern: "alta_intimidad", es: "Se lo contaría abiertamente, esperando que me acompañe.", en: "I'd tell them openly, hoping they'd be there for me." },
-      { key: "b", pattern: "ansioso_pasivo", es: "Esperaría a que lo note por sí misma antes de decir algo.", en: "I'd wait for them to notice on their own before saying anything." },
+      { key: "b", pattern: "ansioso_pasivo", es: "Esperaría a que se dé cuenta antes de decir algo.", en: "I'd wait for them to notice on their own before saying anything." },
       { key: "c", pattern: "baja_apertura", es: "Minimizaría lo que sentí, incluso ante mí mismo/a.", en: "I'd downplay what I felt, even to myself." },
       { key: "d", pattern: "evitativo", es: "Buscaría resolverlo solo/a antes de mencionarlo, si es que llego a mencionarlo.", en: "I'd try to work through it on my own before mentioning it, if I mention it at all." },
     ],
   },
 ];
 
-module.exports = { VIGNETTES };
+// ── Adaptación por situación relacional ─────────────────────────────────────
+// Las viñetas no se puntúan (solo dan tono al informe), así que su escenario
+// puede nombrar a la otra persona según la situación: "tu pareja" (en_pareja),
+// "alguien con quien estás saliendo" (buscando) o "una persona muy cercana a
+// ti" (reconstruyendo / abierto, para no asumir que hay —o hubo— una pareja).
+// Las opciones de respuesta no cambian.
+const VIGNETTE_SCENARIOS = {
+  VIG01: {
+    buscando: { es: "Alguien con quien estás saliendo llega tarde a una cita importante sin avisar. Cuando por fin llega, no da mayor explicación.", en: "Someone you’re dating arrives late to an important date without letting you know. When they finally arrive, they don't offer much of an explanation." },
+    neutral: { es: "Una persona muy cercana a ti llega tarde a una cita importante sin avisar. Cuando por fin llega, no da mayor explicación.", en: "Someone very close to you arrives late to an important meeting without letting you know. When they finally arrive, they don't offer much of an explanation." },
+  },
+  VIG02: {
+    buscando: { es: "Llevas una semana intensa de trabajo. Alguien con quien estás saliendo te propone pasar el fin de semana completo juntos, sin planes de por medio.", en: "You've had an intense week of work. Someone you're dating suggests spending the entire weekend together, with no plans at all." },
+    neutral: { es: "Llevas una semana intensa de trabajo. Una persona muy cercana a ti te propone pasar el fin de semana completo juntos, sin planes de por medio.", en: "You've had an intense week of work. Someone very close to you suggests spending the entire weekend together, with no plans at all." },
+  },
+  VIG03: {
+    buscando: { es: "Algo te afectó profundamente durante el día, pero la persona con la que estás saliendo no lo ha notado.", en: "Something affected you deeply during the day, but the person you're dating hasn't noticed." },
+    neutral: { es: "Algo te afectó profundamente durante el día, pero la persona más cercana a ti no lo ha notado.", en: "Something affected you deeply during the day, but the person closest to you hasn't noticed." },
+  },
+};
+
+// Devuelve las viñetas con el escenario adaptado al grupo ("en_pareja" y
+// grupo desconocido conservan el texto original: "tu pareja").
+function vignettesForGroup(group) {
+  const key = group === "buscando" ? "buscando" : group === "reconstruyendo" || group === "abierto" ? "neutral" : null;
+  return VIGNETTES.map((v) => {
+    const alt = key && VIGNETTE_SCENARIOS[v.id] && VIGNETTE_SCENARIOS[v.id][key];
+    return alt ? { ...v, escenario: alt } : v;
+  });
+}
+
+module.exports = { VIGNETTES, vignettesForGroup };

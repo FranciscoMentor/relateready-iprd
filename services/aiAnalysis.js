@@ -13,6 +13,7 @@
 
 const Anthropic = require("@anthropic-ai/sdk");
 const { dimensionLabel } = require("../data/dimensions");
+const { contextGroup } = require("../data/relationshipContexts");
 
 const MOCK_MODE = !process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
@@ -54,6 +55,44 @@ function fmtList(codes, lang, dimensions) {
   return codes.map((c) => fmtDim(c, lang, dimensions[c].index)).join(", ");
 }
 
+// ── Adaptación a la situación de la persona ─────────────────────────────────
+// El público incluye gente en pareja, separada, divorciada o viuda, no solo
+// solteros. Estas reglas se añaden a cada prompt para que la IA NO asuma que
+// la persona busca "su próxima pareja" y respete su situación real.
+const CONTEXT_RULES = {
+  buscando: {
+    es: "La persona no tiene pareja ahora. Puedes hablar de vínculos futuros, de cómo se presenta al conocer a alguien y de patrones que se repiten entre relaciones.",
+    en: "The person has no partner right now. You may talk about future relationships, how they show up when meeting someone, and patterns that repeat across relationships.",
+  },
+  en_pareja: {
+    es: "La persona YA está en una relación. No hables de 'tu próxima pareja' ni de 'cuando conozcas a alguien'. Habla de la relación actual: cómo cuidarla, comunicarse, pedir y poner límites dentro de ella. Si su texto libre menciona a su pareja, respétalo sin juzgar a esa otra persona.",
+    en: "The person is ALREADY in a relationship. Do not say 'your next partner' or 'when you meet someone'. Speak about the current relationship: how to care for it, communicate, ask, and set boundaries within it. If their free text mentions their partner, respect that without judging the other person.",
+  },
+  reconstruyendo: {
+    es: "La persona viene de una separación, divorcio, viudez o ruptura. NO asumas que quiere pareja nueva ni que debe buscarla; el foco es reconstruirse, entender lo vivido y decidir con libertad qué quiere de sus vínculos (familia, amistades, una posible pareja futura o ninguna). Sé especialmente delicado/a: no culpes a la persona ni a su expareja, no uses 'tus fracasos', y si es viudez, habla de duelo y de apertura con respeto, sin prisa. No uses 'tu pareja' en presente.",
+    en: "The person is coming from a separation, divorce, widowhood or breakup. Do NOT assume they want, or should look for, a new partner; the focus is rebuilding, making sense of what they lived, and freely deciding what they want from their relationships (family, friendships, a possible future partner, or none). Be especially gentle: do not blame the person or their ex, do not use 'your failures', and if widowed, speak of grief and opening up with respect and no rush. Do not use 'your partner' in the present tense.",
+  },
+  abierto: {
+    es: "No asumas si la persona tiene pareja o no, ni que busca una. Guíate por su texto libre y usa un lenguaje neutro como 'tus vínculos' o 'tus relaciones cercanas'.",
+    en: "Do not assume whether the person has a partner or wants one. Follow their free text and use neutral wording such as 'your relationships' or 'the people close to you'.",
+  },
+};
+
+function contextRules(code, lang) {
+  const r = CONTEXT_RULES[contextGroup(code)];
+  return lang === "en" ? r.en : r.es;
+}
+
+function genderRule(gender, lang) {
+  if (lang === "en") {
+    return "Use gender-neutral wording; do not assume the person's gender or their partner's gender.";
+  }
+  if (gender === "F") return "La persona es mujer: usa formas femeninas al referirte a ella (ej. 'preparada', 'tú misma'). No asumas el género de su pareja o expareja.";
+  if (gender === "M") return "La persona es hombre: usa formas masculinas al referirte a él (ej. 'preparado', 'tú mismo'). No asumas el género de su pareja o expareja.";
+  return "No asumas el género de la persona: evita adjetivos con marca de género y fórmulas como 'o/a'; reformula con sustantivos o verbos. No asumas el género de su pareja o expareja.";
+}
+
+
 const SYSTEM_ES =
   "Eres un mentor cálido, cercano y no clínico especializado en preparación relacional para la marca RelateReady (Índice de Desarrollo y Fortalecimiento Relacional). " +
   "Nunca diagnosticas, nunca prometes resultados, nunca usas nombres de marca de terceros. " +
@@ -75,8 +114,17 @@ const SYSTEM_EN =
  * @param {string[]} [p.qualitativeAnswers]
  */
 async function generateAISections(p) {
-  const { name, lang, relationshipContextLabel, relationshipContextText, scoreResult, bandContentByCode, qualitativeAnswers } = p;
-  const system = lang === "en" ? SYSTEM_EN : SYSTEM_ES;
+  const { name, lang, gender, relationshipContextCode, relationshipContextLabel, relationshipContextText, scoreResult, bandContentByCode, qualitativeAnswers } = p;
+  // Reglas de adaptación (situación + género) añadidas al mensaje de sistema.
+  const system =
+    (lang === "en" ? SYSTEM_EN : SYSTEM_ES) +
+    (lang === "en"
+      ? " Write in plain prose only: no asterisks, no bold or italics, no markdown, no headings (except where a prompt explicitly asks for week labels), no lists."
+      : " Escribe solo en prosa simple: sin asteriscos, sin negritas ni cursivas, sin markdown, sin títulos (salvo las etiquetas de semana si el prompt las pide), sin listas.") +
+    " " +
+    contextRules(relationshipContextCode, lang) +
+    " " +
+    genderRule(gender, lang);
   const dims = scoreResult.dimensions;
   const [topStrength, ...restStrengths] = scoreResult.topStrengths;
   const [topDevArea, ...restDevAreas] = scoreResult.topDevelopmentAreas;
@@ -135,7 +183,7 @@ async function generateAISections(p) {
     developmentSynthesis:
       lang === "en"
         ? `These areas aren't separate problems — they tend to show up together, usually in the same kind of moment: when something feels uncertain and there's no clear signal about where you stand with the other person. That's not a character flaw, it's a pattern that was probably useful once and just hasn't been updated. The good news is that patterns like this respond well to small, deliberate practice.`
-        : `Estas áreas no son problemas separados — suelen aparecer juntas, generalmente en el mismo tipo de momento: cuando algo se siente incierto y no hay una señal clara sobre dónde estás parado con la otra persona. No es un defecto de carácter, es un patrón que probablemente fue útil alguna vez y simplemente no se ha actualizado. La buena noticia es que patrones así responden bien a práctica pequeña y deliberada.`,
+        : `Estas áreas no son problemas separados — suelen aparecer juntas, generalmente en el mismo tipo de momento: cuando algo se siente incierto y no hay una señal clara sobre dónde estás con la otra persona. No es un defecto de carácter, es un patrón que probablemente fue útil alguna vez y simplemente no se ha actualizado. La buena noticia es que patrones así responden bien a práctica pequeña y deliberada.`,
     overallSynthesis:
       lang === "en"
         ? `You already lead with ${topStrengthLabel.split(" (")[0].toLowerCase()} more than you probably give yourself credit for, and that's exactly the resource you can lean on while you work on ${topDevAreaLabel.split(" (")[0].toLowerCase()}. The two aren't in tension — your strength is, in fact, the most direct path toward growth in the area that needs it. Given your current context (${relationshipContextLabel}), a good place to start isn't a big gesture, but one honest, low-stakes conversation this week where you practice naming what you actually feel instead of managing the moment. That single shift, repeated, is where real change tends to begin.`
@@ -143,7 +191,7 @@ async function generateAISections(p) {
     actionPlanNarrative:
       lang === "en"
         ? `Week 1 is about noticing, not fixing. Before you try to change anything, spend the week simply naming — to yourself, in a journal or just in your head — the moments when the pattern shows up: a silence that feels heavier than it should, a small urge to pull back. Two or three times this week, pause for ten seconds before reacting and ask "what am I actually feeling right now?"\n\nWeek 2 moves from noticing to practicing, in low-stakes moments first. Pick one small, real thing to share with someone you trust — not a confession, just something true you'd normally keep to yourself. Alongside that, practice tolerating one moment of ambiguity without seeking immediate reassurance: if a message goes unanswered for a few hours, notice the urge to fill in the worst-case story, and let it pass without acting on it.\n\nWeek 3 is about consolidating under slightly more real conditions. Choose one conversation that actually matters — a boundary, a disagreement, something you've been avoiding — and have it using what you practiced: naming the feeling, staying present, resisting the pull to either overexplain or shut down. It won't be perfect, and it doesn't need to be. The goal isn't a flawless conversation; it's proof to yourself that you can stay in the room.\n\nThis plan is meant to be walked through with support, not alone. A free 60-minute intake mentoring session with a relationship & personal development mentor is included with your Extended Report — a space to talk through exactly where you are, ask what this plan doesn't answer, and get a second set of eyes on how it's going.`
-        : `La Semana 1 es sobre notar, no corregir. Antes de intentar cambiar algo, dedica la semana simplemente a nombrar — para ti mismo/a, en un diario o solo mentalmente — los momentos en que aparece el patrón: un silencio que se siente más pesado de lo normal, un pequeño impulso de retraerte. Dos o tres veces esta semana, haz una pausa de diez segundos antes de reaccionar y pregúntate "¿qué estoy sintiendo realmente ahora mismo?"\n\nLa Semana 2 pasa de notar a practicar, primero en momentos de bajo riesgo. Elige algo pequeño y real para compartir con alguien de confianza — no una confesión, solo algo verdadero que normalmente te guardarías. Junto con eso, practica tolerar un momento de ambigüedad sin buscar tranquilidad inmediata: si un mensaje queda sin respuesta por unas horas, nota el impulso de imaginar el peor escenario, y déjalo pasar sin actuar sobre él.\n\nLa Semana 3 es sobre consolidar en condiciones un poco más reales. Elige una conversación que de verdad importe — un límite, un desacuerdo, algo que has estado evitando — y ténla usando lo que practicaste: nombrar lo que sientes, mantenerte presente, resistir el impulso de sobreexplicar o cerrarte. No va a ser perfecta, y no necesita serlo. La meta no es una conversación impecable; es la prueba, para ti mismo/a, de que puedes quedarte en la sala.\n\nEste plan está pensado para recorrerse con acompañamiento, no en soledad. Con tu Informe Extendido tienes incluida una sesión de mentoría indagatoria gratuita de 60 minutos con un mentor en relaciones y desarrollo personal — un espacio para conversar exactamente en dónde estás, preguntar lo que este plan no resuelve, y tener una segunda mirada sobre cómo va tu proceso.`,
+        : `La Semana 1 es sobre notar, no corregir. Antes de intentar cambiar algo, dedica la semana simplemente a nombrar — para ${gender === "F" ? "ti misma" : gender === "M" ? "ti mismo" : "ti"}, en un diario o solo mentalmente — los momentos en que aparece el patrón: un silencio que se siente más pesado de lo normal, un pequeño impulso de retraerte. Dos o tres veces esta semana, haz una pausa de diez segundos antes de reaccionar y pregúntate "¿qué estoy sintiendo realmente ahora mismo?"\n\nLa Semana 2 pasa de notar a practicar, primero en momentos de bajo riesgo. Elige algo pequeño y real para compartir con alguien de confianza — no una confesión, solo algo verdadero que normalmente te guardarías. Junto con eso, practica tolerar un momento de ambigüedad sin buscar tranquilidad inmediata: si un mensaje queda sin respuesta por unas horas, nota el impulso de imaginar el peor escenario, y déjalo pasar sin actuar sobre él.\n\nLa Semana 3 es sobre consolidar en condiciones un poco más reales. Elige una conversación que de verdad importe — un límite, un desacuerdo, algo que has estado evitando — y ténla usando lo que practicaste: nombrar lo que sientes, mantenerte presente, resistir el impulso de sobreexplicar o cerrarte. No va a ser perfecta, y no necesita serlo. La meta no es una conversación impecable; es la prueba, para ${gender === "F" ? "ti misma" : gender === "M" ? "ti mismo" : "ti"}, de que puedes quedarte en la sala.\n\nEste plan está pensado para recorrerse con acompañamiento, no en soledad. Con tu Informe Extendido tienes incluida una sesión de mentoría indagatoria gratuita de 60 minutos con un mentor en relaciones y desarrollo personal — un espacio para conversar exactamente en dónde estás, preguntar lo que este plan no resuelve, y tener una segunda mirada sobre cómo va tu proceso.`,
   };
 
   const [integralReading, strengthsSynthesis, developmentSynthesis, overallSynthesis, actionPlanNarrative] = await Promise.all([

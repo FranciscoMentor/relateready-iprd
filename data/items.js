@@ -79,6 +79,76 @@ const QUALITATIVE_ITEMS = [
   { es: "Si pudieras pedirle una sola cosa a tu yo del pasado antes de tu última relación, ¿cuál sería?", en: "If you could ask one thing of your past self before your last relationship, what would it be?" },
 ];
 
+// ── Adaptación por situación relacional (2026-10) ───────────────────────────
+// Los ítems núcleo se puntúan por id y por "keying" (scoring.js), así que
+// cambiar SOLO la redacción para quien ya está en pareja o viene de una
+// separación no altera el cálculo: el id, la dimensión y el sentido (D/R)
+// son los mismos. Grupos (ver contextGroup en relationshipContexts.js):
+//   buscando       → texto original (soltero/a, primeras citas, etc.)
+//   en_pareja      → referencias a "mi pareja" en vez de "alguien que me interesa"
+//   reconstruyendo / abierto → texto original salvo donde nombra "mi pareja"
+// Solo se listan los ítems cuya redacción original NO encaja con el grupo.
+const CORE_VARIANTS = {
+  en_pareja: {
+    AS02: { es: "Si mi pareja se toma un tiempo para responder, mantengo la calma en vez de asumir lo peor.", en: "If my partner takes a while to reply, I stay calm instead of assuming the worst." },
+    AS05: { es: "Me cuesta relajarme en mi relación porque siento que en cualquier momento la otra persona se puede alejar.", en: "I find it hard to relax in my relationship because I feel the other person could pull away at any moment." },
+    DS05: { es: "El estado de ánimo de mi pareja termina definiendo el mío casi automáticamente.", en: "My partner's mood ends up shaping mine almost automatically." },
+    CG02: { es: "Estoy dispuesto/a a trabajar en una relación aunque no todo fluya con facilidad.", en: "I'm willing to work on a relationship even if things don't flow easily." },
+    CG04: { es: "Si una relación requiere mucho esfuerzo, para mí es señal de que esa persona no es la indicada.", en: "If a relationship requires a lot of effort, to me that's a sign the person isn't the right one." },
+    CG05: { es: "Cuando surge un conflicto serio, mi primer pensamiento suele ser que quizás esa relación no era para mí.", en: "When a serious conflict comes up, my first thought is usually that maybe this relationship wasn't meant for me." },
+    AR01: { es: "Mi sentido de valor personal no depende de mi relación de pareja ni de cómo vaya en este momento.", en: "My sense of self-worth doesn't depend on my relationship or on how it's going right now." },
+    AR02: { es: "Puedo poner un límite claro a mi pareja sin sentir miedo de perderla por eso.", en: "I can set a clear boundary with my partner without fearing I'll lose them over it." },
+    AR04: { es: "Necesito la aprobación constante de mi pareja para sentirme bien conmigo mismo/a.", en: "I need my partner's constant approval to feel good about myself." },
+    AR05: { es: "Me cuesta decir que no a mi pareja, aunque lo que me pida no me parezca justo.", en: "I find it hard to say no to my partner, even when what they ask doesn't feel fair." },
+    IA01: { es: "Me resulta relativamente fácil compartir mis miedos o inseguridades con mi pareja.", en: "I find it fairly easy to share my fears or insecurities with my partner." },
+    IA02: { es: "Estoy dispuesto/a a mostrar partes de mí que no son perfectas frente a mi pareja.", en: "I'm willing to show imperfect sides of myself to my partner." },
+    IA03: { es: "Prefiero mantener una imagen controlada de mí mismo/a antes que mostrar mis vulnerabilidades, incluso ante mi pareja.", en: "I'd rather keep a controlled image of myself than show my vulnerabilities, even to my partner." },
+    IA04: { es: "Me cuesta hablar de temas emocionalmente profundos incluso con mi pareja.", en: "I find it hard to talk about emotionally deep topics even with my partner." },
+    CV05: { es: "Me cuesta identificar qué es lo que realmente quiero de mi relación de pareja, más allá de la costumbre.", en: "I find it hard to identify what I really want from my relationship, beyond habit." },
+  },
+  neutral: {
+    DS01: { es: "Tomo mis decisiones importantes basándome en lo que yo pienso, aunque eso implique no coincidir con las personas cercanas a mí.", en: "I make my important decisions based on what I think, even if that means disagreeing with the people close to me." },
+  },
+};
+
+function variantGroup(group) {
+  if (group === "en_pareja") return "en_pareja";
+  if (group === "reconstruyendo" || group === "abierto") return "neutral";
+  return null; // "buscando" o sin dato → texto original
+}
+
+// Ítems núcleo con la redacción adaptada al grupo relacional (mismos ids).
+function coreItemsForGroup(flatItems, group) {
+  const v = CORE_VARIANTS[variantGroup(group)];
+  if (!v) return flatItems;
+  return flatItems.map((i) => (v[i.id] ? { ...i, es: v[i.id].es, en: v[i.id].en } : i));
+}
+
+// Preguntas cualitativas (opcionales, sin puntuar) por grupo. Alimentan solo
+// el texto que redacta la IA. "buscando" conserva las 3 originales.
+const QUALITATIVE_VARIANTS = {
+  en_pareja: [
+    { es: "Describe brevemente un patrón que notas que se repite en tu relación actual (o en relaciones anteriores) y que te gustaría cambiar.", en: "Briefly describe a pattern you notice repeating in your current relationship (or in past ones) that you'd like to change." },
+    QUALITATIVE_ITEMS[1],
+    { es: "Si pudieras decirle una sola cosa a tu pareja sin miedo a cómo la tome, ¿cuál sería?", en: "If you could tell your partner one thing without fearing how they'd take it, what would it be?" },
+  ],
+  reconstruyendo: [
+    { es: "Describe brevemente algo que has aprendido sobre ti en tus relaciones pasadas y que quieres llevar contigo —o hacer distinto— en esta nueva etapa.", en: "Briefly describe something you've learned about yourself in your past relationships that you want to carry with you — or do differently — in this new chapter." },
+    QUALITATIVE_ITEMS[1],
+    { es: "Si pudieras darte un consejo al comenzar esta nueva etapa de tu vida, ¿cuál sería?", en: "If you could give yourself one piece of advice as you begin this new chapter of your life, what would it be?" },
+  ],
+  abierto: [
+    { es: "Describe brevemente un patrón que notas que se repite en tus relaciones cercanas y que te gustaría cambiar.", en: "Briefly describe a pattern you notice repeating in your close relationships that you'd like to change." },
+    QUALITATIVE_ITEMS[1],
+    { es: "Si pudieras darte un consejo sobre cómo vivir tus relaciones de aquí en adelante, ¿cuál sería?", en: "If you could give yourself one piece of advice on how to live your relationships from here on, what would it be?" },
+  ],
+};
+
+function qualitativeItemsForGroup(group) {
+  const list = QUALITATIVE_VARIANTS[group] || QUALITATIVE_ITEMS;
+  return list.map((item, idx) => ({ id: `QM${String(idx + 1).padStart(2, "0")}`, ...item }));
+}
+
 // Construye la lista plana de ítems núcleo con id (AS01..AS06, DS01..DS06, ...)
 // en el orden de dimensiones definido en dimensions.js, ya intercalable con
 // los ítems de deseabilidad en el frontend.
@@ -107,6 +177,8 @@ module.exports = {
   DESIRABILITY_ITEMS,
   QUALITATIVE_ITEMS,
   buildFlatCoreItems,
+  coreItemsForGroup,
+  qualitativeItemsForGroup,
   buildFlatDesirabilityItems,
   buildFlatQualitativeItems,
 };
