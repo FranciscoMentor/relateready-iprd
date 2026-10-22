@@ -130,3 +130,11 @@ footer.foot img.adamantine-full-logo { height: 40px; width: auto; margin: 2px 0;
 .promo-card p { font-size: 18px; line-height: 1.45; margin: 0 0 16px; }
 .promo-card p.error { font-size: 18px; margin: 14px 0 0; }
 button.primary.promo-btn { width: 100%; min-height: 56px; font-size: 19px; padding: 14px 18px; }
+
+/* Área de pago con promoción vigente: botón de un clic repetido y "Otras opciones" plegado. */
+.promo-inline { margin: 4px 0 14px; }
+.promo-inline-note { font-size: 18px; line-height: 1.45; margin: 0 0 12px; color: var(--accent-dark); font-weight: 600; }
+.promo-inline p.error { font-size: 18px; margin: 12px 0 0; }
+details.other-options { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 4px; }
+details.other-options > summary { cursor: pointer; font-size: 16px; color: var(--accent); font-weight: 600; min-height: 48px; display: flex; align-items: center; }
+details.other-options[open] > summary { margin-bottom: 8px; }

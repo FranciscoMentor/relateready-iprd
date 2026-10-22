@@ -88,6 +88,8 @@
       promoText: "Desbloquea tu Informe Extendido, tu plan de acción de 3 semanas y una sesión de mentoría gratuita de 60 minutos.",
       promoBtn: "Desbloquear mi informe gratis",
       promoWorking: "Desbloqueando...",
+      promoNoPay: "Gratis durante esta promoción: sin pago y sin código.",
+      otherOptions: "Otras opciones: pagar o ingresar un código",
       promoError: "No pudimos desbloquearlo en este momento. Puedes intentarlo de nuevo o escribir tu código abajo.",
       haveCode: "¿Tienes un código de acceso gratuito?",
       codePlaceholder: "Código de acceso",
@@ -167,6 +169,8 @@
       promoText: "Unlock your Extended Report, your 3-week action plan and a free 60-minute mentoring session.",
       promoBtn: "Unlock my free report",
       promoWorking: "Unlocking...",
+      promoNoPay: "Free during this promotion: no payment and no code needed.",
+      otherOptions: "Other options: pay or enter a code",
       promoError: "We couldn't unlock it right now. You can try again or type your code below.",
       haveCode: "Have a free access code?",
       codePlaceholder: "Access code",
@@ -754,8 +758,8 @@
       ? `<div class="card promo-card">
         <h2>${t("promoTitle")}</h2>
         <p>${t("promoText")}</p>
-        <button type="button" class="primary promo-btn" id="btn-promo-unlock">${t("promoBtn")}</button>
-        <p class="error" id="promo-msg" style="display:none"></p>
+        <button type="button" class="primary promo-btn promo-unlock">${t("promoBtn")}</button>
+        <p class="error promo-msg" style="display:none"></p>
       </div>`
       : "";
     const payBtnClass = showPromo ? "secondary" : "primary";
@@ -771,6 +775,21 @@
          ${codeBlockHtml}`
       : `<button class="${payBtnClass}" id="btn-pay">${t("payBtnLabel")} — $${priceStr} (${t("simulatedTag")})</button>
          ${codeBlockHtml}`;
+
+    // Con la promoción vigente, el área de pago repite el botón de un clic y
+    // pliega el pago y el código en "Otras opciones": así quien baja hasta aquí
+    // no ve primero "Pagar" o "Ingresar código" y se confunde.
+    const promoPayAreaHtml = showPromo
+      ? `<div class="promo-inline">
+           <p class="promo-inline-note">${t("promoNoPay")}</p>
+           <button type="button" class="primary promo-btn promo-unlock">${t("promoBtn")}</button>
+           <p class="error promo-msg" style="display:none"></p>
+         </div>
+         <details class="other-options" id="other-options">
+           <summary>${t("otherOptions")}</summary>
+           ${payAreaHtml}
+         </details>`
+      : payAreaHtml;
 
     app.innerHTML = `
       ${promoCardHtml}
@@ -789,7 +808,7 @@
         <h2>${t("extendedTitle")}</h2>
         <p>${t("extendedIntro")}</p>
         ${!state.paid ? `<p class="bonus-note">${t("freeSessionNote")}</p>` : ""}
-        <div id="pay-area">${payAreaHtml}</div>
+        <div id="pay-area">${promoPayAreaHtml}</div>
       </div>
       ${state.paid ? referralBlockHtml : ""}
       ${
@@ -808,16 +827,16 @@
 
     // Botón de un clic: pide al servidor el canje con el código promocional
     // (el código no viaja al navegador). Misma pantalla final que el canje manual.
-    const promoBtn = document.getElementById("btn-promo-unlock");
-    if (promoBtn) {
+    const promoBtns = Array.from(document.querySelectorAll(".promo-unlock"));
+    if (promoBtns.length) {
       trackFunnelOnce("SummaryViewed", "summary_viewed");
-      promoBtn.addEventListener("click", async () => {
+      const setPromoBusy = (busy) => promoBtns.forEach((b) => { b.disabled = busy; b.textContent = busy ? t("promoWorking") : t("promoBtn"); });
+      promoBtns.forEach((promoBtn) => promoBtn.addEventListener("click", async () => {
         if (promoBtn.disabled) return;
         trackFunnelOnce("UnlockClicked", "unlock_clicked");
-        const msg = document.getElementById("promo-msg");
-        msg.style.display = "none";
-        promoBtn.disabled = true;
-        promoBtn.textContent = t("promoWorking");
+        const msgs = Array.from(document.querySelectorAll(".promo-msg"));
+        msgs.forEach((m) => { m.style.display = "none"; });
+        setPromoBusy(true);
         try {
           const res = await fetch("/api/promo/redeem", {
             method: "POST",
@@ -835,15 +854,15 @@
           if (data.reason === "promo_inactive") { state.promo = { active: false }; renderResults(); return; }
           throw new Error(data.reason || "failed");
         } catch (err) {
-          msg.textContent = t("promoError");
-          msg.style.display = "block";
+          msgs.forEach((m) => { m.textContent = t("promoError"); m.style.display = "block"; });
           // Deja visible el campo manual como respaldo.
+          const opts = document.getElementById("other-options");
+          if (opts) opts.open = true;
           const codeForm = document.getElementById("code-form");
           if (codeForm) codeForm.style.display = "block";
-          promoBtn.disabled = false;
-          promoBtn.textContent = t("promoBtn");
+          setPromoBusy(false);
         }
-      });
+      }));
     }
 
     if (state.paid) {
