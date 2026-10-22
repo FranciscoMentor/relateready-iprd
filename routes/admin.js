@@ -925,6 +925,32 @@ router.delete("/api/results/:id", (req, res) => {
 });
 
 /**
+ * Elimina PERMANENTEMENTE un envío de la lista de Resultados (botón "Eliminar"
+ * de cada fila). Todo lo del envío vive en la tabla submissions (resultado,
+ * canje del código, marcas del embudo, atribución utm), así que un DELETE
+ * borra todo y los totales de Resultados y de Campañas con código —que se
+ * calculan en vivo desde esa tabla— se recalculan solos. Protegido por la
+ * misma sesión de administrador del resto (router.use(requireAuth) arriba).
+ */
+router.delete("/api/submissions/:id", (req, res) => {
+  const existing = db.prepare("SELECT id FROM submissions WHERE id = ?").get(req.params.id);
+  if (!existing) return res.status(404).json({ error: "Registro no encontrado." });
+  db.prepare("DELETE FROM submissions WHERE id = ?").run(req.params.id);
+  res.json({ ok: true, deleted: 1 });
+});
+
+/** Elimina varios envíos a la vez (selección múltiple). Body: { ids: ["...", ...] } (máximo 200). */
+router.post("/api/submissions/delete", (req, res) => {
+  const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids.map(String).filter(Boolean) : [];
+  if (!ids.length) return res.status(400).json({ error: "No se indicó ningún envío." });
+  if (ids.length > 200) return res.status(400).json({ error: "Máximo 200 envíos por vez." });
+  const del = db.prepare("DELETE FROM submissions WHERE id = ?");
+  let deleted = 0;
+  db.transaction(() => { for (const id of ids) deleted += del.run(id).changes; })();
+  res.json({ ok: true, deleted });
+});
+
+/**
  * Lista los referidos del programa Hueco 2, leídos en vivo desde el archivo
  * de Excel vía Microsoft Graph (ver services/graphExcel.js — RelateReady
  * nunca escribe ahí, solo lee). Cada fila se cruza contra la tabla

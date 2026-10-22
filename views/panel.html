@@ -164,10 +164,14 @@
       <button type="button" class="btn ghost" id="btnExportCsv">Exportar CSV</button>
     </form>
     <div class="chip-row" id="followupChips"></div>
+    <div id="bulkBar" style="display:none;margin:0 0 10px;align-items:center;gap:12px;">
+      <span class="muted" id="bulkCount"></span>
+      <button type="button" class="btn small" id="bulkDelete" style="background:#9C3B2E;">Eliminar seleccionados</button>
+    </div>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Persona</th><th>Idioma</th><th>Promedio</th><th>Pago</th><th>Derivación</th><th>Seguimiento</th><th>Fecha</th></tr></thead>
-        <tbody id="resultsBody"><tr><td colspan="7" style="text-align:center;color:#999;padding:30px;">Cargando…</td></tr></tbody>
+        <thead><tr><th style="width:34px;"><input type="checkbox" id="selAll" title="Seleccionar todos los visibles"></th><th>Persona</th><th>Idioma</th><th>Promedio</th><th>Pago</th><th>Derivación</th><th>Seguimiento</th><th>Fecha</th><th></th></tr></thead>
+        <tbody id="resultsBody"><tr><td colspan="9" style="text-align:center;color:#999;padding:30px;">Cargando…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -398,7 +402,7 @@
       renderResultsTable();
       renderRecentList();
     } catch (e) {
-      document.getElementById("resultsBody").innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:30px;">No se pudieron cargar los resultados.</td></tr>';
+      document.getElementById("resultsBody").innerHTML = '<tr><td colspan="9" style="text-align:center;color:#999;padding:30px;">No se pudieron cargar los resultados.</td></tr>';
     }
   }
 
@@ -717,11 +721,13 @@
     const rows = filteredResults();
     const tbody = document.getElementById("resultsBody");
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:30px;">Ningún registro coincide con el filtro.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#999;padding:30px;">Ningún registro coincide con el filtro.</td></tr>';
+      updateBulkBar();
       return;
     }
     tbody.innerHTML = rows.map(r=>`
       <tr class="clickable" data-id="${r.id}">
+        <td><input type="checkbox" class="rowSel" data-sel="${r.id}" ${selectedIds.has(r.id)?"checked":""}></td>
         <td><strong>${esc(r.name)}</strong><br><span class="muted">${esc(r.email)||"—"}${r.phone?" · "+esc(r.phone):""}</span></td>
         <td>${r.lang==="en"?"Inglés":"Español"}</td>
         <td>${r.overall_average!==null?r.overall_average:"—"}</td>
@@ -729,11 +735,62 @@
         <td>${r.referral_triggered?'<span style="color:#9C3B2E;font-weight:600;">⚠ Sí</span>':'—'}</td>
         <td><span class="badge" style="background:${FOLLOWUP_COLOR[r.follow_up_status]||'#999'}">${FOLLOWUP_LABEL[r.follow_up_status]||r.follow_up_status}</span></td>
         <td>${esc((r.created_at||"").slice(0,10))}</td>
+        <td><button type="button" class="btn small ghost" data-del-sub="${r.id}" style="color:#9C3B2E;">Eliminar</button></td>
       </tr>`).join("");
     tbody.querySelectorAll("tr[data-id]").forEach(tr=>{
       tr.addEventListener("click", ()=>openDetailModal(tr.dataset.id));
     });
+    // Los controles de la fila no deben abrir el detalle al pulsarlos.
+    tbody.querySelectorAll(".rowSel").forEach(cb=>{
+      cb.addEventListener("click", (e)=>e.stopPropagation());
+      cb.addEventListener("change", ()=>{ cb.checked ? selectedIds.add(cb.dataset.sel) : selectedIds.delete(cb.dataset.sel); updateBulkBar(); });
+    });
+    tbody.querySelectorAll("[data-del-sub]").forEach(btn=>{
+      btn.addEventListener("click", (e)=>{ e.stopPropagation(); deleteSubmissions([btn.dataset.delSub], btn); });
+    });
+    updateBulkBar();
   }
+
+  // ── Eliminar envíos desde la lista de Resultados (uno o varios) ──
+  const selectedIds = new Set();
+  function updateBulkBar() {
+    // Solo cuentan los seleccionados que siguen existiendo en la lista.
+    for (const id of [...selectedIds]) if (!allResults.some(r=>r.id===id)) selectedIds.delete(id);
+    const bar = document.getElementById("bulkBar");
+    bar.style.display = selectedIds.size ? "flex" : "none";
+    document.getElementById("bulkCount").textContent = selectedIds.size + (selectedIds.size===1 ? " envío seleccionado" : " envíos seleccionados");
+    const visible = filteredResults();
+    const all = document.getElementById("selAll");
+    all.checked = visible.length > 0 && visible.every(r=>selectedIds.has(r.id));
+  }
+  async function deleteSubmissions(ids, btn) {
+    const people = ids.map(id=>allResults.find(r=>r.id===id)).filter(Boolean);
+    if (!people.length) return;
+    const lines = people.slice(0,10).map(p=>"• " + p.name + " — " + (p.email||"sin correo")).join("\n");
+    const more = people.length>10 ? "\n…y " + (people.length-10) + " más" : "";
+    const head = people.length===1 ? "¿Eliminar PERMANENTEMENTE este envío?" : "¿Eliminar PERMANENTEMENTE estos " + people.length + " envíos?";
+    if (!confirm(head + "\n\n" + lines + more + "\n\nEl borrado es permanente y no se puede deshacer: se pierde su resultado, el canje del código y su atribución de campaña, y dejan de contar en los totales.")) return;
+    if (btn) { btn.disabled = true; btn.textContent = "Eliminando…"; }
+    try {
+      const res = people.length===1
+        ? await fetch("/admin/api/submissions/" + encodeURIComponent(people[0].id), { method:"DELETE" })
+        : await fetch("/admin/api/submissions/delete", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ ids: people.map(p=>p.id) }) });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) throw new Error(data.error || "No se pudo eliminar.");
+      people.forEach(p=>selectedIds.delete(p.id));
+      await Promise.all([loadResults(), loadKpis()]);
+      // Si la pestaña de campañas ya se había cargado, se recalcula también.
+      if (document.getElementById("sec-campana").classList.contains("active")) loadCampaign();
+    } catch (e) {
+      alert(e.message || "No se pudo eliminar.");
+      if (btn) { btn.disabled = false; btn.textContent = "Eliminar"; }
+    }
+  }
+  document.getElementById("selAll").addEventListener("change", (e)=>{
+    filteredResults().forEach(r=> e.target.checked ? selectedIds.add(r.id) : selectedIds.delete(r.id));
+    renderResultsTable();
+  });
+  document.getElementById("bulkDelete").addEventListener("click", ()=>deleteSubmissions([...selectedIds], document.getElementById("bulkDelete")));
 
   function renderRecentList() {
     const box = document.getElementById("recentList");
