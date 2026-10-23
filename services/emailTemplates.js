@@ -126,10 +126,40 @@ function extendedReportEmail({ name, lang, resultsUrl }) {
 
 // Recordatorio automático para quien completó el test, dejó su correo, pero
 // todavía no compró el Informe Extendido — ver services/reminderScheduler.js.
-function pendingReportReminderEmail({ name, lang, resultsUrl }) {
+//
+// promoUntil (opcional): fecha "Hasta" de la promoción vigente en formato
+// AAAA-MM-DD (la que entrega getActivePromo().until). Si viene, el correo avisa
+// que el informe completo es gratis hasta esa fecha; si no viene, usa el texto
+// de siempre. La fecha NO está escrita aquí: sale de la campaña del panel.
+const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MONTHS_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+function promoDateText(isoDate, lang) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoDate || ""));
+  if (!m) return null;
+  const month = Number(m[2]) - 1, day = Number(m[3]);
+  if (month < 0 || month > 11 || day < 1 || day > 31) return null;
+  return lang === "en" ? `${MONTHS_EN[month]} ${day}` : `${day} de ${MONTHS_ES[month]}`;
+}
+
+function pendingReportReminderEmail({ name, lang, resultsUrl, promoUntil }) {
   const firstName = firstNameOf(name, lang);
+  const untilText = promoDateText(promoUntil, lang);
 
   if (lang === "en") {
+    if (untilText) {
+      return {
+        subject: "Your RelateReady results are waiting for you",
+        html: shell({
+          lang,
+          bodyHtml: `
+          <p style="font-size:16px;margin:0 0 16px;">Hi ${firstName},</p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">A little while ago you completed the RelateReady test. Your summary of 8 areas of your automatic behavior patterns is ready and waiting for you.</p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Through ${untilText}, your full report, a 3-week action plan and a free 60-minute mentoring session are free: open your results and tap "Unlock my free report".</p>
+          <p style="margin:0;">${button(resultsUrl, "View my results")}</p>
+        `,
+        }),
+      };
+    }
     return {
       subject: "Your RelateReady results are waiting for you",
       html: shell({
@@ -143,13 +173,27 @@ function pendingReportReminderEmail({ name, lang, resultsUrl }) {
       }),
     };
   }
+  if (untilText) {
+    return {
+      subject: "Tus resultados de RelateReady te están esperando",
+      html: shell({
+        lang,
+        bodyHtml: `
+        <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Hace un tiempo completaste el test de RelateReady. Tu resumen de 8 áreas de tus patrones automáticos de comportamiento ya está listo y te espera.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Hasta el ${untilText}, tu informe completo, un plan de acción de 3 semanas y una sesión de mentoría gratuita de 60 minutos son gratis: abre tus resultados y toca "Desbloquear mi informe gratis".</p>
+        <p style="margin:0;">${button(resultsUrl, "Ver mis resultados")}</p>
+      `,
+      }),
+    };
+  }
   return {
     subject: "Tus resultados de RelateReady te están esperando",
     html: shell({
       lang,
       bodyHtml: `
         <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
-        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Hace un tiempo completaste el test de preparación relacional de RelateReady — tu resumen de los 8 pilares ya está listo y te espera.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Hace un tiempo completaste el test de RelateReady — tu resumen de los 8 pilares ya está listo y te espera.</p>
         <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Cuando quieras, tu Informe Extendido profundiza en cada pilar, con un plan de acción personalizado y una sesión de mentoría gratuita de 60 minutos incluida.</p>
         <p style="margin:0;">${button(resultsUrl, "Ver mis resultados")}</p>
       `,
