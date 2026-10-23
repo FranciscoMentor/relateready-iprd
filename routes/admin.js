@@ -24,6 +24,7 @@ const { sendReminderNow } = require("../services/reminderScheduler");
 const { sendMail } = require("../services/graphMail");
 const { testInvitationEmail, testInvitationWhatsappText } = require("../services/emailTemplates");
 const { FREE_ACCESS_CODES, normalizeCode, isValidAccessCode } = require("../services/accessCodes");
+const { resultsLink, resultsPath, promoActive } = require("../services/promo");
 
 const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Number(process.env.EXTENDED_PRICE_CENTS) : 2499;
 
@@ -295,7 +296,7 @@ router.get("/", (req, res) => {
 
   const trs = rows.map((r) => {
     const avg = scoreAverage(r.score_result);
-    const resultUrl = `${baseUrl}/?sid=${r.id}`;
+    const resultUrl = resultsLink(baseUrl, r.id);
     let paymentCell = `<span class="badge" style="background:${statusColor[r.payment_status] || "#999"}">${statusLabel[r.payment_status] || r.payment_status}</span>`;
     if (r.payment_status === "pending") {
       paymentCell += `
@@ -318,7 +319,7 @@ router.get("/", (req, res) => {
       <td><a href="/admin/submission/${r.id}" style="color:${BRAND.ink};font-weight:600;text-decoration:none;">${esc(r.name)}</a><br><span class="muted">${esc(r.email) || "—"}${r.phone ? " · " + esc(r.phone) : ""}</span></td>
       <td>${r.lang === "en" ? "Inglés" : "Español"}</td>
       <td>${avg !== null ? avg : "—"}</td>
-      <td>${paymentCell}<input type="hidden" class="result-url" data-id="${r.id}" value="${resultUrl}"></td>
+      <td>${paymentCell}<input type="hidden" class="result-url" data-id="${r.id}" value="${resultUrl.replace(/&/g, "&amp;")}"></td>
       <td>${r.referral_triggered ? `<span style="color:${BRAND.clay};font-weight:600;">⚠ Derivación</span>` : "—"}</td>
       <td>
         <form method="POST" action="/admin/submission/${r.id}/follow-up" class="inline-form">
@@ -406,7 +407,7 @@ router.get("/submission/:id", (req, res) => {
   if (!r) return res.status(404).send("Registro no encontrado.");
 
   const baseUrl = `${req.protocol}://${req.get("host")}`;
-  const resultUrl = `${baseUrl}/?sid=${r.id}`;
+  const resultUrl = resultsLink(baseUrl, r.id);
 
   let scoreResult = {};
   try { scoreResult = JSON.parse(r.score_result); } catch (e) { /* noop */ }
@@ -473,7 +474,7 @@ router.get("/submission/:id", (req, res) => {
           <div class="info-row"><span class="label">Estado de pago</span><span><span class="badge" style="background:${statusColor[r.payment_status] || "#999"}">${statusLabel[r.payment_status] || r.payment_status}</span></span></div>
           <div class="info-row"><span class="label">Referencia de pago</span><span>${esc(r.payment_reference) || "—"}</span></div>
           <div class="info-row"><span class="label">Protocolo de derivación</span><span>${r.referral_triggered ? `<strong style="color:${BRAND.clay};">Sí, activado</strong>` : "No"}</span></div>
-          <div class="info-row"><span class="label">Link de resultados</span><span><button type="button" class="link-btn" onclick="navigator.clipboard.writeText('${resultUrl}').then(()=>{this.textContent='Copiado ✓';setTimeout(()=>this.textContent='Copiar link',1500);})">Copiar link</button></span></div>
+          <div class="info-row"><span class="label">Link de resultados</span><span><button type="button" class="link-btn" onclick="navigator.clipboard.writeText('${resultUrl.replace(/&/g, "&amp;")}').then(()=>{this.textContent='Copiado ✓';setTimeout(()=>this.textContent='Copiar link',1500);})">Copiar link</button></span></div>
           ${r.payment_status !== "pending" ? `<div class="info-row"><span class="label">Informe extendido</span><span><a href="/api/report/extended/${r.id}" target="_blank" class="link-btn" style="text-decoration:none;">Ver / descargar PDF</a></span></div>` : ""}
           ${r.payment_status !== "pending" ? `<div class="info-row"><span class="label">Correo del informe</span><span>
             ${r.extended_email_status ? `<span class="badge" style="background:${emailStatusColor[r.extended_email_status] || "#999"}">${emailStatusLabel[r.extended_email_status] || r.extended_email_status}</span>` : `<span class="muted">Aún no se ha generado/enviado</span>`}
@@ -669,7 +670,7 @@ router.get("/export.csv", (req, res) => {
 // fetch() en vez de tener los datos escritos a mano en el HTML — igual que
 // el panel de referencia de SQ Assessment.
 
-function serializeSubmission(r) {
+function serializeSubmission(r, promoOn = promoActive()) {
   let scoreResult = {};
   try { scoreResult = JSON.parse(r.score_result); } catch (e) { /* noop */ }
   let qualitativeAnswers = [];
@@ -696,6 +697,8 @@ function serializeSubmission(r) {
     follow_up_status: r.follow_up_status,
     follow_up_notes: r.follow_up_notes,
     created_at: r.created_at,
+    // Ruta del link de resultados ("/?sid=<id>", con "&promo=1" solo si hay promoción vigente)
+    result_path: resultsPath(r.id, promoOn),
   };
 }
 
@@ -707,7 +710,8 @@ router.get("/api/kpis", (req, res) => {
 /** Todos los envíos, en vivo desde la base de datos. */
 router.get("/api/results", (req, res) => {
   const rows = db.prepare("SELECT * FROM submissions ORDER BY created_at DESC LIMIT 5000").all();
-  res.json(rows.map(serializeSubmission));
+  const promoOn = promoActive();
+  res.json(rows.map((r) => serializeSubmission(r, promoOn)));
 });
 
 router.get("/api/results/:id", (req, res) => {

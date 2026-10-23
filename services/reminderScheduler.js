@@ -11,6 +11,7 @@
 const db = require("../db/init");
 const { sendMail, GRAPH_MAIL_ENABLED } = require("./graphMail");
 const { pendingReportReminderEmail } = require("./emailTemplates");
+const { resultsLink } = require("./promo");
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // cada hora
 const FIRST_CHECK_DELAY_MS = 2 * 60 * 1000; // 2 min después de arrancar, no de inmediato
@@ -40,7 +41,7 @@ async function runOnce() {
     const { subject, html } = pendingReportReminderEmail({
       name: sub.name,
       lang: sub.lang === "en" ? "en" : "es",
-      resultsUrl: `${baseUrl()}/?sid=${sub.id}`,
+      resultsUrl: resultsLink(baseUrl(), sub.id),
     });
     const result = await sendMail({ to: sub.email, subject, html });
     if (result.sent) {
@@ -82,7 +83,7 @@ async function sendReminderNow(subId, baseUrl) {
   const { subject, html } = pendingReportReminderEmail({
     name: sub.name,
     lang: sub.lang === "en" ? "en" : "es",
-    resultsUrl: `${baseUrl}/?sid=${sub.id}`,
+    resultsUrl: resultsLink(baseUrl, sub.id),
   });
   const result = await sendMail({ to: sub.email, subject, html });
   if (result.sent) {

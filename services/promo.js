@@ -49,6 +49,26 @@ function promoActive(now = Date.now()) {
   return !!getActivePromo(now);
 }
 
+/**
+ * Ruta (sin dominio) del link de resultados de un envío: "/?sid=<id>", y
+ * "&promo=1" SOLO si hay una promoción vigente en el momento de generarlo.
+ * Así quien abre el link desde un correo o un mensaje (sin venir de un anuncio
+ * de Meta) también ve la tarjeta "Tu informe completo es gratis". Sin promoción
+ * vigente el link queda exactamente "/?sid=<id>". No hay fechas ni códigos
+ * escritos aquí: todo sale de getActivePromo().
+ * `promoOn` es opcional: si ya se sabe (p. ej. al armar una lista larga) se
+ * pasa para no consultar la base de datos una vez por fila.
+ */
+function resultsPath(subId, promoOn = promoActive()) {
+  return `/?sid=${subId}` + (promoOn ? "&promo=1" : "");
+}
+
+/** Igual que resultsPath pero con dominio: baseUrl + "/?sid=<id>[&promo=1]". */
+function resultsLink(baseUrl, subId, now = Date.now()) {
+  const base = String(baseUrl || "").replace(/\/$/, "");
+  return base + resultsPath(subId, promoActive(now));
+}
+
 // Límite de peticiones muy básico en memoria: máximo `max` por ventana, por clave.
 function makeRateLimiter(max, windowMs) {
   const hits = new Map();
@@ -63,4 +83,4 @@ function makeRateLimiter(max, windowMs) {
   };
 }
 
-module.exports = { getActivePromo, promoActive, makeRateLimiter };
+module.exports = { getActivePromo, promoActive, resultsPath, resultsLink, makeRateLimiter };

@@ -835,7 +835,7 @@
 
   function renderDetailModal(r) {
     const box = document.getElementById("detailModalBox");
-    const resultUrl = `${window.location.origin}/?sid=${r.id}`;
+    const resultUrl = window.location.origin + (r.result_path || `/?sid=${r.id}`);
     const dimBars = DIMENSIONS.map(d=>{
       const dim = r.dimensions[d.code];
       const pct = dim && typeof dim.index === "number" ? dim.index : null;
