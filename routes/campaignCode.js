@@ -142,7 +142,7 @@ router.post("/sync-sessions", (req, res) => {
 
 // Lista de campañas guardadas.
 router.get("/list", (req, res) => {
-  res.json(db.prepare("SELECT id, name, code, date_from AS \"from\", date_to AS \"to\", one_click AS oneClick FROM campaigns ORDER BY id DESC").all());
+  res.json(db.prepare("SELECT id, name, code, date_from AS \"from\", date_to AS \"to\", one_click AS oneClick, session_until AS sessionUntil FROM campaigns ORDER BY id DESC").all());
 });
 
 // Crea o actualiza una campaña: { id?, name, code, from, to, oneClick }.
@@ -153,17 +153,22 @@ router.post("/save", (req, res) => {
   const from = String(b.from || "");
   const to = String(b.to || "");
   const oneClick = b.oneClick ? 1 : 0;
+  // Fecha límite para agendar la sesión gratuita; vacía = igual que "Hasta".
+  const sessionUntil = String(b.sessionUntil || "").trim() || null;
+  if (sessionUntil && (!/^\d{4}-\d{2}-\d{2}$/.test(sessionUntil) || sessionUntil < from)) {
+    return res.status(400).json({ error: "Revisa la fecha límite de la sesión gratuita: no puede ser anterior a la fecha inicial." });
+  }
   if (!name) return res.status(400).json({ error: "Escribe un nombre para la campaña." });
   if (!/^[A-Z0-9_-]{3,30}$/.test(code)) return res.status(400).json({ error: "El código debe tener de 3 a 30 letras, números, guiones o guion bajo." });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) {
     return res.status(400).json({ error: "Revisa las fechas: la fecha final no puede ser anterior a la inicial." });
   }
   if (b.id) {
-    const r = db.prepare("UPDATE campaigns SET name=?, code=?, date_from=?, date_to=?, one_click=? WHERE id=?").run(name, code, from, to, oneClick, Number(b.id));
+    const r = db.prepare("UPDATE campaigns SET name=?, code=?, date_from=?, date_to=?, one_click=?, session_until=? WHERE id=?").run(name, code, from, to, oneClick, sessionUntil, Number(b.id));
     if (!r.changes) return res.status(404).json({ error: "No se encontró esa campaña." });
     return res.json({ ok: true, id: Number(b.id) });
   }
-  const r = db.prepare("INSERT INTO campaigns (name, code, date_from, date_to, one_click, created_at) VALUES (?,?,?,?,?,?)").run(name, code, from, to, oneClick, new Date().toISOString());
+  const r = db.prepare("INSERT INTO campaigns (name, code, date_from, date_to, one_click, session_until, created_at) VALUES (?,?,?,?,?,?,?)").run(name, code, from, to, oneClick, sessionUntil, new Date().toISOString());
   res.json({ ok: true, id: Number(r.lastInsertRowid) });
 });
 

@@ -29,6 +29,7 @@ const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Numb
 // puede canjear nada.
 const { FREE_ACCESS_CODES } = require("../services/accessCodes");
 const { getActivePromo, makeRateLimiter } = require("../services/promo");
+const { sessionInfoFor } = require("../services/sessionDeadline");
 
 // GET /api/meta?lang=es — todo lo que el frontend necesita para renderizar el test.
 // No se exponen 'keying' ni 'dimension' de los ítems núcleo, para no sesgar
@@ -234,6 +235,16 @@ router.get("/submission/:id/status", (req, res) => {
     referralTriggered: !!sub.referral_triggered,
     paymentStatus: sub.payment_status,
   });
+});
+
+// GET /api/submission/:id/session — plazo para agendar la sesión de mentoring
+// gratuita de esta persona: { until: "AAAA-MM-DD"|null, expired: boolean }.
+// Solo expone la fecha y si ya venció: nunca el código ni la campaña.
+router.get("/submission/:id/session", (req, res) => {
+  const row = db.prepare("SELECT payment_reference, code_redeemed_at, session_until_override FROM submissions WHERE id = ?").get(req.params.id);
+  if (!row) return res.status(404).json({ error: "No encontrado." });
+  const info = sessionInfoFor(row);
+  res.json({ until: info.until, expired: info.expired });
 });
 
 // Aplica un código de acceso gratuito a un envío: mismo estado de pago, misma

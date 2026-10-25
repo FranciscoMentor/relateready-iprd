@@ -83,4 +83,4 @@ function makeRateLimiter(max, windowMs) {
   };
 }
 
-module.exports = { getActivePromo, promoActive, resultsPath, resultsLink, makeRateLimiter };
+module.exports = { getActivePromo, promoActive, resultsPath, resultsLink, makeRateLimiter, todayEcuador };

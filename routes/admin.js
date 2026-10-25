@@ -25,6 +25,7 @@ const { sendMail } = require("../services/graphMail");
 const { testInvitationEmail, testInvitationWhatsappText } = require("../services/emailTemplates");
 const { FREE_ACCESS_CODES, normalizeCode, isValidAccessCode } = require("../services/accessCodes");
 const { resultsLink, resultsPath, promoActive } = require("../services/promo");
+const { sessionInfoFor } = require("../services/sessionDeadline");
 
 const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Number(process.env.EXTENDED_PRICE_CENTS) : 2499;
 
@@ -671,6 +672,7 @@ router.get("/export.csv", (req, res) => {
 // el panel de referencia de SQ Assessment.
 
 function serializeSubmission(r, promoOn = promoActive()) {
+  const session = sessionInfoFor(r);
   let scoreResult = {};
   try { scoreResult = JSON.parse(r.score_result); } catch (e) { /* noop */ }
   let qualitativeAnswers = [];
@@ -699,6 +701,12 @@ function serializeSubmission(r, promoOn = promoActive()) {
     created_at: r.created_at,
     // Ruta del link de resultados ("/?sid=<id>", con "&promo=1" solo si hay promoción vigente)
     result_path: resultsPath(r.id, promoOn),
+    // Plazo para agendar la sesión de mentoring gratuita (ver services/sessionDeadline.js)
+    session_until: session.until,
+    session_until_source: session.source,
+    session_campaign: session.campaign,
+    session_expired: session.expired,
+    session_until_override: r.session_until_override || null,
   };
 }
 
@@ -729,6 +737,17 @@ router.patch("/api/results/:id/follow-up", express.json(), (req, res) => {
     notes !== undefined ? notes : existing.follow_up_notes,
     req.params.id
   );
+  res.json({ ok: true, submission: serializeSubmission(db.prepare("SELECT * FROM submissions WHERE id = ?").get(req.params.id)) });
+});
+
+/** Ajusta (o quita el ajuste de) el plazo de la sesión gratuita de UNA persona: { date: "AAAA-MM-DD" | null }. */
+router.patch("/api/results/:id/session-until", express.json(), (req, res) => {
+  const r = db.prepare("SELECT id FROM submissions WHERE id = ?").get(req.params.id);
+  if (!r) return res.status(404).json({ error: "Registro no encontrado." });
+  const raw = req.body && req.body.date;
+  const date = raw ? String(raw).trim() : null;
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Fecha no válida." });
+  db.prepare("UPDATE submissions SET session_until_override = ? WHERE id = ?").run(date, req.params.id);
   res.json({ ok: true, submission: serializeSubmission(db.prepare("SELECT * FROM submissions WHERE id = ?").get(req.params.id)) });
 });
 

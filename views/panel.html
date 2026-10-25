@@ -245,7 +245,9 @@
         <input type="text" id="cfCode" placeholder="Código (ej. PROMO2026)" style="width:170px;text-transform:uppercase;" required>
         <label class="muted">Desde <input type="date" id="cfFrom" required></label>
         <label class="muted">Hasta <input type="date" id="cfTo" required></label>
+        <label class="muted">Sesión gratis hasta <input type="date" id="cfSessionUntil"></label>
       </div>
+      <p class="muted" style="margin:0 0 10px;font-size:12.5px;"><b>Sesión gratis hasta:</b> último día (hora de Ecuador) en que quienes entran con el código de esta campaña pueden agendar su sesión de mentoring gratuita. Si lo dejas vacío, vale la fecha "Hasta". Puedes cambiarlo para una sola persona desde su ficha.</p>
       <label style="display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13.5px;"><input type="checkbox" id="cfOneClick"> <span><b>Botón de un clic:</b> mientras la campaña esté vigente (hora de Ecuador, fechas inclusive), quien llegue desde un anuncio de Meta verá el botón "Desbloquear mi informe gratis".</span></label>
       <p class="muted" style="margin:0 0 12px;">Para una promoción nueva: 1) agrega el código a la variable <b>FREE_ACCESS_CODES</b> en Render (separado por coma); 2) crea aquí la campaña con ese código y las fechas; 3) publica el anuncio en Meta. No hay que subir código. Si quitas el código de Render, el botón se apaga aunque la fecha no haya pasado. Guardar una campaña no borra ni cambia ningún dato.</p>
       <p id="cfMsg" class="muted" style="color:var(--bad);margin:0 0 10px;"></p>
@@ -615,6 +617,7 @@
     document.getElementById("cfCode").value = c ? c.code : "";
     document.getElementById("cfFrom").value = c ? c.from : new Date().toISOString().slice(0,10);
     document.getElementById("cfTo").value = c ? c.to : "";
+    document.getElementById("cfSessionUntil").value = c && c.sessionUntil ? c.sessionUntil : "";
     document.getElementById("cfOneClick").checked = c ? !!c.oneClick : true;
     document.getElementById("cfMsg").textContent = "";
     document.getElementById("campEditForm").style.display = "block";
@@ -684,7 +687,7 @@
   });
   document.getElementById("campEditForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const body = { id: campEditing ? campEditing.id : undefined, name: document.getElementById("cfName").value, code: document.getElementById("cfCode").value, from: document.getElementById("cfFrom").value, to: document.getElementById("cfTo").value, oneClick: document.getElementById("cfOneClick").checked };
+    const body = { id: campEditing ? campEditing.id : undefined, name: document.getElementById("cfName").value, code: document.getElementById("cfCode").value, from: document.getElementById("cfFrom").value, to: document.getElementById("cfTo").value, sessionUntil: document.getElementById("cfSessionUntil").value, oneClick: document.getElementById("cfOneClick").checked };
     const res = await fetch("/admin/api/campana-codigo/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await res.json();
     if (!res.ok) { document.getElementById("cfMsg").textContent = d.error || "No se pudo guardar."; return; }
@@ -875,6 +878,18 @@
       <button class="btn small ghost" id="d-resend-email" style="margin-bottom:10px;">${r.extended_email_status === "sent" ? "Reenviar de todas formas" : "Reenviar correo"}</button>
       ` : ""}
 
+      ${r.payment_status !== "pending" ? `
+      <h2 style="margin-top:16px;">Sesión de mentoring gratuita</h2>
+      <p style="font-size:13px;margin:0 0 6px;"><strong>Plazo para agendar:</strong>
+        ${r.session_until ? `${esc(r.session_until)} <span class="badge" style="background:${r.session_expired ? '#9C3B2E' : '#3F6B4F'}">${r.session_expired ? "Vencido" : "Vigente"}</span>` : '<span class="muted">Sin plazo</span>'}
+        <span class="muted">${r.session_until_source === "override" ? " · ajuste manual" : r.session_until_source === "campaign" ? " · de la campaña " + esc(r.session_campaign || "") : ""}</span>
+      </p>
+      <div class="form-field"><label>Cambiar el plazo solo para esta persona</label><input type="date" id="d-session-until" value="${esc(r.session_until_override)||''}"></div>
+      <button class="btn small" id="d-save-session">Guardar plazo</button>
+      <button class="btn small ghost" id="d-clear-session" ${r.session_until_override ? "" : "disabled"}>Quitar ajuste</button>
+      <p class="muted" style="margin:6px 0 0;font-size:12px;">Cambia lo que ve esta persona en su informe, su correo y su pantalla; si dejas la fecha vacía vale la de la campaña.</p>
+      ` : ""}
+
       <h2 style="margin-top:16px;">Seguimiento comercial</h2>
       <div class="form-field"><label>Estado</label>
         <select id="d-followup-status">
@@ -894,6 +909,16 @@
     document.getElementById("d-copy-link").addEventListener("click", (e)=>{
       navigator.clipboard.writeText(resultUrl).then(()=>{ e.target.textContent="Copiado ✓"; setTimeout(()=>e.target.textContent="Copiar link",1500); });
     });
+    const saveSession = async (date)=>{
+      const res = await fetch(`/admin/api/results/${r.id}/session-until`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ date }) });
+      const data = await res.json().catch(()=>({}));
+      if (data.submission) renderDetailModal(data.submission);
+    };
+    const saveSessionBtn = document.getElementById("d-save-session");
+    if (saveSessionBtn) {
+      saveSessionBtn.addEventListener("click", ()=>saveSession(document.getElementById("d-session-until").value || null));
+      document.getElementById("d-clear-session").addEventListener("click", ()=>saveSession(null));
+    }
     document.getElementById("d-save-contact").addEventListener("click", async ()=>{
       const body = { name: document.getElementById("d-name").value, email: document.getElementById("d-email").value, phone: document.getElementById("d-phone").value };
       await fetch(`/admin/api/results/${r.id}/contact`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });

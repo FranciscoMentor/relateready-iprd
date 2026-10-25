@@ -130,7 +130,17 @@ db.exec(`
     db.exec("ALTER TABLE campaigns ADD COLUMN one_click INTEGER NOT NULL DEFAULT 0");
     db.exec("UPDATE campaigns SET one_click = 1");
   }
+  // session_until = fecha límite (hora de Ecuador, inclusive) para agendar la
+  // sesión de mentoring gratuita de quienes llegaron con el código de esta
+  // campaña. NULL = la misma fecha "Hasta" de la campaña.
+  if (!campCols.includes("session_until")) {
+    db.exec("ALTER TABLE campaigns ADD COLUMN session_until TEXT");
+  }
 }
+// session_until_override = ajuste manual del plazo de la sesión gratuita para
+// UNA persona (se edita desde su ficha en el panel). NULL = sin ajuste: vale el
+// plazo de su campaña, o ninguno si no llegó con código de campaña.
+addColumnIfMissing("session_until_override", "session_until_override TEXT");
 
 
 // ═══════════════════════════════════════════════════════════════════════
