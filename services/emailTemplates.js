@@ -774,7 +774,8 @@ function sessionReminderEmail(parts) {
   const link = /^https:\/\//.test(parts.link || "") ? parts.link : "";
   const btn = link
     ? `<p style="margin:0 0 6px;">${button(e(link), e(parts.cta))}</p>
-          <p style="font-family:Georgia,'Times New Roman',serif;font-size:12px;color:${MUTED};margin:0 0 20px;">${e(parts.tip)}</p>`
+          <p style="font-family:Georgia,'Times New Roman',serif;font-size:12px;color:${MUTED};margin:0 0 ${parts.joinHelp ? 6 : 20}px;">${e(parts.tip)}</p>
+          ${parts.joinHelp ? `<p style="font-family:Georgia,'Times New Roman',serif;font-size:12px;color:${MUTED};margin:0 0 20px;">${e(parts.joinHelp)}</p>` : ""}`
     : "";
   const sign = (parts.sign || []).map(e).join("<br>");
   const bodyHtml = `
@@ -782,6 +783,7 @@ function sessionReminderEmail(parts) {
           <p style="${P}">${e(parts.intro)}</p>
           ${card}
           ${btn}
+          ${parts.motivator ? `<p style="${P}">${e(parts.motivator)}</p>` : ""}
           <p style="${P}">${e(parts.resched)}</p>
           <p style="${P}">${e(parts.closing)}</p>
           <p style="${P}margin:0;">${sign}</p>`;
