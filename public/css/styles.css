@@ -98,7 +98,12 @@ button.secondary, a.secondary {
   background: var(--light); border-left: 3px solid var(--accent); border-radius: 6px;
   padding: 12px 14px; margin: 4px 0 18px; font-size: 14px; color: var(--ink);
 }
-.session-block { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border); }
+.session-block { margin-top: 20px; padding: 18px 16px; border: 2px solid var(--accent); border-radius: 10px; background: #FFF7E8; }
+.session-block h2 { margin: 0 0 10px; }
+.session-benefits { margin: 0 0 14px; padding-left: 22px; }
+.session-benefits li { margin: 0 0 8px; line-height: 1.45; }
+.session-deadline { font-weight: 700; color: var(--accent-dark); }
+.session-deadline.expired { color: var(--clay); }
 .referral-block { background: var(--light); border-color: var(--light); text-align: center; }
 .referral-block h2 { margin-bottom: 8px; }
 .referral-block p { margin: 0 0 18px; font-size: 14.5px; }

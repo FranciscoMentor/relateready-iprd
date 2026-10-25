@@ -36,7 +36,7 @@
       durationChip: "10 a 15 minutos",
       privacyChip: "Tus datos, protegidos",
       calloutStrong: "Para iniciar tu proceso",
-      calloutRest: " necesitamos tu nombre, correo, teléfono, ciudad y país. Los usamos únicamente para enviarte tu informe y coordinar tu sesión de mentoría gratuita — nunca para spam.",
+      calloutRest: " necesitamos tu nombre, correo, teléfono, ciudad y país. Los usamos únicamente para enviarte tu informe y coordinar tu sesión de mentoring gratuita — nunca para spam.",
       nameLabel: "Tu nombre",
       emailLabel: "Tu correo",
       phoneLabel: "Tu teléfono",
@@ -68,12 +68,16 @@
       resultsIntro: "Este es tu resultado en las 8 dimensiones del Índice de Desarrollo y Fortalecimiento Relacional.",
       extendedTitle: "¿Quieres el detalle completo?",
       extendedIntro: "El Informe Extendido incluye tus 8 dimensiones completas, recomendaciones concretas, 5 secciones escritas especialmente para ti por IA, y tu plan de acción a 3 semanas.",
-      freeSessionNote: "Además, al adquirir tu Informe Extendido recibes una sesión de mentoría indagatoria gratuita de 60 minutos con uno de los mentores de nuestro equipo para revisarlo juntos.",
+      freeSessionNote: "Además, al adquirir tu Informe Extendido recibes una sesión de mentoring gratuita de 60 minutos para revisarlo con un mentor profesional: así no lo interpretas por tu cuenta.",
       bookTeaserLabel: "Además, recibes",
       bookTeaserCopy: 'Tu Informe Extendido es solo el primer paso. El siguiente es tu <strong>sesión de mentoría indagatoria gratuita de 60 minutos</strong> con uno de los mentores de nuestro equipo — y ahí, exclusivamente ahí, recibirás <strong>"Tú Primero"</strong>: <strong>el libro digital gratuito</strong> diseñado para profundizar en tus 8 pilares y acompañarte semanas después de esa conversación. No está a la venta ni disponible por ningún otro medio: es una guía reservada para quienes completan el proceso, informe y sesión de mentoría.',
-      scheduleSessionTitle: "Tu sesión de mentoría gratuita",
-      scheduleSessionIntro: "Como parte de tu Informe Extendido, tienes una sesión de mentoría indagatoria gratuita de 60 minutos con uno de los mentores de nuestro equipo para revisar tus resultados.",
-      scheduleSessionBtn: "Agendar mi sesión gratuita",
+      scheduleSessionTitle: "Tu sesión de mentoring para revisar tu informe",
+      scheduleSessionIntro: "Tus resultados son un mapa, y un mapa se lee mejor con alguien que conoce el terreno. Tu Informe Extendido incluye una sesión de mentoring gratuita de 60 minutos con un mentor profesional que tiene años de experiencia en desarrollo personal aplicado a las relaciones y a tu capacidad de relacionarte. Juntos revisan tu informe para que no tengas que interpretarlo por tu cuenta, y sales con:",
+      scheduleSessionBtn: "Agendar mi sesión de mentoring",
+      sessionBullets: [["Una lectura clara de tus resultados: ", "qué significa cada pilar para ti y qué no significa."], ["Tus prioridades: ", "cuál o cuáles de tus 8 pilares atender primero, según tu situación real."], ["Tu plan de 3 semanas ajustado a tu vida, ", "no una lista genérica."], ["Respuestas a tus preguntas, ", "incluidas las que el informe no puede responder."], ["\"Tú Primero\": ", "el libro digital gratuito que solo se entrega en esta sesión."]],
+      sessionClosing: "Es una conversación de mentoring, no un examen ni una llamada de ventas. Solo trae tu informe.",
+      sessionDeadline: "Agenda tu sesión gratuita hasta el {d}.",
+      sessionExpired: "El plazo para agendar tu sesión gratuita terminó el {d}. Responde al correo con el que recibiste tu informe y vemos tus opciones.",
       payBtnLabel: "Desbloquear Informe Extendido",
       payBtnRealLabel: "Pagar Informe Extendido",
       simulatedTag: "simulado",
@@ -85,7 +89,7 @@
       paying: "Procesando...",
       downloadExtended: "Descargar mi Informe Extendido (PDF)",
       promoTitle: "Tu informe completo es gratis",
-      promoText: "Desbloquea tu Informe Extendido, tu plan de acción de 3 semanas y una sesión de mentoría gratuita de 60 minutos.",
+      promoText: "Desbloquea tu Informe Extendido, tu plan de acción de 3 semanas y una sesión de mentoring gratuita de 60 minutos para revisar tu informe con un mentor profesional.",
       promoBtn: "Desbloquear mi informe gratis",
       promoWorking: "Desbloqueando...",
       promoNoPay: "Gratis durante esta promoción: sin pago y sin código.",
@@ -149,12 +153,16 @@
       resultsIntro: "This is your result across the 8 dimensions of the Relationship Development and Strengthening Index.",
       extendedTitle: "Want the full detail?",
       extendedIntro: "The Extended Report includes all 8 full dimensions, concrete recommendations, 5 sections written specifically for you by AI, and your 3-week action plan.",
-      freeSessionNote: "Plus, getting your Extended Report includes a free 60-minute intake mentoring session with one of our mentors to review it together.",
+      freeSessionNote: "Plus, getting your Extended Report includes a free 60-minute mentoring session to review it with a professional mentor, so you don't have to interpret it on your own.",
       bookTeaserLabel: "Plus, you get",
       bookTeaserCopy: 'Your Extended Report is only the first step. The next one is your <strong>free 60-minute discovery mentoring session</strong> with one of our team mentors — and that\'s the exclusive moment you\'ll receive <strong>"You First"</strong>: <strong>the free digital book</strong> designed to deepen your work on the 8 pillars and stay with you long after that conversation ends. It isn\'t for sale anywhere else: it\'s reserved for those who complete the process — report and mentoring session.',
-      scheduleSessionTitle: "Your free mentoring session",
-      scheduleSessionIntro: "As part of your Extended Report, you get a free 60-minute intake mentoring session with one of our mentors to review your results.",
-      scheduleSessionBtn: "Schedule my free session",
+      scheduleSessionTitle: "Your mentoring session to review your report",
+      scheduleSessionIntro: "Your results are a map, and a map is easier to read with someone who knows the terrain. Your Extended Report includes a free 60-minute mentoring session with a professional mentor who has years of experience in personal development applied to relationships and to your capacity to relate. Together you go through your report so you don't have to interpret it on your own, and you leave with:",
+      scheduleSessionBtn: "Book my mentoring session",
+      sessionBullets: [["A clear reading of your results: ", "what each pillar means for you, and what it doesn't."], ["Your priorities: ", "which one or two of your 8 pillars to work on first, given your real situation."], ["Your 3-week plan, adjusted to your life, ", "not a generic list."], ["Answers to your questions, ", "including the ones the report can't answer."], ["\"You First\": ", "the free digital book we only share in this session."]],
+      sessionClosing: "It's a mentoring conversation, not an exam or a sales call. Just bring your report.",
+      sessionDeadline: "Book your free session by {d}.",
+      sessionExpired: "The deadline to book your free session ended on {d}. Reply to the email that came with your report and we'll look at your options.",
       payBtnLabel: "Unlock Extended Report",
       payBtnRealLabel: "Pay for Extended Report",
       simulatedTag: "simulated",
@@ -166,7 +174,7 @@
       paying: "Processing...",
       downloadExtended: "Download my Extended Report (PDF)",
       promoTitle: "Your full report is free",
-      promoText: "Unlock your Extended Report, your 3-week action plan and a free 60-minute mentoring session.",
+      promoText: "Unlock your Extended Report, your 3-week action plan and a free 60-minute mentoring session to review your report with a professional mentor.",
       promoBtn: "Unlock my free report",
       promoWorking: "Unlocking...",
       promoNoPay: "Free during this promotion: no payment and no code needed.",
@@ -248,11 +256,34 @@
     paid: false,
     promo: null,        // { active, until } desde /api/promo/status
     promoLoaded: false,
+    session: null,      // { until, expired } desde /api/submission/:id/session (plazo de la sesión gratuita)
+    sessionLoaded: false,
   };
 
   const app = document.getElementById("app");
   function t(key) {
     return I18N[state.lang][key];
+  }
+
+  // "2026-10-31" -> "31 de octubre" / "October 31" (misma regla que services/dateText.js)
+  function humanDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+    if (!m) return null;
+    const en = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const es = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+    const mo = Number(m[2]) - 1, day = Number(m[3]);
+    if (mo < 0 || mo > 11) return null;
+    return state.lang === "en" ? `${en[mo]} ${day}` : `${day} de ${es[mo]}`;
+  }
+
+  // Plazo de la sesión gratuita de esta persona (lo decide el servidor: campaña
+  // o ajuste manual del panel). Si falla, simplemente no se muestra plazo.
+  async function loadSessionInfo() {
+    try {
+      const res = await fetch(`/api/submission/${state.submissionId}/session`);
+      if (res.ok) state.session = await res.json();
+    } catch (e) { /* sin plazo */ }
+    state.sessionLoaded = true;
   }
 
   async function loadMeta() {
@@ -703,6 +734,11 @@
       loadPromoStatus().then(renderResults);
       return;
     }
+    if (state.paid && !state.sessionLoaded) {
+      // El plazo de la sesión gratuita se consulta antes de pintar, para que el bloque no cambie de golpe.
+      loadSessionInfo().then(renderResults);
+      return;
+    }
     const showPromo = promoEligible();
     const dims = state.scoreSummary.dimensions;
     const codes = state.meta.dimensions.map((d) => d.code);
@@ -731,13 +767,21 @@
         <p class="error" id="code-msg" style="display:none"></p>
       </div>`;
 
-    // Bloque de agendamiento de la sesión de mentoría gratuita de 60 min,
+    // Bloque de la sesión de mentoring gratuita de 60 min para revisar el informe,
     // incluida con el Informe Extendido — se muestra una vez pagado/liberado.
+    // Beneficios, qué es y qué no es, y el plazo (si tiene). Si el plazo ya
+    // venció, en vez del botón sale el aviso para responder el correo del informe.
+    const sess = state.session || {};
+    const sessDate = humanDate(sess.until);
+    const sessNote = sessDate ? (sess.expired ? t("sessionExpired") : t("sessionDeadline")).replace("{d}", sessDate) : "";
     const sessionBlockHtml = `
       <div class="session-block">
         <h2>${t("scheduleSessionTitle")}</h2>
         <p>${t("scheduleSessionIntro")}</p>
-        <a class="primary" style="text-decoration:none;display:inline-block" href="${BOOKING_LINKS[state.lang] || BOOKING_LINKS.es}" target="_blank" onclick="try{fbq('track','Schedule')}catch(e){}">${t("scheduleSessionBtn")}</a>
+        <ul class="session-benefits">${t("sessionBullets").map(([lead, rest]) => `<li><strong>${lead}</strong>${rest}</li>`).join("")}</ul>
+        <p>${t("sessionClosing")}</p>
+        ${sessNote ? `<p class="session-deadline${sess.expired ? " expired" : ""}">${sessNote}</p>` : ""}
+        ${sess.expired ? "" : `<a class="primary" style="text-decoration:none;display:inline-block" href="${BOOKING_LINKS[state.lang] || BOOKING_LINKS.es}" target="_blank" onclick="try{fbq('track','Schedule')}catch(e){}">${t("scheduleSessionBtn")}</a>`}
       </div>`;
 
     // Invitación a referir un amigo — solo aparece una vez pagado/liberado el

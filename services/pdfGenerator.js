@@ -42,6 +42,7 @@ const INDEX_NAME = { es: "Índice de Desarrollo y Fortalecimiento Relacional", e
 // public/js/app.js — si cambian alguno, actualizar en ambos lugares).
 // El mentor se menciona de forma genérica (sin nombre propio) en el informe.
 const MENTOR_NAME = { es: "un mentor en relaciones y desarrollo personal", en: "a relationship & personal development mentor" };
+const { copyFor, deadlineLine } = require("./sessionCopy");
 const BOOKING_LINKS = {
   es: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/eMJ5GQhw_0W_-z2cJN-S9g2",
   en: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/K4DmDOt-kUSplfAlddYmbw2",
@@ -383,28 +384,75 @@ function bookTeaserBlock(doc, lang) {
   doc.font("Helvetica").fillColor(INK);
 }
 
-// Párrafo + botón al final de la Introducción (después del texto de
-// bienvenida): una vez leído el informe, se recomienda revisarlo con un mentor
-// experto en la sesión de mentoría indagatoria gratuita (regalo incluido con el Informe
-// Extendido). Es un SEGUNDO camino para agendar, adicional a la sección "Tu
-// sesión de mentoría indagatoria gratuita" (que no se toca) — por eso
-// reutiliza BOOKING_LINKS.
-const MENTOR_REVIEW_COPY = {
-  es: {
-    body: "Una vez que hayas leído tu informe completo, te recomendamos revisarlo con un mentor experto durante tu sesión de mentoría indagatoria gratuita. Es un regalo incluido con tu Informe Extendido: 60 minutos para conversar sobre tus resultados, resolver tus dudas y diseñar tus siguientes pasos. Reserva tu sesión cuando quieras.",
-    btn: "Agendar mi sesión gratuita",
-  },
-  en: {
-    body: "Once you have read your full report, we recommend reviewing it with an expert mentor during your free intake mentoring session. It is a gift included with your Extended Report: 60 minutes to talk through your results, answer your questions, and design your next steps. Book your session whenever you are ready.",
-    btn: "Schedule my free session",
-  },
-};
+// Invitación a la sesión de mentoring gratuita para revisar el informe. Los
+// textos viven en services/sessionCopy.js (compartidos con el correo); el plazo
+// viene de services/sessionDeadline.js. Hay tres puntos de contacto en el PDF:
+//  1) la Introducción (párrafo corto + botón) — mentorReviewBlock,
+//  2) la sección completa con beneficios después de las 8 dimensiones —
+//     sessionSection,
+//  3) al final del plan de acción de 3 semanas — planInviteBlock.
+// Si el plazo de la persona ya venció, en vez del botón sale el aviso para
+// responder el correo del informe.
 
-function mentorReviewBlock(doc, lang) {
-  const copy = MENTOR_REVIEW_COPY[lang] || MENTOR_REVIEW_COPY.es;
-  ensureSpace(doc, 110);
-  body(doc, copy.body);
-  linkButton(doc, copy.btn, BOOKING_LINKS[lang] || BOOKING_LINKS.es);
+// Línea del plazo (o del vencimiento) en negrilla y color de acento.
+function deadlineNote(doc, lang, session) {
+  const line = deadlineLine(lang, session);
+  if (!line) return;
+  doc.fontSize(10.5).font("Helvetica-Bold").fillColor(ACCENT).text(line, { lineGap: 3 });
+  doc.font("Helvetica").fillColor(INK);
+  doc.moveDown(0.5);
+}
+
+function sessionButton(doc, lang, session) {
+  if (session && session.expired) return;
+  linkButton(doc, copyFor(lang).btn, BOOKING_LINKS[lang] || BOOKING_LINKS.es);
+}
+
+function mentorReviewBlock(doc, lang, session) {
+  ensureSpace(doc, 150);
+  body(doc, copyFor(lang).shortIntro);
+  deadlineNote(doc, lang, session);
+  sessionButton(doc, lang, session);
+}
+
+// Viñetas con la primera parte en negrilla (el beneficio) y el resto normal.
+function sessionBulletList(doc, items) {
+  const textWidth = 612 - PAGE_MARGIN * 2 - 16;
+  items.forEach(([lead, rest]) => {
+    doc.fontSize(10.5).font("Helvetica-Bold");
+    const full = lead + rest;
+    const textHeight = doc.heightOfString(full, { width: textWidth, lineGap: 3 });
+    if (doc.y + textHeight + 6 > CONTENT_BOTTOM) doc.addPage();
+    const startX = doc.x, startY = doc.y;
+    doc.fillColor(ACCENT).circle(startX + 3, startY + 6, 2.5).fill();
+    doc.fillColor(INK).font("Helvetica-Bold").text(lead, startX + 16, startY, { width: textWidth, lineGap: 3, continued: true });
+    doc.font("Helvetica").text(rest, { lineGap: 3 });
+    doc.x = startX;
+    doc.y = Math.max(doc.y, startY + textHeight) + 4;
+  });
+  doc.font("Helvetica").fillColor(INK);
+  doc.moveDown(0.3);
+}
+
+// Sección completa: qué se lleva la persona de la sesión.
+function sessionSection(doc, lang, session) {
+  const c = copyFor(lang);
+  ensureSpace(doc, 330);
+  h1(doc, c.title);
+  body(doc, c.intro);
+  sessionBulletList(doc, c.bullets);
+  body(doc, c.closing);
+  deadlineNote(doc, lang, session);
+  sessionButton(doc, lang, session);
+}
+
+// Cierre del plan de acción de 3 semanas: el último párrafo del plan (texto del
+// informe) ya invita a la sesión; aquí solo va el botón, sin repetir el plazo,
+// que ya aparece arriba.
+function planInviteBlock(doc, lang, session) {
+  if (session && session.expired) return;
+  ensureSpace(doc, 50);
+  sessionButton(doc, lang, session);
 }
 
 // Bloque de invitación al programa de referidos (Hueco 2): copy breve +
@@ -803,7 +851,7 @@ const INTRO_FOCUS = {
   },
 };
 
-function introPage(doc, lang, participant) {
+function introPage(doc, lang, participant, session) {
   doc.addPage();
   h1(doc, T(lang, "Introducción", "Introduction"));
   const focus = INTRO_FOCUS[contextGroup(participant.contextCode)];
@@ -816,7 +864,7 @@ function introPage(doc, lang, participant) {
       `Hi ${participant.name}. This report isn't an exam you pass or fail — no one "qualifies" for love once and for all. It's here to show you, as honestly as possible, which learned patterns you already have solidly built as strengths, and which ones are worth paying attention to ${focus.en}. Think of it as a map, not a verdict.`
     )
   );
-  mentorReviewBlock(doc, lang);
+  mentorReviewBlock(doc, lang, session);
 }
 
 function referralClosePage(doc, lang) {
@@ -849,7 +897,7 @@ function standardClosePage(doc, lang) {
   );
 }
 
-async function generateExtendedReportPDF({ participant, scoreResult, referral, aiSections, qualitativeAnswers }) {
+async function generateExtendedReportPDF({ participant, scoreResult, referral, aiSections, qualitativeAnswers, session }) {
   const lang = participant.lang;
   const doc = newDoc();
   const chunks = [];
@@ -857,7 +905,7 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
   const done = new Promise((resolve) => doc.on("end", () => resolve(Buffer.concat(chunks))));
 
   coverPage(doc, lang, participant);
-  introPage(doc, lang, participant);
+  introPage(doc, lang, participant, session || null);
 
   ensureSpace(doc, 160); // reserva espacio solo para título + párrafo intro
   h1(doc, T(lang, "Cómo leer tu perfil", "How to read your profile"));
@@ -930,29 +978,17 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
     if (band === "d") bulletList(doc, bc.recommendations);
   });
 
-  // Invitación a la sesión de mentoría gratuita — sección propia, ANTES del
-  // plan de acción (a pedido de Francisco, 2026-09-12): antes vivía como
-  // subtítulo (h2) pegado justo debajo del plan de acción, y visualmente se
-  // veía como si fuera parte de ese mismo bloque en vez de su propia
-  // sección. Ahora se presenta como la recomendación de revisar el informe
-  // completo con un mentor — el plan de acción de 3 semanas que sigue es
-  // uno de los temas que se revisan ahí, no al revés.
-  ensureSpace(doc, 160);
-  h1(doc, T(lang, "Tu sesión de mentoría indagatoria gratuita", "Your free intake mentoring session"));
-  body(
-    doc,
-    T(
-      lang,
-      `Como parte de tu Informe Extendido, tienes una sesión de mentoría indagatoria GRATUITA de 60 minutos con ${MENTOR_NAME.es}. Te recomendamos agendarla para revisar juntos este informe completo —incluyendo el plan de acción de las próximas 3 semanas que encontrarás a continuación— y diseñar tus siguientes pasos.`,
-      `As part of your Extended Report, you have a FREE 60-minute intake mentoring session with ${MENTOR_NAME.en}. We recommend scheduling it to review this full report together —including the 3-week action plan you'll find next— and design your next steps.`
-    )
-  );
-  linkButton(doc, T(lang, "Agendar mi sesión gratuita", "Schedule my free session"), BOOKING_LINKS[lang] || BOOKING_LINKS.es);
+  // Invitación a la sesión de mentoring gratuita — sección propia, ANTES del
+  // plan de acción: qué se lleva la persona de la sesión (beneficios), qué es y
+  // qué no es, el plazo si lo tiene, y el botón de agendar. El plan de acción
+  // de 3 semanas que sigue es uno de los temas que se revisan ahí.
+  sessionSection(doc, lang, session);
 
   // Plan de acción a 3 semanas
   ensureSpace(doc, 320);
   h1(doc, T(lang, "Tu plan de acción a 3 semanas", "Your 3-week action plan"));
   aiBlock(doc, aiSections.actionPlanNarrative);
+  planInviteBlock(doc, lang, session);
 
   bookTeaserBlock(doc, lang);
   friendReferralBlock(doc, lang);

@@ -24,6 +24,7 @@ const LOGO_URL = `${BASE_URL}/assets/logo-relateready-header.png`;
 // Enlaces de agendamiento de la sesión de mentoría gratuita — los mismos que
 // usa la pantalla de resultados (ver public/js/app.js, BOOKING_LINKS). Si se
 // cambian ahí, hay que actualizarlos también aquí.
+const { copyFor, deadlineLine } = require("./sessionCopy");
 const BOOKING_LINKS = {
   es: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/eMJ5GQhw_0W_-z2cJN-S9g2",
   en: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/K4DmDOt-kUSplfAlddYmbw2",
@@ -90,34 +91,44 @@ function firstNameOf(name, lang) {
 
 // Se envía la primera vez que alguien genera su Informe Extendido (pago ya
 // confirmado) — ver routes/api.js, GET /api/report/extended/:id.
-function extendedReportEmail({ name, lang, resultsUrl }) {
+function extendedReportEmail({ name, lang, resultsUrl, session }) {
   const bookingUrl = BOOKING_LINKS[lang] || BOOKING_LINKS.es;
   const firstName = firstNameOf(name, lang);
+  const c = copyFor(lang);
+  const expired = !!(session && session.expired);
+  const deadline = deadlineLine(lang, session);
+
+  // Bloque de la sesión de mentoring: texto de services/sessionCopy.js (el mismo del PDF).
+  const bullets = c.bullets
+    .map(([lead, rest]) => `<li style="margin:0 0 8px;"><strong>${lead}</strong>${rest}</li>`)
+    .join("");
+  const sessionBlock = `
+          <p style="font-size:15px;line-height:1.6;margin:0 0 12px;">${c.intro}</p>
+          <ul style="font-size:15px;line-height:1.5;margin:0 0 16px;padding-left:22px;">${bullets}</ul>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">${c.closing}</p>
+          ${deadline ? `<p style="font-size:15px;line-height:1.6;margin:0 0 16px;font-weight:bold;color:${ACCENT};">${deadline}</p>` : ""}
+          ${expired ? "" : `<p style="margin:0 0 12px;">${button(bookingUrl, c.btn)}</p>`}`;
 
   if (lang === "en") {
     return {
-      subject: "Your RelateReady Extended Report is ready",
+      subject: expired ? c.emailSubjectExpired : c.emailSubject,
       html: shell({
         lang,
         bodyHtml: `
           <p style="font-size:16px;margin:0 0 16px;">Hi ${firstName},</p>
-          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thank you for getting your RelateReady Extended Report. You'll find it attached to this email as a PDF, and you can also view it online anytime through the link below.</p>
-          <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Your report includes a free 60-minute intake mentoring session to review your results together — that's also where you'll receive "You First", the free digital book that goes deeper into your 8 pillars.</p>
-          <p style="margin:0 0 12px;">${button(bookingUrl, "Schedule my free session")}</p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thank you for getting your RelateReady Extended Report. You'll find it attached to this email as a PDF, and you can also view it online anytime through the link below.</p>${sessionBlock}
           <p style="margin:20px 0 0;"><a href="${resultsUrl}" style="color:${ACCENT};font-size:14px;">View your results online</a></p>
         `,
       }),
     };
   }
   return {
-    subject: "Tu Informe Extendido de RelateReady está listo",
+    subject: expired ? c.emailSubjectExpired : c.emailSubject,
     html: shell({
       lang,
       bodyHtml: `
         <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
-        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Gracias por adquirir tu Informe Extendido de RelateReady. Lo encontrarás adjunto a este correo en PDF y también podrás consultarlo en línea cuando quieras, a través del enlace que aparece abajo.</p>
-        <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Tu informe incluye una sesión de mentoría indagatoria gratuita de 60 minutos para revisar tus resultados juntos — y ahí, exclusivamente ahí, recibes "Tú Primero", el libro digital gratuito que profundiza en tus 8 pilares.</p>
-        <p style="margin:0 0 12px;">${button(bookingUrl, "Agendar mi sesión gratuita")}</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Gracias por adquirir tu Informe Extendido de RelateReady. Lo encontrarás adjunto a este correo en PDF y también podrás consultarlo en línea cuando quieras, a través del enlace que aparece abajo.</p>${sessionBlock}
         <p style="margin:20px 0 0;"><a href="${resultsUrl}" style="color:${ACCENT};font-size:14px;">Ver tus resultados en línea</a></p>
       `,
     }),
@@ -131,15 +142,8 @@ function extendedReportEmail({ name, lang, resultsUrl }) {
 // AAAA-MM-DD (la que entrega getActivePromo().until). Si viene, el correo avisa
 // que el informe completo es gratis hasta esa fecha; si no viene, usa el texto
 // de siempre. La fecha NO está escrita aquí: sale de la campaña del panel.
-const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const MONTHS_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
-function promoDateText(isoDate, lang) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoDate || ""));
-  if (!m) return null;
-  const month = Number(m[2]) - 1, day = Number(m[3]);
-  if (month < 0 || month > 11 || day < 1 || day > 31) return null;
-  return lang === "en" ? `${MONTHS_EN[month]} ${day}` : `${day} de ${MONTHS_ES[month]}`;
-}
+const { humanDate } = require("./dateText");
+function promoDateText(isoDate, lang) { return humanDate(isoDate, lang); }
 
 function pendingReportReminderEmail({ name, lang, resultsUrl, promoUntil }) {
   const firstName = firstNameOf(name, lang);

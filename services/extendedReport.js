@@ -30,6 +30,7 @@ const { generateExtendedReportPDF } = require("./pdfGenerator");
 const { generateAISections } = require("./aiAnalysis");
 const { sendMail } = require("./graphMail");
 const { extendedReportEmail } = require("./emailTemplates");
+const { sessionInfoFor } = require("./sessionDeadline");
 
 // Nombre de archivo para los PDF descargados/adjuntos: "RelateReady -
 // <Nombre> - <Tipo>.pdf" en vez del id/UUID interno. Quita caracteres que no
@@ -71,6 +72,7 @@ async function generatePdfForSubmission(sub) {
     referral: { triggered: !!sub.referral_triggered },
     aiSections,
     qualitativeAnswers: sub.qualitativeAnswers,
+    session: sessionInfoFor(sub),
   });
 }
 
@@ -86,6 +88,7 @@ async function sendExtendedReportEmail(sub, pdf, baseUrl) {
     name: sub.name,
     lang: sub.lang === "en" ? "en" : "es",
     resultsUrl: `${baseUrl}/?sid=${sub.id}`,
+    session: sessionInfoFor(sub),
   });
   const result = await sendMail({
     to: sub.email,
