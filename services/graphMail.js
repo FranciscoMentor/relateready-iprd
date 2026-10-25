@@ -38,8 +38,9 @@ if (!GRAPH_MAIL_ENABLED) {
 
 // sendMail({ to, subject, html, attachments, replyTo })
 // replyTo: correo opcional al que llegan las respuestas (en vez del remitente)
+// cc: correo (o arreglo de correos) opcional con copia
 // attachments: [{ filename, contentBytes: Buffer, contentType }]
-async function sendMail({ to, subject, html, attachments = [], replyTo }) {
+async function sendMail({ to, subject, html, attachments = [], replyTo, cc }) {
   if (!GRAPH_MAIL_ENABLED) {
     console.log(`[graphMail] (deshabilitado) no se envió correo a ${to} — asunto: "${subject}"`);
     return { sent: false, reason: "disabled" };
@@ -56,6 +57,8 @@ async function sendMail({ to, subject, html, attachments = [], replyTo }) {
       toRecipients: [{ emailAddress: { address: to } }],
     };
     if (replyTo) message.replyTo = [{ emailAddress: { address: replyTo } }];
+    const ccList = [].concat(cc || []).filter(Boolean);
+    if (ccList.length) message.ccRecipients = ccList.map((address) => ({ emailAddress: { address } }));
     if (attachments.length) {
       message.attachments = attachments.map((a) => ({
         "@odata.type": "#microsoft.graph.fileAttachment",

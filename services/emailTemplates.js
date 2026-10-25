@@ -747,5 +747,46 @@ function testInvitationWhatsappText({ name, lang, testUrl, repName, vipCode }) {
   return L.join("\n");
 }
 
-module.exports = { extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail, speedDatingSurveyEmail, speedDatingSurveyReminderEmail, testInvitationEmail, testInvitationWhatsappText };
+// Recordatorio 24 h antes de una sesión de mentoring (cliente o sesión gratuita).
+// El TEXTO y los cálculos de idioma / zona horaria los produce la tarea
+// programada "Recordatorio de sesión 24h" (motor remind_calc, en el panel de
+// sesiones de Adamantine Mentoring) y llegan ya resueltos en `parts`; aquí
+// solo se les da el diseño de marca (mismo encabezado, colores y botón que el
+// resto de correos). Todo el texto se escapa: el endpoint no acepta HTML.
+function sessionReminderEmail(parts) {
+  const e = escapeHtml;
+  const lang = parts.lang === "en" ? "en" : "es";
+  const P = `font-family:Georgia,'Times New Roman',serif;color:${INK};font-size:16px;line-height:1.6;margin:0 0 16px;`;
+  const small = (t, mt) => `<div style="font-family:Georgia,'Times New Roman',serif;font-size:13px;color:${MUTED};margin:${mt || 6}px 0 0;">${e(t)}</div>`;
+  const chip = parts.chip
+    ? `<span style="display:inline-block;background:${ACCENT};color:#ffffff;font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:3px 9px;border-radius:999px;margin-left:8px;vertical-align:middle;">${e(parts.chip)}</span>`
+    : "";
+  const card = `
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:${PAPER};border:1px solid #E7DFD2;border-radius:10px;">
+            <tr><td style="padding:18px 20px;">
+              <div style="font-family:Georgia,'Times New Roman',serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${ACCENT};margin:0 0 8px;">${e(parts.eyebrow)}${chip}</div>
+              <div style="font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.25;color:${INK};margin:0 0 4px;">${e(parts.dayTxt)}</div>
+              <div style="font-family:Georgia,'Times New Roman',serif;font-size:18px;color:${INK};margin:0 0 2px;"><strong>${e(parts.timeTxt)}</strong> &middot; ${e(parts.zoneLabel)}</div>
+              ${parts.ecuLine ? small(parts.ecuLine) : ""}
+              ${parts.altLine ? small(parts.altLine, 8) : ""}
+            </td></tr>
+          </table>`;
+  const link = /^https:\/\//.test(parts.link || "") ? parts.link : "";
+  const btn = link
+    ? `<p style="margin:0 0 6px;">${button(e(link), e(parts.cta))}</p>
+          <p style="font-family:Georgia,'Times New Roman',serif;font-size:12px;color:${MUTED};margin:0 0 20px;">${e(parts.tip)}</p>`
+    : "";
+  const sign = (parts.sign || []).map(e).join("<br>");
+  const bodyHtml = `
+          <p style="${P}">${e(parts.greet)}</p>
+          <p style="${P}">${e(parts.intro)}</p>
+          ${card}
+          ${btn}
+          <p style="${P}">${e(parts.resched)}</p>
+          <p style="${P}">${e(parts.closing)}</p>
+          <p style="${P}margin:0;">${sign}</p>`;
+  return { subject: String(parts.subject || ""), html: shell({ bodyHtml, lang }) };
+}
+
+module.exports = { sessionReminderEmail, extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail, speedDatingSurveyEmail, speedDatingSurveyReminderEmail, testInvitationEmail, testInvitationWhatsappText };
 

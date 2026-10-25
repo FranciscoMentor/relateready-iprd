@@ -7,6 +7,7 @@ const path = require("path");
 const apiRoutes = require("./routes/api");
 const adminRoutes = require("./routes/admin");
 const speedDatingAdminRoutes = require("./routes/speedDatingAdmin");
+const reminderMailRoutes = require("./routes/reminderMail");
 const speedDatingPublicRoutes = require("./routes/speedDatingPublic");
 const db = require("./db/init");
 const reminderScheduler = require("./services/reminderScheduler");
@@ -50,6 +51,7 @@ app.use(express.static(path.join(__dirname, "public"), {
 app.get("/health", (req, res) => res.json({ ok: true }));
 
 app.use("/api", apiRoutes);
+app.use("/internal/reminder-mail", reminderMailRoutes);
 app.use("/admin", adminRoutes);
 
 // Piloto de speed dating (Mila Rooftop, 2026-09) — panel del organizador
