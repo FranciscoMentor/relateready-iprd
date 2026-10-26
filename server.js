@@ -11,6 +11,7 @@ const reminderMailRoutes = require("./routes/reminderMail");
 const bookingSyncRoutes = require("./routes/bookingSync");
 const leadInfoRoutes = require("./routes/leadInfo");
 const sessionNudgeRoutes = require("./routes/sessionNudge");
+const countryNormalizeRoutes = require("./routes/countryNormalize");
 const speedDatingPublicRoutes = require("./routes/speedDatingPublic");
 const db = require("./db/init");
 const reminderScheduler = require("./services/reminderScheduler");
@@ -59,6 +60,7 @@ app.use("/internal/reminder-mail", reminderMailRoutes);
 app.use("/internal/booking-sync", bookingSyncRoutes);
 app.use("/internal/lead-info", leadInfoRoutes);
 app.use("/internal/session-nudge", sessionNudgeRoutes);
+app.use("/internal/normalize-countries", countryNormalizeRoutes);
 app.use("/admin", adminRoutes);
 
 // Piloto de speed dating (Mila Rooftop, 2026-09) — panel del organizador
