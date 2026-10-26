@@ -106,6 +106,7 @@
       referralNotice: "Tus respuestas sugieren que este podría ser un buen momento para hablar con alguien de confianza o un profesional de salud mental. RelateReady no es una herramienta de diagnóstico ni de crisis.",
       errorRequired: "Por favor completa todos los campos obligatorios.",
       errorEmailInvalid: "Por favor ingresa un correo válido.",
+      errorCountry: "Elige tu país de la lista.",
       progress: "Pregunta",
       of: "de",
       otherSpecify: "Especifica tu situación",
@@ -194,6 +195,7 @@
       referralNotice: "Your answers suggest this might be a good time to talk with someone you trust or a mental health professional. RelateReady is not a diagnostic or crisis tool.",
       errorRequired: "Please fill in all required fields.",
       errorEmailInvalid: "Please enter a valid email address.",
+      errorCountry: "Please choose your country from the list.",
       progress: "Question",
       of: "of",
       otherSpecify: "Specify your situation",
@@ -424,7 +426,7 @@
       if (!us) document.getElementById("f-state").value = "";
     });
 
-    document.getElementById("btn-start").addEventListener("click", () => {
+    document.getElementById("btn-start").addEventListener("click", async () => {
       const name = document.getElementById("f-name").value.trim();
       const email = document.getElementById("f-email").value.trim();
       const phone = document.getElementById("f-phone").value.trim();
@@ -442,6 +444,23 @@
         document.getElementById("intake-error").textContent = t("errorEmailInvalid");
         return;
       }
+      // El país debe ser uno reconocido (el servidor guarda un nombre único). Se
+      // revisa aquí, antes de las preguntas, para no rechazarlo al final del test.
+      // Si no hay conexión con el servidor, se sigue y se valida al enviar.
+      try {
+        const chk = await (await fetch("/api/check-country?country=" + encodeURIComponent(country))).json();
+        if (chk && chk.ok === false) {
+          document.getElementById("intake-error").textContent = t("errorCountry");
+          return;
+        }
+        if (chk && chk.isUS && !usState) {
+          state.country = country;
+          document.getElementById("state-row").style.display = "block";
+          document.getElementById("intake-error").textContent = t("errorRequired");
+          return;
+        }
+      } catch (e) { /* se valida de nuevo al enviar */ }
+      document.getElementById("intake-error").textContent = "";
       state.name = name;
       state.email = email;
       state.phone = phone;

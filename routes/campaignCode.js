@@ -13,6 +13,20 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db/init");
 const { applyBookingEvents } = require("../services/bookingSync");
+const { canonicalCountry, countryNameEs } = require("../services/location");
+
+// País para el reporte: nombre único (los datos viejos como "USA" o "Usa" también
+// quedan juntos); si no se reconoce, el texto original recortado o "(sin país)".
+function countryOf(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return "(sin país)";
+  const canon = canonicalCountry(text);
+  return canon ? countryNameEs(canon) : text;
+}
+function countryForCsv(raw) {
+  const text = String(raw || "").trim();
+  return canonicalCountry(text) || text;
+}
 
 // Campañas guardadas (nombre, código, fechas). Cada campaña es solo una
 // "vista" de los envíos que canjearon ese código en ese rango: crear, editar o
@@ -104,7 +118,7 @@ function loadCampaign(query) {
     byCampaign: groupBy(campaignOf),
     byAd: groupBy((r) => (r.utm_content ? r.utm_content : null)),
     bySourceMedium: groupBy((r) => `${r.utm_source || "(sin source)"} / ${r.utm_medium || "(sin medium)"}`),
-    byCountry: groupBy((r) => (r.country ? r.country.trim() : "(sin país)")),
+    byCountry: groupBy((r) => countryOf(r.country)),
     byLang: groupBy((r) => (r.lang === "en" ? "Inglés" : "Español")),
   };
 }
@@ -189,7 +203,7 @@ router.get("/export.csv", (req, res) => {
   const lines = [headers.join(",")];
   d.rows.forEach((r) => {
     lines.push([
-      r.created_at, r.code_redeemed_at, r.summary_viewed_at, r.unlock_clicked_at, r.name, r.email, r.phone, r.country, r.state, r.city,
+      r.created_at, r.code_redeemed_at, r.summary_viewed_at, r.unlock_clicked_at, r.name, r.email, r.phone, countryForCsv(r.country), r.state, r.city,
       r.lang === "en" ? "Inglés" : "Español", d.isCode(r) ? "Sí" : "No", r.payment_status, r.payment_reference,
       r.extended_generated_at ? "Sí" : "No", r.extended_email_status, r.follow_up_status,
       r.utm_source, r.utm_medium, r.utm_campaign, r.utm_content, r.utm_term, r.from_meta_ad ? "Sí" : "No",

@@ -8,7 +8,7 @@ const { vignettesForGroup } = require("../data/vignettes");
 const { RELATIONSHIP_CONTEXTS, contextGroup } = require("../data/relationshipContexts");
 const { buildFlatCoreItems, buildFlatDesirabilityItems, coreItemsForGroup, qualitativeItemsForGroup } = require("../data/items");
 const { scoreTest, checkReferralProtocol } = require("../services/scoring");
-const { isUnitedStates, canonicalState } = require("../services/location");
+const { isUnitedStates, canonicalState, canonicalCountry } = require("../services/location");
 const { preparePayment, confirmPayment, PAYPHONE_ENABLED } = require("../services/payphone");
 const { generatePdfForSubmission, sendExtendedReportEmail, triggerExtendedReportEmailOnce, pdfFilename } = require("../services/extendedReport");
 
@@ -41,6 +41,13 @@ const { sessionInfoFor } = require("../services/sessionDeadline");
 // y recibe viñetas, ítems y preguntas cualitativas con la redacción adaptada
 // a esa situación (en pareja, separado/a, divorciado/a, viudo/a, buscando…).
 // Los ids de los ítems no cambian, así que el puntaje se calcula igual.
+// Valida el país en la pantalla de datos, antes de que la persona conteste todo
+// el test (el servidor lo vuelve a validar al enviar).
+router.get("/check-country", (req, res) => {
+  const canon = canonicalCountry(String(req.query.country || ""));
+  res.json({ ok: !!canon, country: canon, isUS: !!canon && isUnitedStates(canon) });
+});
+
 router.get("/meta", (req, res) => {
   const lang = req.query.lang === "en" ? "en" : "es";
   const group = req.query.context ? contextGroup(String(req.query.context)) : "buscando";
@@ -117,11 +124,18 @@ router.post("/submit", (req, res) => {
       return res.status(400).json({ error: "La ciudad es obligatoria." });
     }
     if (!country || typeof country !== "string" || !country.trim()) {
-      return res.status(400).json({ error: "El país es obligatorio." });
+      return res.status(400).json({ error: lang === "en" ? "Please choose your country from the list." : "Elige tu país de la lista." });
+    }
+    // El país se guarda con un nombre único en inglés ("United States", "Mexico"…),
+    // sin importar cómo lo escribió la persona (USA, EE.UU., México…). Si no es un
+    // país reconocido se rechaza con un mensaje en su idioma.
+    const canonCountry = canonicalCountry(country);
+    if (!canonCountry) {
+      return res.status(400).json({ error: lang === "en" ? "Please choose your country from the list." : "Elige tu país de la lista." });
     }
     // Solo para Estados Unidos se pide también el estado (ciudad + estado + país);
     // para cualquier otro país basta ciudad + país. Con eso se deduce la zona horaria.
-    const isUS = isUnitedStates(country);
+    const isUS = isUnitedStates(canonCountry);
     const cleanState = isUS ? canonicalState(stateInput) : "";
     if (isUS && !cleanState) {
       return res.status(400).json({ error: "El estado es obligatorio para Estados Unidos." });
@@ -138,7 +152,7 @@ router.post("/submit", (req, res) => {
     const cleanEmail = email.trim();
     const cleanPhone = phone.trim();
     const cleanCity = city.trim();
-    const cleanCountry = country.trim();
+    const cleanCountry = canonCountry;
 
     const id = crypto.randomUUID();
     db.prepare(
