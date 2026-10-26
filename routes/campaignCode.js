@@ -12,6 +12,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db/init");
+const { applyBookingEvents } = require("../services/bookingSync");
 
 // Campañas guardadas (nombre, código, fechas). Cada campaña es solo una
 // "vista" de los envíos que canjearon ese código en ese rango: crear, editar o
@@ -110,34 +111,13 @@ function loadCampaign(query) {
 
 // Sincroniza las sesiones agendadas en Outlook Bookings. El panel lee el
 // calendario (con la cuenta de Microsoft conectada en la pestaña Calendario)
-// y envía aquí los eventos con invitados: { events: [{ id, subject, start, emails: [] }] }.
+// y envía aquí las reservas: { events: [{ id, subject, start, emails: [] }] }, donde emails incluye
+// el correo del cliente leído del texto de la reserva (los invitados del evento son solo cuentas internas).
 // Si el correo de un invitado coincide con el de un test, esa ficha pasa a
 // "sesion_agendada" (solo si estaba en nuevo o contactado: nunca se baja un estado posterior).
 router.post("/sync-sessions", (req, res) => {
-  const events = Array.isArray(req.body && req.body.events) ? req.body.events.slice(0, 1000) : [];
-  const find = db.prepare("SELECT id, name, email, follow_up_status, follow_up_notes FROM submissions WHERE lower(email) = ? ORDER BY id DESC LIMIT 1");
-  const upd = db.prepare("UPDATE submissions SET follow_up_status = 'sesion_agendada', follow_up_notes = ? WHERE id = ?");
-  const matched = [];
-  let alreadyKnown = 0, checked = 0;
-  for (const ev of events) {
-    const when = String(ev.start || "").slice(0, 16).replace("T", " ");
-    const tag = "Sesión agendada (Bookings): " + when + (ev.id ? " [" + String(ev.id).slice(-12) + "]" : "");
-    for (const raw of Array.isArray(ev.emails) ? ev.emails.slice(0, 10) : []) {
-      const email = String(raw || "").trim().toLowerCase();
-      if (!email || email.length > 200) continue;
-      checked++;
-      const row = find.get(email);
-      if (!row) continue;
-      if (row.follow_up_notes && ev.id && row.follow_up_notes.includes("[" + String(ev.id).slice(-12) + "]")) { alreadyKnown++; continue; }
-      if (row.follow_up_status === "nuevo" || row.follow_up_status === "contactado") {
-        upd.run((row.follow_up_notes ? row.follow_up_notes + "\n" : "") + tag, row.id);
-        matched.push({ name: row.name, email: row.email, start: when });
-      } else {
-        alreadyKnown++;
-      }
-    }
-  }
-  res.json({ ok: true, eventsRead: events.length, matched, alreadyKnown });
+  const out = applyBookingEvents(req.body && req.body.events);
+  res.json({ ok: true, ...out });
 });
 
 // Lista de campañas guardadas.

@@ -669,7 +669,7 @@
       const res = await fetch("/admin/api/campana-codigo/sync-sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ events }) });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "Error");
-      msg.textContent = `Calendario revisado: ${d.eventsRead} citas con invitados. ` + (d.matched.length ? `Sesiones nuevas vinculadas: ${d.matched.map(m => m.name || m.email).join(", ")}.` : "No hay sesiones nuevas que vincular.");
+      msg.textContent = `Calendario revisado: ${d.eventsRead} reservas de clientes. ` + (d.matched.length ? `Sesiones nuevas vinculadas: ${d.matched.map(m => m.name || m.email).join(", ")}.` : "No hay sesiones nuevas que vincular.");
       if (d.matched.length) loadCampaign();
     } catch (e) { msg.textContent = "No se pudo sincronizar el calendario. Reconecta tu cuenta en la pestaña Calendario."; }
   }
@@ -1052,6 +1052,8 @@
   // desde el campo "+ Conectar otra cuenta" de arriba.
   const ACCOUNT_META = {
     'adamantinementor@outlook.com': { color: '#B5732A', short: 'RelateReady' },
+    // Calendario donde llegan hoy las reservas de Bookings (Sesión gratuita / Free Mentoring Session).
+    'franciscorosero@adamantinehealing.onmicrosoft.com': { color: '#2A2A28', short: 'Adamantine (Bookings)' },
   };
   let SYNC_EMAILS = Object.keys(ACCOUNT_META);
 
@@ -1144,14 +1146,19 @@
       const me = (entry.account.username || '').toLowerCase();
       let token;
       try { token = await getGraphToken(entry, false); } catch (e) { continue; }
-      let url = `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${encodeURIComponent(fromISO)}&endDateTime=${encodeURIComponent(toISO)}&$select=id,subject,start,attendees,isCancelled&$top=100`;
+      let url = `https://graph.microsoft.com/v1.0/me/calendarview?startDateTime=${encodeURIComponent(fromISO)}&endDateTime=${encodeURIComponent(toISO)}&$select=id,subject,start,attendees,bodyPreview,isCancelled&$top=100`;
       for (let page = 0; url && page < 5; page++) {
         const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
         if (!resp.ok) break;
         const json = await resp.json();
         (json.value || []).forEach(ev => {
           if (ev.isCancelled) return;
-          const emails = (ev.attendees || []).map(a => (a.emailAddress && a.emailAddress.address || '').toLowerCase()).filter(e => e && e !== me);
+          // En las reservas de Bookings los invitados son solo cuentas internas: el correo
+          // de la persona está en el texto de la reserva ("Email:" / "Correo electrónico:").
+          const isStaff = e => e.endsWith('@adamantinehealing.onmicrosoft.com');
+          const emails = (ev.attendees || []).map(a => (a.emailAddress && a.emailAddress.address || '').toLowerCase()).filter(e => e && e !== me && !isStaff(e));
+          const m = /(?:^|[\r\n])\s*(?:e-?mail|correo(?:\s+electr[oó]nico)?)\s*:\s*([^\s<>"']+@[^\s<>"']+)/i.exec(ev.bodyPreview || '');
+          if (m) { const e = m[1].replace(/[.,;:)]+$/, '').toLowerCase(); if (e && !isStaff(e) && !emails.includes(e)) emails.push(e); }
           if (emails.length) out.push({ id: ev.id, subject: ev.subject || '', start: ev.start && ev.start.dateTime, emails });
         });
         url = json['@odata.nextLink'] || null;
