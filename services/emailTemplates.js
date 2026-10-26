@@ -807,6 +807,13 @@ function sessionNudgeEmail({ name, lang, session, second }) {
   const P = 'style="font-size:15px;line-height:1.6;margin:0 0 16px;"';
   const tag = (label) => `<span style="display:inline-block;background:${ACCENT};color:#ffffff;font-size:10.5px;letter-spacing:1px;padding:2px 8px;border-radius:999px;margin:0 0 0 6px;vertical-align:middle;">${label}</span>`;
   const footerExtra = en ? "RelateReady is an educational tool, not therapy." : "RelateReady es una herramienta educativa, no terapia.";
+  // Nota opcional para una tanda (p. ej. "Nuestras próximas sesiones empiezan el 4 de noviembre"):
+  // sale de SESSION_NUDGE_NOTE_EN / SESSION_NUDGE_NOTE_ES en Render, vacía por defecto.
+  const noteRaw = String((en ? process.env.SESSION_NUDGE_NOTE_EN : process.env.SESSION_NUDGE_NOTE_ES) || "").trim();
+  const noteHtml = noteRaw ? `<p ${P}>${escapeHtml(noteRaw)}</p>` : "";
+  const tzHtml = `<p ${P}>${en
+    ? "The times on the booking page are shown in a time zone listed at the bottom of the page. Please check it before you confirm."
+    : "Los horarios de la página de reservas se muestran en la zona horaria que aparece al final de la página. Revísala antes de confirmar."}</p>`;
 
   if (second) {
     return {
@@ -817,10 +824,12 @@ function sessionNudgeEmail({ name, lang, session, second }) {
         bodyHtml: en
           ? `<p style="font-size:16px;margin:0 0 16px;">${greet}</p>
           <p ${P}>A quick reminder that your free 60-minute mentoring session to review your RelateReady report can be booked until ${until}.</p>
+          ${noteHtml}${tzHtml}
           <p style="margin:0 0 16px;">${button(bookingUrl, "Book my free session")}</p>
           <p ${P}>If none of the times work, just reply to this email.</p>`
           : `<p style="font-size:16px;margin:0 0 16px;">${greet}</p>
           <p ${P}>Te recordamos que tu sesión de mentoring gratuita de 60 minutos para revisar tu informe de RelateReady se puede agendar hasta el ${until}.</p>
+          ${noteHtml}${tzHtml}
           <p style="margin:0 0 16px;">${button(bookingUrl, "Agendar mi sesión gratuita")}</p>
           <p ${P}>Si ninguno de los horarios te sirve, responde a este correo.</p>`,
       }),
@@ -843,6 +852,7 @@ function sessionNudgeEmail({ name, lang, session, second }) {
             <li ${li}><strong>"You First", our digital book</strong>${tag("FREE")}: shared only in this session.</li>
           </ul>
           <p ${P}>It's a mentoring conversation, not an exam or a sales call. Just bring your report. You can book your session any day until ${until}.</p>
+          ${noteHtml}${tzHtml}
           <p style="margin:0 0 16px;">${button(bookingUrl, "Book my free session")}</p>
           <p ${P}>If none of the times work for you, just reply to this email and we'll find another way.</p>
           <p style="font-size:15px;line-height:1.6;margin:0;">Wishing you clarity and a good week,<br>The RelateReady team<br>RelateReady · Adamantine Mentoring</p>`
@@ -855,6 +865,7 @@ function sessionNudgeEmail({ name, lang, session, second }) {
             <li ${li}><strong>"Tú Primero", nuestro libro digital</strong>${tag("GRATIS")}: se comparte solo en esta sesión.</li>
           </ul>
           <p ${P}>Es una conversación de mentoring, no un examen ni una llamada de ventas. Solo trae tu informe. Puedes agendar tu sesión hasta el ${until}.</p>
+          ${noteHtml}${tzHtml}
           <p style="margin:0 0 16px;">${button(bookingUrl, "Agendar mi sesión gratuita")}</p>
           <p ${P}>Si ninguno de los horarios te sirve, responde a este correo y buscamos otra forma.</p>
           <p style="font-size:15px;line-height:1.6;margin:0;">Te deseamos claridad y una buena semana,<br>El equipo de RelateReady<br>RelateReady · Adamantine Mentoring</p>`,

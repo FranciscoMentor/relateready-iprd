@@ -1055,6 +1055,13 @@ router.get("/api/seguimiento-sesion/simulacion", (req, res) => {
   res.json(require("../services/sessionNudgeScheduler").simulate());
 });
 
+// Pausar / reanudar el envío desde el panel (no hace falta tocar Render).
+router.post("/api/seguimiento-sesion/pausa", express.json(), (req, res) => {
+  const sched = require("../services/sessionNudgeScheduler");
+  sched.setPaused(!!(req.body && req.body.paused));
+  res.json({ ok: true, paused: sched.isPaused() });
+});
+
 router.get("/seguimiento-sesion", (req, res) => {
   const sim = require("../services/sessionNudgeScheduler").simulate();
   const when = (iso) => (iso ? esc(String(iso).slice(0, 16).replace("T", " ")) + " UTC" : "—");
@@ -1064,6 +1071,10 @@ router.get("/seguimiento-sesion", (req, res) => {
         list.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc(i.email)}</td><td>${esc(i.lang)}</td><td>${when(i.unlockedAt)}</td><td>${i.hoursSinceUnlock}</td><td>${esc(i.until)}</td><td>${esc(i.campaign || "")}</td></tr>`).join("") +
         `</table>`
       : `<p class="muted">Nadie por ahora.</p>`;
+  const sentTable = sim.sent.length
+    ? `<table><tr><th>Nombre</th><th>Correo</th><th>Idioma</th><th>Primer correo</th><th>Segundo aviso</th></tr>` +
+      sim.sent.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc(i.email)}</td><td>${esc(i.lang)}</td><td>${when(i.first)}</td><td>${when(i.second)}</td></tr>`).join("") + `</table>`
+    : `<p class="muted">Todavía no se ha enviado ninguno.</p>`;
   const excl = Object.entries(sim.excluded).map(([k, v]) => `<li>${esc(k)}: ${v}</li>`).join("") || "<li>—</li>";
   const syncTxt = sim.sync.lastSyncAt
     ? `${when(sim.sync.lastSyncAt)} (hace ${sim.sync.ageHours.toFixed(1)} h) — ${sim.sync.fresh ? "al día" : "DESACTUALIZADA: el envío se pausaría"}`
@@ -1078,12 +1089,16 @@ th,td{border:1px solid #e5ddd0;padding:6px 8px;text-align:left}th{background:#f3
 <p class="muted">Solo muestra a quién le tocaría el correo. No envía nada.</p>
 <div class="box">
 <p><strong>Interruptor (SESSION_NUDGE_ENABLED):</strong> ${sim.switchOn ? "ENCENDIDO" : "apagado"}<br>
+<strong>Pausa desde el panel:</strong> ${sim.paused ? "EN PAUSA (no sale nada)" : "no"}
+<button id="pausa" style="margin-left:8px;padding:4px 12px;cursor:pointer">${sim.paused ? "Reanudar el envío" : "Pausar el envío ya"}</button><br>
 <strong>Correo automático configurado:</strong> ${sim.mailConfigured ? "sí" : "no"}<br>
 <strong>Última sincronización con Bookings:</strong> ${syncTxt}<br>
 <strong>Personas con informe desbloqueado:</strong> ${sim.unlockedTotal}</p></div>
 <h2>Recibirían el primer correo (${sim.first.length})</h2>${table(sim.first)}
 <h2>Recibirían el segundo aviso (${sim.second.length})</h2>${table(sim.second)}
+<h2>Ya enviados (${sim.sent.length})</h2>${sentTable}
 <h2>No reciben (motivo)</h2><ul>${excl}</ul>
+<script>document.getElementById("pausa").onclick=async function(){this.disabled=true;await fetch("/admin/api/seguimiento-sesion/pausa",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({paused:${sim.paused ? "false" : "true"}})});location.reload();};</script>
 </body></html>`);
 });
 

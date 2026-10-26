@@ -160,6 +160,14 @@ db.exec(`
     last_sync_at TEXT NOT NULL
   );
 `);
+// Pausa rápida del seguimiento desde el panel (/admin/seguimiento-sesion).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS session_nudge_pause (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    paused INTEGER NOT NULL DEFAULT 0,
+    changed_at TEXT
+  );
+`);
 
 
 // ═══════════════════════════════════════════════════════════════════════

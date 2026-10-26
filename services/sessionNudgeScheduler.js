@@ -54,6 +54,30 @@ function enabled() {
   return String(process.env.SESSION_NUDGE_ENABLED || "").trim().toLowerCase() === "true";
 }
 
+// Pausa rápida desde el panel (/admin/seguimiento-sesion), sin tocar Render: mientras
+// esté en pausa no sale ningún correo aunque el interruptor esté encendido.
+function isPaused() {
+  const r = db.prepare("SELECT paused FROM session_nudge_pause WHERE id = 1").get();
+  return !!(r && r.paused);
+}
+
+function setPaused(paused) {
+  db.prepare(
+    "INSERT INTO session_nudge_pause (id, paused, changed_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET paused = excluded.paused, changed_at = excluded.changed_at"
+  ).run(paused ? 1 : 0, new Date().toISOString());
+}
+
+// Registro de envíos: a quién se le envió cada correo y cuándo.
+function sentLog() {
+  return db
+    .prepare(
+      `SELECT name, email, lang, session_nudge_sent_at AS first, session_nudge2_sent_at AS second
+       FROM submissions WHERE session_nudge_sent_at IS NOT NULL OR session_nudge2_sent_at IS NOT NULL
+       ORDER BY datetime(COALESCE(session_nudge2_sent_at, session_nudge_sent_at)) DESC`
+    )
+    .all();
+}
+
 function maxSyncAgeHours() {
   const n = Number(process.env.SESSION_NUDGE_MAX_SYNC_AGE_HOURS);
   return n > 0 ? n : 3;
@@ -133,6 +157,8 @@ function simulate(now = Date.now()) {
   return {
     now: new Date(now).toISOString(),
     switchOn: enabled(),
+    paused: isPaused(),
+    sent: sentLog(),
     mailConfigured: GRAPH_MAIL_ENABLED,
     sync: syncStatus(now),
     first,
@@ -152,7 +178,8 @@ async function sendOne(item, second, now = Date.now()) {
   let result;
   try {
     const { subject, html } = sessionNudgeEmail({ name: item.name, lang: item.lang, session: item.session, second });
-    result = await sendMail({ to: item.email, subject, html });
+    // Las respuestas llegan al buzón remitente, o a SESSION_NUDGE_REPLY_TO si se define en Render.
+    result = await sendMail({ to: item.email, subject, html, replyTo: String(process.env.SESSION_NUDGE_REPLY_TO || "").trim() || undefined });
   } catch (err) {
     result = { sent: false, error: err.message };
   }
@@ -168,6 +195,7 @@ async function sendOne(item, second, now = Date.now()) {
 async function runOnce(now = Date.now()) {
   if (!enabled()) return { ran: false, reason: "interruptor apagado" };
   if (!GRAPH_MAIL_ENABLED) return { ran: false, reason: "correo automático deshabilitado" };
+  if (isPaused()) return { ran: false, reason: "en pausa desde el panel" };
   const sim = simulate(now);
   if (!sim.sync.fresh) {
     console.log(`[sessionNudge] Pausado: la última sincronización con Bookings es ${sim.sync.lastSyncAt || "inexistente"} (máximo ${sim.sync.maxAgeHours} h). No se envía nada.`);
@@ -196,4 +224,4 @@ function start() {
   console.log("[sessionNudge] ENCENDIDO — revisa cada hora a quién enviarle el seguimiento de la sesión gratuita.");
 }
 
-module.exports = { start, simulate, runOnce, enabled };
+module.exports = { start, simulate, runOnce, enabled, isPaused, setPaused };
