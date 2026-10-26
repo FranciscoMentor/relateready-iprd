@@ -69,7 +69,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       <div class="field">
         <label>Género</label>
         <div class="sd-seg-toggle" id="gender-toggle">
-          <button type="button" data-value="F" class="sel">Mujer</button>
+          <button type="button" data-value="F">Mujer</button>
           <button type="button" data-value="M">Hombre</button>
         </div>
         <p class="sd-subtext sd-hidden" id="gender-note" style="margin-top:6px;"></p>
@@ -120,7 +120,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
   const errorText = document.getElementById('error-text');
   const form = document.getElementById('registro-form');
 
-  let gender = 'F';
+  let gender = null; // sin valor hasta que la persona elija Mujer u Hombre
   let consent = 1;
   let soldOut = false;
   let generoAbierto = { F: true, M: true };
@@ -204,6 +204,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
     if (e.target.tagName !== 'BUTTON') return;
     selectToggle('gender-toggle', e.target.dataset.value, (v) => gender = v);
     updateGenderNote();
+    document.getElementById('form-error').classList.add('sd-hidden');
   });
   document.getElementById('consent-toggle').addEventListener('click', (e) => {
     if (e.target.tagName !== 'BUTTON') return;
@@ -270,6 +271,12 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
     const formError = document.getElementById('form-error');
     formError.classList.add('sd-hidden');
     if (!checkAge()) { ageInput.focus(); return; }
+    if (gender !== 'F' && gender !== 'M') {
+      formError.textContent = 'Elige si eres Mujer u Hombre para continuar.';
+      formError.classList.remove('sd-hidden');
+      document.getElementById('gender-toggle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     // El correo ya no es type="email" (para que el navegador del celular no
     // ofrezca guardar los datos), así que se revisa aquí.
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(document.getElementById('f-email').value.trim())) {
