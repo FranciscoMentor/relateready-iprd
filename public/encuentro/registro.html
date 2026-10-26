@@ -111,7 +111,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
           <path d="M65 71 L72 78 L86 62" stroke-width="8"/>
         </svg>
       </div>
-      <h2>¡Listo, quedaste registrada!</h2>
+      <h2>¡Listo, tu registro está confirmado!</h2>
       <p id="success-text">Guarda este link — es tu acceso personal durante todo el evento.</p>
       <button class="sd-cta-primary" id="go-btn" style="margin-top:14px;">Ir a mi pantalla</button>
     </div>
@@ -247,7 +247,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       soldOut = data.cuposDisponibles <= 0;
       document.getElementById('evento-nombre').textContent = soldOut
         ? `${data.name} ya agotó su cupo`
-        : `Bienvenida a ${data.name}`;
+        : `Te damos la bienvenida a ${data.name}`;
       const cuando = formatEventWhen(data.eventDate, data.eventTime);
       if (cuando) {
         const fechaEl = document.getElementById('evento-fecha');
