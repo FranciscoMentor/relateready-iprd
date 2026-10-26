@@ -8,6 +8,7 @@ const { vignettesForGroup } = require("../data/vignettes");
 const { RELATIONSHIP_CONTEXTS, contextGroup } = require("../data/relationshipContexts");
 const { buildFlatCoreItems, buildFlatDesirabilityItems, coreItemsForGroup, qualitativeItemsForGroup } = require("../data/items");
 const { scoreTest, checkReferralProtocol } = require("../services/scoring");
+const { isUnitedStates, canonicalState } = require("../services/location");
 const { preparePayment, confirmPayment, PAYPHONE_ENABLED } = require("../services/payphone");
 const { generatePdfForSubmission, sendExtendedReportEmail, triggerExtendedReportEmailOnce, pdfFilename } = require("../services/extendedReport");
 
@@ -84,6 +85,7 @@ router.post("/submit", (req, res) => {
       phone,
       city,
       country,
+      state: stateInput,
       lang,
       gender,
       relationshipContextCode,
@@ -117,6 +119,13 @@ router.post("/submit", (req, res) => {
     if (!country || typeof country !== "string" || !country.trim()) {
       return res.status(400).json({ error: "El país es obligatorio." });
     }
+    // Solo para Estados Unidos se pide también el estado (ciudad + estado + país);
+    // para cualquier otro país basta ciudad + país. Con eso se deduce la zona horaria.
+    const isUS = isUnitedStates(country);
+    const cleanState = isUS ? canonicalState(stateInput) : "";
+    if (isUS && !cleanState) {
+      return res.status(400).json({ error: "El estado es obligatorio para Estados Unidos." });
+    }
     if (!relationshipContextCode || !relationshipContextText || !relationshipContextText.trim()) {
       return res.status(400).json({ error: "El contexto relacional actual (selección + texto) es obligatorio." });
     }
@@ -134,10 +143,10 @@ router.post("/submit", (req, res) => {
     const id = crypto.randomUUID();
     db.prepare(
       `INSERT INTO submissions
-        (id, created_at, name, email, phone, city, country, lang, gender, relationship_context_code, relationship_context_text,
+        (id, created_at, name, email, phone, city, state, country, lang, gender, relationship_context_code, relationship_context_text,
          core_responses, desirability_responses, vignette_responses, qualitative_answers,
          score_result, referral_triggered, payment_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')`
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')`
     ).run(
       id,
       new Date().toISOString(),
@@ -145,6 +154,7 @@ router.post("/submit", (req, res) => {
       cleanEmail,
       cleanPhone,
       cleanCity,
+      cleanState || null,
       cleanCountry,
       effLang,
       effGender,

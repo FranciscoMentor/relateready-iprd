@@ -48,7 +48,7 @@ function loadCampaign(query) {
 
   const rows = db
     .prepare(
-      `SELECT id, created_at, name, email, phone, city, country, lang, payment_status, payment_reference,
+      `SELECT id, created_at, name, email, phone, city, state, country, lang, payment_status, payment_reference,
               code_redeemed_at, summary_viewed_at, unlock_clicked_at, extended_generated_at, extended_email_status, follow_up_status,
               utm_source, utm_medium, utm_campaign, utm_content, utm_term, from_meta_ad
          FROM submissions WHERE created_at >= ? AND created_at < ? ORDER BY created_at ASC`
@@ -180,7 +180,7 @@ router.get("/", (req, res) => {
 
 router.get("/export.csv", (req, res) => {
   const d = loadCampaign(req.query);
-  const headers = ["Fecha del test", "Fecha del canje", "Resumen visto", "Pulsó desbloquear", "Nombre", "Correo", "Teléfono", "País", "Ciudad", "Idioma", "Canjeó el código", "Estado de pago", "Referencia", "Informe generado", "Correo del informe", "Seguimiento", "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "Clic de anuncio de Meta"];
+  const headers = ["Fecha del test", "Fecha del canje", "Resumen visto", "Pulsó desbloquear", "Nombre", "Correo", "Teléfono", "País", "Estado", "Ciudad", "Idioma", "Canjeó el código", "Estado de pago", "Referencia", "Informe generado", "Correo del informe", "Seguimiento", "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "Clic de anuncio de Meta"];
   const csvEscape = (v) => {
     if (v === null || v === undefined) return "";
     const s = String(v).replace(/"/g, '""');
@@ -189,7 +189,7 @@ router.get("/export.csv", (req, res) => {
   const lines = [headers.join(",")];
   d.rows.forEach((r) => {
     lines.push([
-      r.created_at, r.code_redeemed_at, r.summary_viewed_at, r.unlock_clicked_at, r.name, r.email, r.phone, r.country, r.city,
+      r.created_at, r.code_redeemed_at, r.summary_viewed_at, r.unlock_clicked_at, r.name, r.email, r.phone, r.country, r.state, r.city,
       r.lang === "en" ? "Inglés" : "Español", d.isCode(r) ? "Sí" : "No", r.payment_status, r.payment_reference,
       r.extended_generated_at ? "Sí" : "No", r.extended_email_status, r.follow_up_status,
       r.utm_source, r.utm_medium, r.utm_campaign, r.utm_content, r.utm_term, r.from_meta_ad ? "Sí" : "No",

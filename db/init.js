@@ -74,6 +74,8 @@ addColumnIfMissing("reminder_sent_at", "reminder_sent_at TEXT");
 // Informe Extendido (Hueco 1) depende de que todo envío tenga un email.
 addColumnIfMissing("city", "city TEXT");
 addColumnIfMissing("country", "country TEXT");
+// Estado (solo cuando el país es Estados Unidos): sirve para la zona horaria de los recordatorios (2026-10).
+addColumnIfMissing("state", "state TEXT");
 
 // ── Migración: confirmación real de envío del correo del Informe Extendido (2026-09) ──
 // Antes el envío del correo con el PDF adjunto era "dispara y olvida": si

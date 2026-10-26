@@ -36,13 +36,16 @@
       durationChip: "10 a 15 minutos",
       privacyChip: "Tus datos, protegidos",
       calloutStrong: "Para iniciar tu proceso",
-      calloutRest: " necesitamos tu nombre, correo, teléfono, ciudad y país. Los usamos únicamente para enviarte tu informe y coordinar tu sesión de mentoring gratuita — nunca para spam.",
+      calloutRest: " necesitamos tu nombre, correo, teléfono y dónde vives (ciudad y país; si estás en Estados Unidos, también tu estado). Los usamos únicamente para enviarte tu informe y coordinar tu sesión de mentoring gratuita — nunca para spam.",
       nameLabel: "Tu nombre",
       emailLabel: "Tu correo",
       phoneLabel: "Tu teléfono",
       phoneFormatHint: "Escríbelo con el código de tu país y de tu área incluidos — por ejemplo: +593 99 123 4567.",
       cityLabel: "Tu ciudad",
       countryLabel: "Tu país",
+      stateLabel: "Tu estado",
+      statePlaceholder: "Selecciona tu estado",
+      locationWhy: "Solo para enviarte los recordatorios a la hora correcta de tu zona.",
       genderLabel: "Género con el que te identificas",
       genderM: "Masculino",
       genderF: "Femenino",
@@ -121,13 +124,16 @@
       durationChip: "10 to 15 minutes",
       privacyChip: "Your data, protected",
       calloutStrong: "To start your process",
-      calloutRest: " we need your name, email, phone, city, and country. We only use this to send you your report and coordinate your free mentoring session — never for spam.",
+      calloutRest: " we need your name, email, phone, and where you live (city and country; if you are in the United States, your state too). We only use this to send you your report and coordinate your free mentoring session — never for spam.",
       nameLabel: "Your name",
       emailLabel: "Your email",
       phoneLabel: "Your phone",
       phoneFormatHint: "Include your country code and area code — for example: +593 99 123 4567.",
       cityLabel: "Your city",
       countryLabel: "Your country",
+      stateLabel: "Your state",
+      statePlaceholder: "Select your state",
+      locationWhy: "Only so we can send your reminders at the right time for your time zone.",
       genderLabel: "Gender you identify with",
       genderM: "Male",
       genderF: "Female",
@@ -234,6 +240,18 @@
   const REFERRAL_FORM_LINK =
     "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=AMDBNKKQqUCiLShlpDoGbHhxKWqJvslMjZ6UbkxnfPVUQTBDOFJJVkxaQTE5TDJGSVA2Nk1IT05KQy4u";
 
+  // ── Ubicación: estado solo para Estados Unidos ─────────────────────────────
+  const US_STATES = ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"];
+  const US_NAMES = ["us", "usa", "unitedstates", "unitedstatesofamerica", "eeuu", "estadosunidos", "estadosunidosdeamerica", "estadosunidosdenorteamerica"];
+  function isUnitedStatesName(country) {
+    const n = String(country || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+    return US_NAMES.includes(n);
+  }
+  const COUNTRY_SUGGESTIONS = {
+    es: ["Estados Unidos", "Puerto Rico", "Ecuador", "México", "Colombia", "Perú", "Chile", "Argentina", "Venezuela", "República Dominicana", "España", "Canadá", "Panamá", "Costa Rica", "Guatemala", "Honduras", "El Salvador", "Bolivia", "Uruguay", "Paraguay", "Brasil", "Cuba"],
+    en: ["United States", "Puerto Rico", "Ecuador", "Mexico", "Colombia", "Peru", "Chile", "Argentina", "Venezuela", "Dominican Republic", "Spain", "Canada", "Panama", "Costa Rica", "Guatemala", "Honduras", "El Salvador", "Bolivia", "Uruguay", "Paraguay", "Brazil", "Cuba", "United Kingdom"],
+  };
+
   const state = {
     lang: "es",
     meta: null,
@@ -242,6 +260,7 @@
     email: "",
     phone: "",
     city: "",
+    state: "",
     country: "",
     gender: "",
     relationshipContextCode: "",
@@ -362,9 +381,18 @@
           </div>
           <div>
             <label>${t("countryLabel")}</label>
-            <input type="text" id="f-country" value="${escapeAttr(state.country)}" />
+            <input type="text" id="f-country" list="country-options" autocomplete="country-name" value="${escapeAttr(state.country)}" />
+            <datalist id="country-options">${COUNTRY_SUGGESTIONS[state.lang === "en" ? "en" : "es"].map((c) => `<option value="${escapeAttr(c)}"></option>`).join("")}</datalist>
           </div>
         </div>
+        <div id="state-row" style="display:${isUnitedStatesName(state.country) ? "block" : "none"};">
+          <label>${t("stateLabel")}</label>
+          <select id="f-state">
+            <option value="">${t("statePlaceholder")}</option>
+            ${US_STATES.map((st) => `<option value="${escapeAttr(st)}" ${state.state === st ? "selected" : ""}>${st}</option>`).join("")}
+          </select>
+        </div>
+        <p class="muted">${t("locationWhy")}</p>
 
         <label>${t("genderLabel")}</label>
         <div class="radio-group">
@@ -389,16 +417,24 @@
         </div>
       </div>`;
 
+    // El campo "estado" aparece solo cuando el país escrito es Estados Unidos.
+    document.getElementById("f-country").addEventListener("input", (e) => {
+      const us = isUnitedStatesName(e.target.value);
+      document.getElementById("state-row").style.display = us ? "block" : "none";
+      if (!us) document.getElementById("f-state").value = "";
+    });
+
     document.getElementById("btn-start").addEventListener("click", () => {
       const name = document.getElementById("f-name").value.trim();
       const email = document.getElementById("f-email").value.trim();
       const phone = document.getElementById("f-phone").value.trim();
       const city = document.getElementById("f-city").value.trim();
       const country = document.getElementById("f-country").value.trim();
+      const usState = isUnitedStatesName(country) ? document.getElementById("f-state").value : "";
       const gender = (document.querySelector('input[name="gender"]:checked') || {}).value;
       const contextCode = document.getElementById("f-context-code").value;
       const contextText = document.getElementById("f-context-text").value.trim();
-      if (!name || !email || !phone || !city || !country || !gender || !contextCode || !contextText) {
+      if (!name || !email || !phone || !city || !country || (isUnitedStatesName(country) && !usState) || !gender || !contextCode || !contextText) {
         document.getElementById("intake-error").textContent = t("errorRequired");
         return;
       }
@@ -411,6 +447,7 @@
       state.phone = phone;
       state.city = city;
       state.country = country;
+      state.state = usState;
       state.gender = gender;
       state.relationshipContextCode = contextCode;
       state.relationshipContextText = contextText;
@@ -604,6 +641,7 @@
             phone: state.phone,
             city: state.city,
             country: state.country,
+            state: state.state,
             lang: state.lang,
             gender: state.gender,
             relationshipContextCode: state.relationshipContextCode,
