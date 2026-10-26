@@ -31,6 +31,22 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       <span class="sd-code-chip">Registro</span>
     </div>
 
+    <!-- Solo se muestra dentro del navegador interno de Instagram/Facebook:
+         ese navegador (de Meta) pregunta "¿Guardar la información para la
+         próxima vez?" al enviar un formulario, y no se puede apagar desde la
+         página. En Safari/Chrome ese aviso no existe. -->
+    <div id="iab-block" class="sd-center-col sd-hidden">
+      <div class="sd-big-icon accent">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 4 5.6 4 9s-1.4 6.4-4 9c-2.6-2.6-4-5.6-4-9s1.4-6.4 4-9z"/></svg>
+      </div>
+      <h2>Ábrelo en tu navegador</h2>
+      <p>Para registrarte de forma segura, abre esta página en Safari o Chrome. Así tus datos solo se envían al evento y no se te pide guardarlos en Instagram.</p>
+      <button type="button" class="sd-cta-primary" id="iab-open-btn" style="margin-top:6px;">Abrir en mi navegador</button>
+      <p class="sd-subtext" id="iab-help" style="margin:0;">Si no se abre, toca los tres puntos (⋯) arriba y elige «Abrir en el navegador».</p>
+      <button type="button" class="sd-cta-ghost" id="iab-copy-btn">Copiar enlace</button>
+      <button type="button" class="sd-link-btn" id="iab-continue-btn">Continuar aquí de todos modos</button>
+    </div>
+
     <div id="loading-block">
       <p class="sd-subtext">Cargando evento…</p>
     </div>
@@ -39,7 +55,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       <div class="sd-error-banner" id="error-text"></div>
     </div>
 
-    <form id="registro-form" class="sd-hidden" autocomplete="off">
+    <div id="registro-form" class="sd-hidden" role="group" aria-label="Registro">
       <p class="sd-prompt" id="evento-nombre" style="font-size:19px;"></p>
       <p class="sd-prompt" id="evento-fecha" style="font-size:19px;margin-top:0;display:none;"></p>
       <p class="sd-subtext" id="evento-lugar" style="display:none;"></p>
@@ -47,21 +63,21 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
 
       <div class="field">
         <label>Nombre completo</label>
-        <input type="text" id="f-name" required autocomplete="off" autocapitalize="words" spellcheck="false">
+        <input type="text" id="f-name" name="rr_n1" required autocomplete="off" autocapitalize="words" spellcheck="false">
       </div>
       <div class="field">
         <label>Teléfono (WhatsApp)</label>
-        <input type="text" inputmode="tel" id="f-phone" placeholder="+593 99 123 4567" required autocomplete="off" autocorrect="off" spellcheck="false">
+        <input type="text" inputmode="tel" id="f-phone" name="rr_n2" placeholder="+593 99 123 4567" required autocomplete="off" autocorrect="off" spellcheck="false">
       </div>
       <div class="field">
         <label>Correo</label>
-        <input type="text" inputmode="email" id="f-email" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <input type="text" inputmode="email" id="f-email" name="rr_n3" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
       </div>
       <div class="field">
         <label for="f-age">Edad</label>
         <p class="sd-field-hint sd-hidden" id="age-hint"></p>
         <div class="sd-age-row">
-          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" id="f-age" required autocomplete="off" aria-describedby="age-hint age-error">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" id="f-age" name="rr_n4" required autocomplete="off" aria-describedby="age-hint age-error">
           <span class="sd-age-suffix">años</span>
         </div>
         <p class="sd-field-error sd-hidden" id="age-error" role="alert"></p>
@@ -85,8 +101,8 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
 
       <div id="form-error" class="sd-error-banner sd-hidden"></div>
 
-      <button type="submit" class="sd-cta-primary" id="submit-btn">Confirmar registro</button>
-    </form>
+      <button type="button" class="sd-cta-primary" id="submit-btn">Confirmar registro</button>
+    </div>
 
     <div id="success-block" class="sd-center-col sd-hidden">
       <div class="sd-big-icon lg">
@@ -265,8 +281,7 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
     }
   }
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  async function submitRegistro() {
     const submitBtn = document.getElementById('submit-btn');
     const formError = document.getElementById('form-error');
     formError.classList.add('sd-hidden');
@@ -327,9 +342,52 @@ src="https://www.facebook.com/tr?id=1084726450809554&ev=PageView&noscript=1"
       submitBtn.disabled = false;
       submitBtn.textContent = soldOut ? 'Unirme a la lista de espera' : 'Confirmar registro';
     }
+  }
+
+  // Sin <form>: el envío es un clic normal + fetch. Así el navegador interno
+  // de Meta no ve un "envío de formulario" para ofrecer guardar los datos.
+  document.getElementById('submit-btn').addEventListener('click', submitRegistro);
+  form.querySelectorAll('input').forEach((inp) => {
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+    });
   });
 
-  init();
+  // ── Navegador interno de Instagram / Facebook ──────────────────────────
+  const IN_APP_META = /Instagram|FBAN|FBAV|FB_IAB|FBIOS|FB4A|FBSS/i.test(navigator.userAgent);
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  const iabBlock = document.getElementById('iab-block');
+
+  function openInBrowser() {
+    const u = new URL(location.href);
+    if (isIOS) {
+      location.href = 'x-safari-https://' + u.host + u.pathname + u.search;
+    } else if (isAndroid) {
+      location.href = 'intent://' + u.host + u.pathname + u.search + '#Intent;scheme=https;action=android.intent.action.VIEW;end';
+    }
+  }
+  document.getElementById('iab-open-btn').addEventListener('click', openInBrowser);
+  document.getElementById('iab-copy-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    try {
+      await navigator.clipboard.writeText(location.href);
+      btn.textContent = 'Enlace copiado ✓ — pégalo en Safari o Chrome';
+    } catch (err) {
+      btn.textContent = 'Mantén presionado el enlace de arriba para copiarlo';
+    }
+  });
+  document.getElementById('iab-continue-btn').addEventListener('click', () => {
+    iabBlock.classList.add('sd-hidden');
+    init();
+  });
+
+  if (IN_APP_META && eventId) {
+    loadingBlock.classList.add('sd-hidden');
+    iabBlock.classList.remove('sd-hidden');
+  } else {
+    init();
+  }
 </script>
 </body>
 </html>
