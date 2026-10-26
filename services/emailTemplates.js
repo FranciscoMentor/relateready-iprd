@@ -30,9 +30,10 @@ const BOOKING_LINKS = {
   en: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/K4DmDOt-kUSplfAlddYmbw2",
 };
 
-function shell({ bodyHtml, lang }) {
+function shell({ bodyHtml, lang, footerExtra }) {
   const footer =
-    lang === "en" ? "RelateReady — a project by Adamantine Mentoring." : "RelateReady — un proyecto de Adamantine Mentoring.";
+    (lang === "en" ? "RelateReady — a project by Adamantine Mentoring." : "RelateReady — un proyecto de Adamantine Mentoring.") +
+    (footerExtra ? `<br>${footerExtra}` : "");
   return `<!doctype html>
 <html lang="${lang}">
   <head>
@@ -790,5 +791,76 @@ function sessionReminderEmail(parts) {
   return { subject: String(parts.subject || ""), html: shell({ bodyHtml, lang }) };
 }
 
-module.exports = { sessionReminderEmail, extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail, speedDatingSurveyEmail, speedDatingSurveyReminderEmail, testInvitationEmail, testInvitationWhatsappText };
+// ── Seguimiento para agendar la sesión gratuita (2026-10) ──────────────────
+// Para quien ya desbloqueó su informe completo y todavía no agenda la sesión de
+// mentoring gratuita — ver services/sessionNudgeScheduler.js.
+//   session = { until: "AAAA-MM-DD" } (plazo de services/sessionDeadline.js)
+//   second  = true → aviso corto "dos días antes del plazo"
+// El plazo sale de session.until (humanDate), nunca escrito a mano. El mentor se
+// menciona sin nombre propio, como en el resto de los textos de la app.
+function sessionNudgeEmail({ name, lang, session, second }) {
+  const en = lang === "en";
+  const first = String(name || "").trim().split(/\s+/)[0];
+  const greet = first ? `${en ? "Hi" : "Hola"} ${escapeHtml(first)},` : en ? "Hi," : "Hola,";
+  const until = humanDate(session && session.until, en ? "en" : "es") || "";
+  const bookingUrl = BOOKING_LINKS[en ? "en" : "es"];
+  const P = 'style="font-size:15px;line-height:1.6;margin:0 0 16px;"';
+  const tag = (label) => `<span style="display:inline-block;background:${ACCENT};color:#ffffff;font-size:10.5px;letter-spacing:1px;padding:2px 8px;border-radius:999px;margin:0 0 0 6px;vertical-align:middle;">${label}</span>`;
+  const footerExtra = en ? "RelateReady is an educational tool, not therapy." : "RelateReady es una herramienta educativa, no terapia.";
+
+  if (second) {
+    return {
+      subject: en ? `Your free session is open until ${until}` : `Tu sesión gratuita está abierta hasta el ${until}`,
+      html: shell({
+        lang: en ? "en" : "es",
+        footerExtra,
+        bodyHtml: en
+          ? `<p style="font-size:16px;margin:0 0 16px;">${greet}</p>
+          <p ${P}>A quick reminder that your free 60-minute mentoring session to review your RelateReady report can be booked until ${until}.</p>
+          <p style="margin:0 0 16px;">${button(bookingUrl, "Book my free session")}</p>
+          <p ${P}>If none of the times work, just reply to this email.</p>`
+          : `<p style="font-size:16px;margin:0 0 16px;">${greet}</p>
+          <p ${P}>Te recordamos que tu sesión de mentoring gratuita de 60 minutos para revisar tu informe de RelateReady se puede agendar hasta el ${until}.</p>
+          <p style="margin:0 0 16px;">${button(bookingUrl, "Agendar mi sesión gratuita")}</p>
+          <p ${P}>Si ninguno de los horarios te sirve, responde a este correo.</p>`,
+      }),
+    };
+  }
+
+  const li = 'style="margin:0 0 8px;"';
+  return {
+    subject: en ? "Your free 60-minute session to review your RelateReady report" : "Tu sesión gratuita de 60 minutos para revisar tu informe de RelateReady",
+    html: shell({
+      lang: en ? "en" : "es",
+      footerExtra,
+      bodyHtml: en
+        ? `<p style="font-size:16px;margin:0 0 16px;">${greet}</p>
+          <p ${P}>Thank you for taking the RelateReady test and unlocking your full report. We hope your week is off to a calm start.</p>
+          <p ${P}>Your results are a map, and a map is easier to read with someone who knows the terrain. Your report includes a free 60-minute mentoring session with a professional mentor, so you can go through it together instead of interpreting it on your own. In the session you leave with:</p>
+          <ul style="font-size:15px;line-height:1.5;margin:0 0 16px;padding-left:22px;">
+            <li ${li}><strong>Your full report:</strong> already unlocked and in your inbox.</li>
+            <li ${li}><strong>A 60-minute mentoring session</strong>${tag("FREE")}: a clear reading of your results, your priorities, and a 3-week plan adjusted to your real life.</li>
+            <li ${li}><strong>"You First", our digital book</strong>${tag("FREE")}: shared only in this session.</li>
+          </ul>
+          <p ${P}>It's a mentoring conversation, not an exam or a sales call. Just bring your report. You can book your session any day until ${until}.</p>
+          <p style="margin:0 0 16px;">${button(bookingUrl, "Book my free session")}</p>
+          <p ${P}>If none of the times work for you, just reply to this email and we'll find another way.</p>
+          <p style="font-size:15px;line-height:1.6;margin:0;">Wishing you clarity and a good week,<br>The RelateReady team<br>RelateReady · Adamantine Mentoring</p>`
+        : `<p style="font-size:16px;margin:0 0 16px;">${greet}</p>
+          <p ${P}>Gracias por hacer el test de RelateReady y desbloquear tu informe completo. Esperamos que tu semana comience con calma.</p>
+          <p ${P}>Tus resultados son un mapa, y un mapa se lee mejor con alguien que conoce el terreno. Tu informe incluye una sesión de mentoring gratuita de 60 minutos con un mentor profesional, para revisarlo juntos y que no tengas que interpretarlo por tu cuenta. En la sesión te llevas:</p>
+          <ul style="font-size:15px;line-height:1.5;margin:0 0 16px;padding-left:22px;">
+            <li ${li}><strong>Tu informe completo:</strong> ya desbloqueado y en tu correo.</li>
+            <li ${li}><strong>Una sesión de mentoring de 60 minutos</strong>${tag("GRATIS")}: una lectura clara de tus resultados, tus prioridades y un plan de 3 semanas ajustado a tu vida real.</li>
+            <li ${li}><strong>"Tú Primero", nuestro libro digital</strong>${tag("GRATIS")}: se comparte solo en esta sesión.</li>
+          </ul>
+          <p ${P}>Es una conversación de mentoring, no un examen ni una llamada de ventas. Solo trae tu informe. Puedes agendar tu sesión hasta el ${until}.</p>
+          <p style="margin:0 0 16px;">${button(bookingUrl, "Agendar mi sesión gratuita")}</p>
+          <p ${P}>Si ninguno de los horarios te sirve, responde a este correo y buscamos otra forma.</p>
+          <p style="font-size:15px;line-height:1.6;margin:0;">Te deseamos claridad y una buena semana,<br>El equipo de RelateReady<br>RelateReady · Adamantine Mentoring</p>`,
+    }),
+  };
+}
+
+module.exports = { sessionNudgeEmail, sessionReminderEmail, extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail, speedDatingSurveyEmail, speedDatingSurveyReminderEmail, testInvitationEmail, testInvitationWhatsappText };
 

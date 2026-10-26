@@ -10,9 +10,11 @@ const speedDatingAdminRoutes = require("./routes/speedDatingAdmin");
 const reminderMailRoutes = require("./routes/reminderMail");
 const bookingSyncRoutes = require("./routes/bookingSync");
 const leadInfoRoutes = require("./routes/leadInfo");
+const sessionNudgeRoutes = require("./routes/sessionNudge");
 const speedDatingPublicRoutes = require("./routes/speedDatingPublic");
 const db = require("./db/init");
 const reminderScheduler = require("./services/reminderScheduler");
+const sessionNudgeScheduler = require("./services/sessionNudgeScheduler");
 const backupService = require("./services/backupService");
 const speedDatingScheduler = require("./services/speedDatingScheduler");
 const speedDatingReminderScheduler = require("./services/speedDatingReminderScheduler");
@@ -56,6 +58,7 @@ app.use("/api", apiRoutes);
 app.use("/internal/reminder-mail", reminderMailRoutes);
 app.use("/internal/booking-sync", bookingSyncRoutes);
 app.use("/internal/lead-info", leadInfoRoutes);
+app.use("/internal/session-nudge", sessionNudgeRoutes);
 app.use("/admin", adminRoutes);
 
 // Piloto de speed dating (Mila Rooftop, 2026-09) — panel del organizador
@@ -115,6 +118,10 @@ app.listen(PORT, () => {
 // services/reminderScheduler.js) — se activa solo si el correo automático
 // está configurado (GRAPH_* en Environment).
 reminderScheduler.start();
+
+// Seguimiento para agendar la sesión gratuita (ver services/sessionNudgeScheduler.js).
+// Apagado por defecto: solo envía si SESSION_NUDGE_ENABLED=true en Render.
+sessionNudgeScheduler.start();
 
 // Respaldo semanal de la base de datos por correo (domingos 03:00 hora de
 // Ecuador) — ver services/backupService.js. Mismo criterio: solo se activa

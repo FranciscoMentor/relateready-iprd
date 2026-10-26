@@ -32,6 +32,10 @@ function extractCustomerEmail(text) {
 // Si trae "text", el correo se extrae de ahí. Los correos internos se ignoran.
 function applyBookingEvents(events) {
   const list = Array.isArray(events) ? events.slice(0, 1000) : [];
+  // Cada llamada con una lista (aunque venga vacía) cuenta como "sincronización reciente".
+  if (Array.isArray(events)) {
+    db.prepare("INSERT INTO booking_sync_state (id, last_sync_at) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET last_sync_at = excluded.last_sync_at").run(new Date().toISOString());
+  }
   const find = db.prepare("SELECT id, name, email, follow_up_status, follow_up_notes FROM submissions WHERE lower(email) = ? ORDER BY id DESC LIMIT 1");
   const upd = db.prepare("UPDATE submissions SET follow_up_status = 'sesion_agendada', follow_up_notes = ? WHERE id = ?");
   const matched = [];
@@ -62,4 +66,10 @@ function applyBookingEvents(events) {
   return { eventsRead: withEmail, matched, alreadyKnown, checked };
 }
 
-module.exports = { applyBookingEvents, extractCustomerEmail, isStaff };
+/** ISO de la última sincronización con Bookings, o null si nunca se hizo. */
+function lastSyncAt() {
+  const row = db.prepare("SELECT last_sync_at FROM booking_sync_state WHERE id = 1").get();
+  return row ? row.last_sync_at : null;
+}
+
+module.exports = { applyBookingEvents, extractCustomerEmail, isStaff, lastSyncAt };

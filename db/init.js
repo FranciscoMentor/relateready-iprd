@@ -144,6 +144,23 @@ db.exec(`
 // plazo de su campaña, o ninguno si no llegó con código de campaña.
 addColumnIfMissing("session_until_override", "session_until_override TEXT");
 
+// ── Migración: correo de seguimiento para agendar la sesión (2026-10) ─────
+// session_nudge_sent_at  = cuándo se envió el primer correo de seguimiento
+//                          (services/sessionNudgeScheduler.js). NULL = no se ha enviado.
+// session_nudge2_sent_at = cuándo se envió el segundo aviso (dos días antes del plazo).
+// Como máximo dos correos por persona; las columnas evitan repetirlos.
+addColumnIfMissing("session_nudge_sent_at", "session_nudge_sent_at TEXT");
+addColumnIfMissing("session_nudge2_sent_at", "session_nudge2_sent_at TEXT");
+// Última vez que se sincronizaron las reservas de Bookings (services/bookingSync.js).
+// El seguimiento solo se envía si esa sincronización es reciente, para no escribirle
+// a quien ya reservó y todavía no está marcado.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS booking_sync_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    last_sync_at TEXT NOT NULL
+  );
+`);
+
 
 // ═══════════════════════════════════════════════════════════════════════
 // Speed Dating (piloto Mila Rooftop, 2026-09) ─ tablas nuevas, propias del

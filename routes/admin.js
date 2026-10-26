@@ -1048,6 +1048,45 @@ router.get("/backup/download", async (req, res) => {
   }
 });
 
+// Simulación del correo de seguimiento de la sesión gratuita (ver
+// services/sessionNudgeScheduler.js). Solo lista a quién le tocaría el correo:
+// no envía nada ni escribe en la base.
+router.get("/api/seguimiento-sesion/simulacion", (req, res) => {
+  res.json(require("../services/sessionNudgeScheduler").simulate());
+});
+
+router.get("/seguimiento-sesion", (req, res) => {
+  const sim = require("../services/sessionNudgeScheduler").simulate();
+  const when = (iso) => (iso ? esc(String(iso).slice(0, 16).replace("T", " ")) + " UTC" : "—");
+  const table = (list) =>
+    list.length
+      ? `<table><tr><th>Nombre</th><th>Correo</th><th>Idioma</th><th>Desbloqueó</th><th>Horas</th><th>Plazo</th><th>Campaña</th></tr>` +
+        list.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc(i.email)}</td><td>${esc(i.lang)}</td><td>${when(i.unlockedAt)}</td><td>${i.hoursSinceUnlock}</td><td>${esc(i.until)}</td><td>${esc(i.campaign || "")}</td></tr>`).join("") +
+        `</table>`
+      : `<p class="muted">Nadie por ahora.</p>`;
+  const excl = Object.entries(sim.excluded).map(([k, v]) => `<li>${esc(k)}: ${v}</li>`).join("") || "<li>—</li>";
+  const syncTxt = sim.sync.lastSyncAt
+    ? `${when(sim.sync.lastSyncAt)} (hace ${sim.sync.ageHours.toFixed(1)} h) — ${sim.sync.fresh ? "al día" : "DESACTUALIZADA: el envío se pausaría"}`
+    : "nunca — el envío no saldría hasta que la tarea horaria sincronice Bookings";
+  res.send(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seguimiento de la sesión gratuita — simulación</title>
+<style>body{font-family:system-ui,sans-serif;background:#FBF8F3;color:#2A2A28;max-width:980px;margin:24px auto;padding:0 16px}
+h1{font-size:22px}h2{font-size:17px;margin-top:28px}table{border-collapse:collapse;width:100%;font-size:14px;background:#fff}
+th,td{border:1px solid #e5ddd0;padding:6px 8px;text-align:left}th{background:#f3ece0}.muted{color:#7a7a72}
+.box{background:#fff;border:1px solid #e5ddd0;border-radius:8px;padding:12px 16px}</style></head><body>
+<h1>Seguimiento de la sesión gratuita — simulación</h1>
+<p class="muted">Solo muestra a quién le tocaría el correo. No envía nada.</p>
+<div class="box">
+<p><strong>Interruptor (SESSION_NUDGE_ENABLED):</strong> ${sim.switchOn ? "ENCENDIDO" : "apagado"}<br>
+<strong>Correo automático configurado:</strong> ${sim.mailConfigured ? "sí" : "no"}<br>
+<strong>Última sincronización con Bookings:</strong> ${syncTxt}<br>
+<strong>Personas con informe desbloqueado:</strong> ${sim.unlockedTotal}</p></div>
+<h2>Recibirían el primer correo (${sim.first.length})</h2>${table(sim.first)}
+<h2>Recibirían el segundo aviso (${sim.second.length})</h2>${table(sim.second)}
+<h2>No reciben (motivo)</h2><ul>${excl}</ul>
+</body></html>`);
+});
+
 // El panel de control completo (/panel-control, ver server.js) reutiliza
 // este mismo login: se exporta requireAuth para que server.js proteja esa
 // ruta con la misma sesión de administrador.
