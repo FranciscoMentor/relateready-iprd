@@ -43,9 +43,8 @@ function totals() {
     if (src) t[src]++; else t.pending++;
   }
   const rev = db.prepare("SELECT COALESCE(SUM(amount_cents),0) c, COUNT(*) n FROM payments WHERE status = 'approved' AND currency = 'USD'").get();
-  const ref = db.prepare("SELECT COALESCE(SUM(amount_cents),0) c, COUNT(*) n FROM payments WHERE status = 'refunded' AND currency = 'USD'").get();
   const started = db.prepare("SELECT COUNT(DISTINCT submission_id) n FROM payments").get().n;
-  return { ...t, revenueCents: rev.c, payphonePayments: rev.n, refundedCount: ref.n, refundedCents: ref.c, checkoutStarted: started };
+  return { ...t, revenueCents: rev.c, payphonePayments: rev.n, checkoutStarted: started };
 }
 
 /** Embudo por campaña (utm_campaign), con el gasto capturado a mano y el costo por compra. */
@@ -97,7 +96,7 @@ function salesList() {
     )
     .all();
   const payBySub = new Map();
-  for (const p of db.prepare("SELECT * FROM payments WHERE status IN ('approved','refunded') ORDER BY id ASC").all()) payBySub.set(p.submission_id, p);
+  for (const p of db.prepare("SELECT * FROM payments WHERE status = 'approved' ORDER BY id ASC").all()) payBySub.set(p.submission_id, p);
   const out = rows.map((s) => {
     const p = payBySub.get(s.id);
     const hasApproved = !!(p && p.status === "approved");
@@ -114,16 +113,7 @@ function salesList() {
       emailStatus: s.extended_email_status || null,
     };
   });
-  // Reembolsados (su informe volvió a "pendiente"): quedan visibles como tales.
-  const refunded = db
-    .prepare("SELECT p.*, s.name, s.email, s.utm_campaign, s.from_meta_ad FROM payments p JOIN submissions s ON s.id = p.submission_id WHERE p.status = 'refunded' ORDER BY p.refunded_at DESC")
-    .all()
-    .map((p) => ({
-      id: p.submission_id, name: p.name, email: p.email, campaign: campaignKey(p), source: "refunded", paymentId: p.id,
-      amountCents: p.amount_cents, currency: p.currency, date: p.confirmed_at || p.created_at, refundedAt: p.refunded_at,
-      transactionId: p.payphone_id, authorizationCode: p.authorization_code, bookDownloads: 0, emailStatus: null,
-    }));
-  return [...out, ...refunded].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  return out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
 }
 
 function setSpend(campaign, amountCents) {
@@ -135,22 +125,4 @@ function setSpend(campaign, amountCents) {
     .run(key, cents, new Date().toISOString());
 }
 
-/**
- * Registra un reembolso (hecho en el panel de Payphone): el pago queda "refunded" y el informe
- * vuelve a "pendiente" — deja de contar como venta y se desactivan el informe y el libro.
- */
-function refundPayment(paymentId) {
-  const p = db.prepare("SELECT * FROM payments WHERE id = ?").get(Number(paymentId));
-  if (!p) return { ok: false, reason: "not_found" };
-  if (p.status !== "approved") return { ok: false, reason: "not_approved" };
-  const tx = db.transaction(() => {
-    db.prepare("UPDATE payments SET status = 'refunded', refunded_at = ? WHERE id = ?").run(new Date().toISOString(), p.id);
-    // Si no queda otro pago aprobado de ese informe, vuelve a pendiente (no toca códigos gratis ni marcas manuales).
-    const other = db.prepare("SELECT 1 FROM payments WHERE submission_id = ? AND status = 'approved'").get(p.submission_id);
-    if (!other) db.prepare("UPDATE submissions SET payment_status = 'pending' WHERE id = ? AND payment_status = 'paid'").run(p.submission_id);
-  });
-  tx();
-  return { ok: true };
-}
-
-module.exports = { campaignKey, saleSourceOf, totals, byCampaign, salesList, setSpend, refundPayment };
+module.exports = { campaignKey, saleSourceOf, totals, byCampaign, salesList, setSpend };

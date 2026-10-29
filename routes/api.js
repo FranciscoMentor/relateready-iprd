@@ -10,7 +10,7 @@ const { buildFlatCoreItems, buildFlatDesirabilityItems, coreItemsForGroup, quali
 const { scoreTest, checkReferralProtocol } = require("../services/scoring");
 const { isUnitedStates, canonicalState, canonicalCountry } = require("../services/location");
 const { preparePayment, confirmPayment, PAYPHONE_ENABLED } = require("../services/payphone");
-const { createPayment, approvedPaymentFor, confirmForSubmission } = require("../services/payments");
+const { createPayment, paymentByClientTx, approvedPaymentFor, confirmForSubmission } = require("../services/payments");
 const { generatePdfForSubmission, sendExtendedReportEmail, triggerExtendedReportEmailOnce, pdfFilename } = require("../services/extendedReport");
 
 const CORE_ITEMS_FLAT = buildFlatCoreItems();
@@ -443,6 +443,50 @@ router.get("/payment/confirm/:id", async (req, res) => {
   } catch (err) {
     console.error("GET /api/payment/confirm —", err.message);
     res.status(500).json({ error: "No se pudo confirmar el pago con Payphone." });
+  }
+});
+
+// POST /api/payphone/NotificacionPago — "Notificación Externa" de Payphone (webhook).
+// Payphone avisa cada pago APROBADO de tu tienda, aunque la persona haya cerrado la
+// pestaña sin volver al sitio. Este aviso NO se usa para desbloquear: con el
+// ClientTransactionId y el TransactionId del aviso el servidor llama él mismo a
+// Confirm (dentro de los 5 minutos, antes del reverso automático) y aplica las
+// mismas verificaciones de siempre (dueño, monto, moneda, id). Un aviso falso no
+// desbloquea nada. Requiere que Payphone autorice el servicio y se registre la URL
+// https://<dominio>/api/payphone/NotificacionPago. Responde { Response, ErrorCode }
+// como pide Payphone: 000 ok, 111 cuerpo inválido, 444 faltan datos, 666 tienda
+// distinta, 222 error.
+router.post("/payphone/NotificacionPago", async (req, res) => {
+  const body = req.body && typeof req.body === "object" ? req.body : null;
+  if (!body) return res.json({ Response: false, ErrorCode: "111" });
+  const pick = (k) => body[k] !== undefined ? body[k] : body[k.charAt(0).toLowerCase() + k.slice(1)];
+  const clientTx = pick("ClientTransactionId"), txId = pick("TransactionId"), storeId = pick("StoreId"), statusCode = pick("StatusCode");
+  if (!clientTx || txId === undefined || txId === null || storeId === undefined || storeId === null || statusCode === undefined || statusCode === null) {
+    return res.json({ Response: false, ErrorCode: "444" });
+  }
+  if (!PAYPHONE_ENABLED) return res.json({ Response: false, ErrorCode: "222" });
+  if (String(storeId) !== String(process.env.PAYPHONE_STORE_ID)) return res.json({ Response: false, ErrorCode: "666" });
+  // Solo interesan los aprobados; cualquier otro estado se recibe sin hacer nada.
+  if (Number(statusCode) !== 3) return res.json({ Response: true, ErrorCode: "000" });
+  try {
+    const payment = paymentByClientTx(String(clientTx));
+    if (!payment) {
+      console.warn(`[payphone-webhook] Aviso de un pago desconocido (${String(clientTx).slice(0, 12)}…): se recibe y se ignora.`);
+      return res.json({ Response: true, ErrorCode: "000" });
+    }
+    const sub = loadSubmission(payment.submission_id);
+    if (!sub) return res.json({ Response: true, ErrorCode: "000" });
+    const out = await confirmForSubmission(sub, { payphoneId: String(txId), clientTransactionId: String(clientTx) });
+    if (out.newlyApproved) {
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      triggerExtendedReportEmailOnce(sub.id, baseUrl).catch((err) =>
+        console.error("[payphone-webhook] Error generando/enviando el Informe Extendido —", err.message)
+      );
+    }
+    res.json({ Response: true, ErrorCode: "000" });
+  } catch (err) {
+    console.error("POST /api/payphone/NotificacionPago —", err.message);
+    res.json({ Response: false, ErrorCode: "222" });
   }
 });
 

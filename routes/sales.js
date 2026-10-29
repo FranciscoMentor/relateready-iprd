@@ -20,11 +20,4 @@ router.post("/gasto", express.json(), (req, res) => {
   }
 });
 
-// Registra un reembolso ya hecho en Payphone: { } sobre el id del pago.
-router.post("/reembolso/:paymentId", (req, res) => {
-  const r = sales.refundPayment(req.params.paymentId);
-  if (!r.ok) return res.status(r.reason === "not_found" ? 404 : 400).json({ error: r.reason === "not_found" ? "Pago no encontrado." : "Ese pago no está aprobado (o ya fue reembolsado)." });
-  res.json({ ok: true });
-});
-
 module.exports = router;

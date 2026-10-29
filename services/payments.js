@@ -52,10 +52,6 @@ async function confirmForSubmission(sub, { payphoneId, clientTransactionId }) {
   if (!payment || payment.submission_id !== sub.id) {
     return { ok: false, approved: false, reason: "payment_not_found" };
   }
-  if (payment.status === "refunded") {
-    // Pago reembolsado desde el panel: nunca se vuelve a aprobar con el mismo enlace de retorno.
-    return { ok: false, approved: false, reason: "refunded" };
-  }
   if (payment.status === "approved") {
     // Ya confirmado antes: nada que repetir (y no se vuelve a llamar a Payphone).
     return { ok: true, approved: true, newlyApproved: false, payment };

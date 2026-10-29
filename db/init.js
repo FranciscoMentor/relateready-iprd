@@ -185,11 +185,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_payments_submission ON payments (submission_id);
   CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payphone_approved ON payments (payphone_id) WHERE status = 'approved' AND payphone_id IS NOT NULL;
 `);
-// Reembolsos (panel de ventas) y gasto en anuncios capturado a mano.
-{
-  const payCols = db.prepare("PRAGMA table_info(payments)").all().map((c) => c.name);
-  if (!payCols.includes("refunded_at")) db.exec("ALTER TABLE payments ADD COLUMN refunded_at TEXT");
-}
+// Gasto en anuncios capturado a mano (pestaña Ventas del panel).
 db.exec(`
   CREATE TABLE IF NOT EXISTS ad_spend (
     campaign TEXT PRIMARY KEY,

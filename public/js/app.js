@@ -27,10 +27,10 @@
   const I18N = {
     es: {
       slogan: "<em>Listos por dentro. Listos en pareja:</em><br>la preparación empieza contigo, no con la otra persona.",
+      payCards: "Aceptamos tarjetas de débito y crédito Visa y Mastercard de cualquier país (Diners y Discover, solo emitidas en Ecuador). En tu estado de cuenta el cobro puede aparecer como «CONSUMO PAY-CUENCA» o similar: es Payphone, nuestra pasarela de pago.",
       legalTerms: "Términos",
       legalPrivacy: "Privacidad",
-      legalRefunds: "Reembolsos",
-      payTerms: 'Al pagar aceptas los <a href="{terms}" target="_blank" rel="noopener">Términos y condiciones</a> y la <a href="{privacy}" target="_blank" rel="noopener">Política de privacidad</a>. <a href="{refunds}" target="_blank" rel="noopener">Reembolso completo dentro de 7 días.</a>',
+      payTerms: 'Al pagar aceptas los <a href="{terms}" target="_blank" rel="noopener">Términos y condiciones</a> y la <a href="{privacy}" target="_blank" rel="noopener">Política de privacidad</a>.',
       footerBefore: "Desarrollado por",
       footerAfter: "Índice de Desarrollo y Fortalecimiento Relacional",
       intakeTitle: "Antes de empezar",
@@ -131,10 +131,10 @@
     },
     en: {
       slogan: "<em>Ready Within. Ready Together —</em><br>readiness starts with you, not the other person.",
+      payCards: "We accept Visa and Mastercard debit and credit cards from any country (Diners and Discover only if issued in Ecuador). On your statement the charge may appear as “CONSUMO PAY-CUENCA” or similar: that's Payphone, our payment processor.",
       legalTerms: "Terms",
       legalPrivacy: "Privacy",
-      legalRefunds: "Refunds",
-      payTerms: 'By paying you accept the <a href="{terms}" target="_blank" rel="noopener">Terms and conditions</a> and the <a href="{privacy}" target="_blank" rel="noopener">Privacy policy</a>. <a href="{refunds}" target="_blank" rel="noopener">Full refund within 7 days.</a>',
+      payTerms: 'By paying you accept the <a href="{terms}" target="_blank" rel="noopener">Terms and conditions</a> and the <a href="{privacy}" target="_blank" rel="noopener">Privacy policy</a>.',
       footerBefore: "Developed by",
       footerAfter: "Relationship Development and Strengthening Index",
       intakeTitle: "Before you start",
@@ -377,14 +377,14 @@
     // Enlaces legales del pie: se abren en pestaña nueva para no perder el avance del test.
     const nav = document.getElementById("legal-links");
     if (nav) {
-      nav.innerHTML = [["terms", "legalTerms"], ["privacy", "legalPrivacy"], ["refunds", "legalRefunds"]]
+      nav.innerHTML = [["terms", "legalTerms"], ["privacy", "legalPrivacy"]]
         .map(([k, key]) => `<a href="${legalUrl(k)}" target="_blank" rel="noopener">${t(key)}</a>`)
         .join(" · ");
     }
   }
   function legalUrl(kind) { return `/legal/${kind}.html?lang=${state.lang === "en" ? "en" : "es"}`; }
   function payTermsHtml() {
-    return t("payTerms").replace("{terms}", legalUrl("terms")).replace("{privacy}", legalUrl("privacy")).replace("{refunds}", legalUrl("refunds"));
+    return t("payTerms").replace("{terms}", legalUrl("terms")).replace("{privacy}", legalUrl("privacy"));
   }
   document.getElementById("btn-es").addEventListener("click", () => setLang("es"));
   document.getElementById("btn-en").addEventListener("click", () => setLang("en"));
@@ -942,6 +942,7 @@
       : state.meta.payphoneEnabled
       ? `<button class="${payBtnClass}" id="btn-pay">${t("payBtnRealLabel")} — $${priceStr}</button>
          <p class="hint">${t("payHint")}</p>
+         <p class="hint">${t("payCards")}</p>
          <p class="hint legal-hint">${payTermsHtml()}</p>
          <button class="secondary" id="btn-verify">${t("verifyBtn")}</button>
          <p class="error" id="pay-msg" style="display:none"></p>

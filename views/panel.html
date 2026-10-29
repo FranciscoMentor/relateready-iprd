@@ -241,10 +241,9 @@
     </div>
     <div class="card">
       <h2 style="margin:0 0 4px;font-size:15px;">Compras</h2>
-      <p class="muted" style="margin:0 0 14px;">Si devuelves el dinero a alguien, primero haz el reembolso en el panel de Payphone y luego pulsa "Registrar reembolso": deja de contar como venta y se desactivan su informe y su libro.</p>
       <div class="table-scroll"><table>
-        <thead><tr><th>Fecha</th><th>Persona</th><th>Origen</th><th>Monto</th><th>Transacción Payphone</th><th>Libro</th><th></th></tr></thead>
-        <tbody id="ventasList"><tr><td colspan="7" style="text-align:center;color:#999;padding:24px;">Cargando…</td></tr></tbody>
+        <thead><tr><th>Fecha</th><th>Persona</th><th>Origen</th><th>Monto</th><th>Transacción Payphone</th><th>Libro</th></tr></thead>
+        <tbody id="ventasList"><tr><td colspan="6" style="text-align:center;color:#999;padding:24px;">Cargando…</td></tr></tbody>
       </table></div>
     </div>
   </section>
@@ -415,8 +414,8 @@
   });
 
   // ── Ventas (compras reales de Payphone, códigos y marcas manuales) ──
-  const SALE_SOURCE_LABEL = { payphone:"Payphone (real)", manual:"Marca manual", legacy:"Pagado (anterior)", refunded:"Reembolsado", simulated:"Simulado", code:"Código gratis" };
-  const SALE_SOURCE_COLOR = { payphone:"#3F6B4F", manual:"#9C6B14", legacy:"#6B6259", refunded:"#9C3B2E", simulated:"#999", code:"#B5732A" };
+  const SALE_SOURCE_LABEL = { payphone:"Payphone (real)", manual:"Marca manual", legacy:"Pagado (anterior)", simulated:"Simulado", code:"Código gratis" };
+  const SALE_SOURCE_COLOR = { payphone:"#3F6B4F", manual:"#9C6B14", legacy:"#6B6259", simulated:"#999", code:"#B5732A" };
   const usd = (cents) => "$" + (Number(cents || 0) / 100).toFixed(2);
   async function loadVentas() {
     try {
@@ -430,7 +429,6 @@
         card(t.payphone, "Compras reales (Payphone)") + card(usd(t.revenueCents), "Ingresos reales") +
         card(t.checkoutStarted, "Personas que iniciaron el pago") + card(t.payphone && t.tests ? (t.payphone / t.tests * 100).toFixed(1) + "%" : "0%", "Tests que compraron") +
         card(t.code, "Informes gratis con código") + card(t.manual + (t.legacy ? " (+" + t.legacy + " anteriores)" : ""), "Marcas manuales (no son compras)") +
-        card(t.refundedCount + (t.refundedCount ? " · " + usd(t.refundedCents) : ""), "Reembolsos registrados") +
         card(t.payphone && totalSpend ? usd(totalSpend / t.payphone) : "—", "Costo por compra (gasto total / compras)");
       document.getElementById("ventasCampaigns").innerHTML = d.campaigns.length ? d.campaigns.map(c => `<tr>
         <td>${esc(c.campaign)}</td><td>${c.tests}</td><td>${c.summaryViewed}</td><td>${c.checkoutStarted}</td><td><strong>${c.purchases}</strong></td><td>${usd(c.revenueCents)}</td><td>${c.codes}</td>
@@ -454,20 +452,8 @@
         <td><span class="badge" style="background:${SALE_SOURCE_COLOR[s.source] || "#999"}">${esc(SALE_SOURCE_LABEL[s.source] || s.source)}</span></td>
         <td>${s.amountCents !== null && s.amountCents !== undefined ? usd(s.amountCents) + " " + esc(s.currency || "") : "—"}</td>
         <td>${esc(s.transactionId || "—")}${s.authorizationCode ? '<br><span class="muted">Aut. ' + esc(s.authorizationCode) + "</span>" : ""}</td>
-        <td>${s.source === "refunded" ? "—" : (s.bookDownloads ? "Descargado (" + s.bookDownloads + ")" : "No todavía")}</td>
-        <td>${s.source === "payphone" && s.paymentId ? `<button class="btn ghost small" data-refund="${s.paymentId}" data-refund-name="${esc(s.name)}">Registrar reembolso</button>` : (s.source === "refunded" ? '<span class="muted">' + esc((s.refundedAt || "").slice(0, 10)) + "</span>" : "")}</td></tr>`).join("")
-        : '<tr><td colspan="7" style="text-align:center;color:#999;padding:24px;">Todavía no hay compras.</td></tr>';
-      document.querySelectorAll("[data-refund]").forEach(btn => btn.addEventListener("click", async () => {
-        const who = btn.getAttribute("data-refund-name");
-        if (!confirm("¿Registrar el reembolso de " + who + "? Haz primero la devolución en el panel de Payphone. Su informe y su libro se desactivarán.")) return;
-        btn.disabled = true;
-        try {
-          const r = await fetch("/admin/api/ventas/reembolso/" + btn.getAttribute("data-refund"), { method:"POST" });
-          const j = await r.json();
-          if (!r.ok) throw new Error(j.error || "Error");
-          await loadVentas(); loadKpis();
-        } catch (e) { alert("No se pudo registrar: " + e.message); btn.disabled = false; }
-      }));
+        <td>${s.bookDownloads ? "Descargado (" + s.bookDownloads + ")" : "No todavía"}</td></tr>`).join("")
+        : '<tr><td colspan="6" style="text-align:center;color:#999;padding:24px;">Todavía no hay compras.</td></tr>';
     } catch (e) {
       document.getElementById("ventasNote").textContent = "No se pudieron cargar las ventas. Recarga la página e inicia sesión de nuevo si es necesario.";
     }
