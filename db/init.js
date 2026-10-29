@@ -151,6 +151,9 @@ addColumnIfMissing("session_until_override", "session_until_override TEXT");
 // Como máximo dos correos por persona; las columnas evitan repetirlos.
 addColumnIfMissing("session_nudge_sent_at", "session_nudge_sent_at TEXT");
 addColumnIfMissing("session_nudge2_sent_at", "session_nudge2_sent_at TEXT");
+// Libro de regalo (services/bookDownload.js): primera descarga y número de descargas.
+addColumnIfMissing("book_downloaded_at", "book_downloaded_at TEXT");
+addColumnIfMissing("book_download_count", "book_download_count INTEGER");
 // Última vez que se sincronizaron las reservas de Bookings (services/bookingSync.js).
 // El seguimiento solo se envía si esa sincronización es reciente, para no escribirle
 // a quien ya reservó y todavía no está marcado.

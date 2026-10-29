@@ -32,6 +32,7 @@ const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Numb
 const { FREE_ACCESS_CODES } = require("../services/accessCodes");
 const { getActivePromo, makeRateLimiter } = require("../services/promo");
 const { sessionInfoFor, sessionOfferEnabled } = require("../services/sessionDeadline");
+const bookDownload = require("../services/bookDownload");
 
 // GET /api/meta?lang=es — todo lo que el frontend necesita para renderizar el test.
 // No se exponen 'keying' ni 'dimension' de los ítems núcleo, para no sesgar
@@ -267,7 +268,32 @@ router.get("/submission/:id/status", (req, res) => {
       const p = approvedPaymentFor(sub.id);
       return p ? { eventId: p.client_tx_id, value: p.amount_cents / 100, currency: p.currency } : null;
     })(),
+    // Enlace firmado (30 días) al libro de regalo; solo quien tiene derecho (informe pagado).
+    bookUrl: bookDownload.bookUrlFor(sub, ""),
   });
+});
+
+// GET /api/book/:id?t=<vence>.<firma> — descarga del libro de regalo ("Tú Primero" /
+// "You First", en el idioma del informe). Enlace firmado de 30 días (ver
+// services/bookDownload.js). Enlace falso o alterado: 404. Enlace auténtico pero
+// vencido: lleva a la pantalla de resultados, donde se genera uno nuevo.
+const bookIpLimit = makeRateLimiter(30, 60 * 1000);
+router.get("/book/:id", (req, res) => {
+  if (!bookIpLimit("ip:" + req.ip)) return res.status(429).send("Demasiadas peticiones. Espera un minuto.");
+  const id = String(req.params.id || "");
+  const sub = db.prepare("SELECT id, lang, payment_status FROM submissions WHERE id = ?").get(id);
+  const token = String(req.query.t || "");
+  if (!sub || !bookDownload.entitled(sub)) return res.status(404).send("No encontrado.");
+  if (!bookDownload.verifyToken(id, token)) {
+    // ¿Firma auténtica pero vencida? Entonces lo mandamos a su pantalla de resultados.
+    if (bookDownload.verifyToken(id, token, 0)) return res.redirect(302, `/?sid=${encodeURIComponent(id)}`);
+    return res.status(404).send("No encontrado.");
+  }
+  const book = bookDownload.bookFor(sub.lang);
+  if (!book) return res.status(503).send("El libro no está disponible por ahora. Escríbenos y te lo enviamos.");
+  bookDownload.recordDownload(id);
+  res.setHeader("Cache-Control", "private, no-store");
+  res.download(book.file, book.name);
 });
 
 // GET /api/submission/:id/session — plazo para agendar la sesión de mentoring

@@ -73,6 +73,9 @@
       extendedIntro: "El Informe Extendido incluye tus 8 dimensiones completas, recomendaciones concretas, 5 secciones escritas especialmente para ti por IA, y tu plan de acción a 3 semanas.",
       freeSessionNote: "Además, al adquirir tu Informe Extendido recibes una sesión de mentoring gratuita de 60 minutos para revisarlo con un mentor profesional: así no lo interpretas por tu cuenta.",
       bookGiftNote: "Además, al adquirir tu Informe Extendido recibes de regalo el libro digital \"Tú Primero\", para seguir trabajando tus 8 pilares.",
+      bookDownloadTitle: "Tu regalo: el libro \"Tú Primero\"",
+      bookDownloadText: "Una guía para seguir trabajando tus 8 pilares después de leer tu informe. También te lo enviamos por correo.",
+      bookDownloadBtn: "Descargar el libro (PDF)",
       bookGiftLabel: "De regalo contigo",
       bookGiftCopy: 'Tu Informe Extendido incluye <strong>"Tú Primero"</strong>: <strong>el libro digital</strong> diseñado para profundizar en tus 8 pilares y acompañarte semanas después de leer tu informe. Lo descargas en cuanto se confirma tu compra.',
       bookTeaserLabel: "Además, recibes",
@@ -170,6 +173,9 @@
       extendedIntro: "The Extended Report includes all 8 full dimensions, concrete recommendations, 5 sections written specifically for you by AI, and your 3-week action plan.",
       freeSessionNote: "Plus, getting your Extended Report includes a free 60-minute mentoring session to review it with a professional mentor, so you don't have to interpret it on your own.",
       bookGiftNote: "Plus, getting your Extended Report includes the digital book \"You First\" as a gift, to keep working on your 8 pillars.",
+      bookDownloadTitle: "Your gift: the book \"You First\"",
+      bookDownloadText: "A guide to keep working on your 8 pillars after you read your report. We also sent it to your email.",
+      bookDownloadBtn: "Download the book (PDF)",
       bookGiftLabel: "A gift with your purchase",
       bookGiftCopy: 'Your Extended Report includes <strong>"You First"</strong>: <strong>the digital book</strong> designed to deepen your work on the 8 pillars and stay with you for weeks after you read your report. You download it as soon as your purchase is confirmed.',
       bookTeaserLabel: "Plus, you get",
@@ -253,9 +259,9 @@
     en: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/K4DmDOt-kUSplfAlddYmbw2",
   };
 
-  // Portada del libro digital gratuito "Tu Primero"/"You First" — se entrega
-  // exclusivamente durante la sesión de mentoría gratuita (no es parte de la
-  // compra del Informe Extendido). Ver bookTeaserLabel/bookTeaserCopy arriba.
+  // Portada del libro digital "Tu Primero"/"You First": regalo de quien compra el
+  // Informe Extendido (descarga con enlace firmado, ver services/bookDownload.js);
+  // con promoción se entrega en la sesión gratuita. Ver bookGift*/bookTeaser* arriba.
   const BOOK_COVERS = {
     es: "/assets/tu-primero-cover-es.jpg",
     en: "/assets/you-first-cover-en.jpg",
@@ -305,6 +311,7 @@
     promoLoaded: false,
     session: null,      // { until, expired } desde /api/submission/:id/session (plazo de la sesión gratuita)
     sessionLoaded: false,
+    bookUrl: null,      // enlace firmado al libro de regalo (solo quien compró), desde /api/submission/:id/status
   };
 
   const app = document.getElementById("app");
@@ -330,6 +337,11 @@
       const res = await fetch(`/api/submission/${state.submissionId}/session`);
       if (res.ok) state.session = await res.json();
     } catch (e) { /* sin plazo */ }
+    // Enlace firmado al libro de regalo (solo quien compró lo recibe del servidor).
+    try {
+      const st = await fetch(`/api/submission/${state.submissionId}/status`, { cache: "no-store" });
+      if (st.ok) { const d = await st.json(); state.bookUrl = d.bookUrl || null; }
+    } catch (e) { /* sin libro: el correo trae el enlace */ }
     state.sessionLoaded = true;
   }
 
@@ -863,6 +875,13 @@
     const sessionPitch = showPromo || !!state.meta.sessionOfferEnabled;
     const sessDate = humanDate(sess.until);
     const sessNote = sessDate ? (sess.expired ? t("sessionExpired") : t("sessionDeadline")).replace("{d}", sessDate) : "";
+    const bookDownloadHtml = state.bookUrl
+      ? `<div class="session-block book-download">
+           <h2>${t("bookDownloadTitle")}</h2>
+           <p>${t("bookDownloadText")}</p>
+           <a class="primary" style="text-decoration:none;display:inline-block" href="${state.bookUrl}" onclick="try{fbq('trackCustom','BookDownload')}catch(e){}">${t("bookDownloadBtn")}</a>
+         </div>`
+      : "";
     const sessionBlockHtml = `
       <div class="session-block">
         <h2>${t("scheduleSessionTitle")}</h2>
@@ -899,7 +918,8 @@
 
     const payAreaHtml = state.paid
       ? `<a class="primary" style="text-decoration:none;display:inline-block" href="/api/report/extended/${state.submissionId}" target="_blank">${t("downloadExtended")}</a>
-         ${sessionOfferedToUser ? sessionBlockHtml : ""}`
+         ${bookDownloadHtml}
+        ${sessionOfferedToUser ? sessionBlockHtml : ""}`
       : state.meta.payphoneEnabled
       ? `<button class="${payBtnClass}" id="btn-pay">${t("payBtnRealLabel")} — $${priceStr}</button>
          <p class="hint">${t("payHint")}</p>
