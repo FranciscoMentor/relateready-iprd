@@ -27,6 +27,10 @@
   const I18N = {
     es: {
       slogan: "<em>Listos por dentro. Listos en pareja:</em><br>la preparación empieza contigo, no con la otra persona.",
+      legalTerms: "Términos",
+      legalPrivacy: "Privacidad",
+      legalRefunds: "Reembolsos",
+      payTerms: 'Al pagar aceptas los <a href="{terms}" target="_blank" rel="noopener">Términos y condiciones</a> y la <a href="{privacy}" target="_blank" rel="noopener">Política de privacidad</a>. <a href="{refunds}" target="_blank" rel="noopener">Reembolso completo dentro de 7 días.</a>',
       footerBefore: "Desarrollado por",
       footerAfter: "Índice de Desarrollo y Fortalecimiento Relacional",
       intakeTitle: "Antes de empezar",
@@ -127,6 +131,10 @@
     },
     en: {
       slogan: "<em>Ready Within. Ready Together —</em><br>readiness starts with you, not the other person.",
+      legalTerms: "Terms",
+      legalPrivacy: "Privacy",
+      legalRefunds: "Refunds",
+      payTerms: 'By paying you accept the <a href="{terms}" target="_blank" rel="noopener">Terms and conditions</a> and the <a href="{privacy}" target="_blank" rel="noopener">Privacy policy</a>. <a href="{refunds}" target="_blank" rel="noopener">Full refund within 7 days.</a>',
       footerBefore: "Developed by",
       footerAfter: "Relationship Development and Strengthening Index",
       intakeTitle: "Before you start",
@@ -366,6 +374,17 @@
     document.querySelector('[data-i18n="footerBefore"]').textContent = t("footerBefore");
     document.querySelector('[data-i18n="footerAfter"]').textContent = t("footerAfter");
     document.querySelector('[data-i18n="slogan"]').innerHTML = t("slogan");
+    // Enlaces legales del pie: se abren en pestaña nueva para no perder el avance del test.
+    const nav = document.getElementById("legal-links");
+    if (nav) {
+      nav.innerHTML = [["terms", "legalTerms"], ["privacy", "legalPrivacy"], ["refunds", "legalRefunds"]]
+        .map(([k, key]) => `<a href="${legalUrl(k)}" target="_blank" rel="noopener">${t(key)}</a>`)
+        .join(" · ");
+    }
+  }
+  function legalUrl(kind) { return `/legal/${kind}.html?lang=${state.lang === "en" ? "en" : "es"}`; }
+  function payTermsHtml() {
+    return t("payTerms").replace("{terms}", legalUrl("terms")).replace("{privacy}", legalUrl("privacy")).replace("{refunds}", legalUrl("refunds"));
   }
   document.getElementById("btn-es").addEventListener("click", () => setLang("es"));
   document.getElementById("btn-en").addEventListener("click", () => setLang("en"));
@@ -923,6 +942,7 @@
       : state.meta.payphoneEnabled
       ? `<button class="${payBtnClass}" id="btn-pay">${t("payBtnRealLabel")} — $${priceStr}</button>
          <p class="hint">${t("payHint")}</p>
+         <p class="hint legal-hint">${payTermsHtml()}</p>
          <button class="secondary" id="btn-verify">${t("verifyBtn")}</button>
          <p class="error" id="pay-msg" style="display:none"></p>
          ${codeBlockHtml}`

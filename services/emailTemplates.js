@@ -111,6 +111,11 @@ function extendedReportEmail({ name, lang, resultsUrl, session, bookUrl, receipt
   const en = lang === "en";
   const T2 = (es, enT) => (en ? enT : es);
   const rcell = (label, value) => `<tr><td style="padding:4px 14px 4px 0;color:${MUTED};font-size:14px;">${label}</td><td style="padding:4px 0;font-size:14px;">${escapeHtml(value)}</td></tr>`;
+  let refundUrl = "";
+  try { refundUrl = `${new URL(resultsUrl).origin}/legal/refunds.html?lang=${en ? "en" : "es"}`; } catch (e) { /* sin enlace */ }
+  const refundLine = refundUrl
+    ? `<p style="font-size:13px;line-height:1.5;margin:-8px 0 18px;color:${MUTED};">${T2(`Reembolso completo dentro de 7 días: responde a este correo. <a href="${refundUrl}" style="color:${MUTED};">Ver política de reembolso</a>.`, `Full refund within 7 days: just reply to this email. <a href="${refundUrl}" style="color:${MUTED};">See the refund policy</a>.`)}</p>`
+    : "";
   const receiptBlock = receipt
     ? `
           <p style="font-size:15px;line-height:1.6;margin:0 0 6px;"><strong>${T2("Tu recibo", "Your receipt")}</strong></p>
@@ -120,7 +125,8 @@ function extendedReportEmail({ name, lang, resultsUrl, session, bookUrl, receipt
             ${rcell(T2("Fecha", "Date"), receipt.dateText)}
             ${receipt.transactionId ? rcell(T2("Transacción Payphone", "Payphone transaction"), receipt.transactionId) : ""}
             ${receipt.authorizationCode ? rcell(T2("Autorización", "Authorization"), receipt.authorizationCode) : ""}
-          </table>`
+          </table>
+          ${refundLine}`
     : "";
   const giftBlock = bookUrl
     ? `

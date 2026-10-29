@@ -127,6 +127,8 @@ button.secondary, a.secondary {
 .vignette-option:hover { border-color: var(--accent); }
 .vignette-option.selected { border-color: var(--accent); background: var(--light); }
 footer.foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 44px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+footer.foot .legal-links { margin-top: 6px; }
+footer.foot .legal-links a, .legal-hint a { color: var(--muted); }
 footer.foot img.adamantine-full-logo { height: 40px; width: auto; margin: 2px 0; }
 
 /* Tarjeta de desbloqueo con un clic (promoción). Móvil primero: texto ≥ 18 px y botón ≥ 48 px. */

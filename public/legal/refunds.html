@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Política de reembolso — RelateReady</title>
+<link rel="icon" type="image/png" href="/assets/relateready-icon.png" />
+<link rel="stylesheet" href="/css/styles.css" />
+<style>
+.legal-card { background:#fff; border:1px solid var(--border); border-radius:14px; padding:28px; box-shadow:0 4px 18px rgba(42,42,40,0.06); }
+.doc h1 { margin:0 0 4px; font-size:26px; }
+.doc h2 { font-size:17px; margin:24px 0 6px; color:var(--accent-dark); }
+.doc p { margin:0 0 10px; font-size:15px; }
+.doc .updated { color:var(--muted); font-size:13px; margin-bottom:6px; }
+.doc a { color:var(--accent-dark); }
+.doc .back { margin-top:26px; }
+.legal-nav { text-align:center; font-size:13px; color:var(--muted); margin-top:20px; }
+.legal-nav a { color:var(--muted); }
+.legal-nav [aria-current="page"] { font-weight:700; color:var(--ink); }
+.doc[hidden], .legal-nav[hidden] { display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a href="/" id="home-link"><img src="/assets/relateready-logo-crop.png" alt="RelateReady" class="brand-logo" /></a>
+    <div class="lang-toggle">
+      <span class="lang-label">Language / Idioma</span>
+      <div class="lang-buttons"><button id="btn-es" class="active">ES</button><button id="btn-en">EN</button></div>
+    </div>
+  </header>
+  <div class="legal-card" style="margin-top:22px">
+<section class="doc" data-lang="es" lang="es"><h1>Política de reembolso</h1><p class="updated">Última actualización: 29 de octubre de 2026</p>
+<h2>Reembolso completo dentro de 7 días</h2>
+<p>Si compraste el Informe Extendido y no estás conforme, puedes pedir el reembolso del 100% del pago <strong>dentro de los 7 días siguientes a tu compra</strong>, sin tener que dar explicaciones.</p>
+<h2>Cómo pedirlo</h2>
+<p>Escribe a adamantinementor@outlook.com (o responde al correo de tu recibo) indicando el nombre y el correo con el que hiciste el test. Verificamos tu compra y procesamos el reembolso.</p>
+<h2>Cómo y cuándo recibes el dinero</h2>
+<p>El reembolso se hace al mismo medio de pago que usaste. Una vez procesado, el tiempo en que lo ves reflejado depende de tu banco o emisor de tarjeta, y puede tardar varios días hábiles.</p>
+<h2>Qué pasa con tu acceso</h2>
+<p>Al reembolsarte, tu acceso al Informe Extendido y al libro de regalo se desactiva, y pedimos que dejes de usar o distribuir esos materiales.</p>
+<h2>Si algo salió mal</h2>
+<p>Si pagaste y no recibiste tu informe o tu libro, o el sitio falló, escríbenos primero: lo resolvemos o te reembolsamos.</p>
+<p class="back"><a href="/" data-back>Volver al test</a></p></section>
+<section class="doc" data-lang="en" lang="en"><h1>Refund policy</h1><p class="updated">Last updated: October 29, 2026</p>
+<h2>Full refund within 7 days</h2>
+<p>If you bought the Extended Report and are not satisfied, you can request a 100% refund of your payment <strong>within 7 days of your purchase</strong>, no explanation needed.</p>
+<h2>How to request it</h2>
+<p>Write to adamantinementor@outlook.com (or reply to your receipt email) with the name and email you used for the test. We verify your purchase and process the refund.</p>
+<h2>How and when you get your money</h2>
+<p>The refund goes back to the same payment method you used. Once processed, how soon you see it depends on your bank or card issuer, and it can take several business days.</p>
+<h2>What happens to your access</h2>
+<p>Once refunded, your access to the Extended Report and the gift book is deactivated, and we ask that you stop using or distributing those materials.</p>
+<h2>If something went wrong</h2>
+<p>If you paid and did not receive your report or book, or the site failed, write to us first: we will fix it or refund you.</p>
+<p class="back"><a href="/" data-back>Back to the test</a></p></section>
+  </div>
+<p class="legal-nav" data-lang="es"><a href="/legal/terms.html" data-lang-link="es">Términos y condiciones</a> · <a href="/legal/privacy.html" data-lang-link="es">Política de privacidad</a> · <a href="/legal/refunds.html" data-lang-link="es" aria-current="page">Política de reembolso</a></p>
+<p class="legal-nav" data-lang="en"><a href="/legal/terms.html" data-lang-link="en">Terms and conditions</a> · <a href="/legal/privacy.html" data-lang-link="en">Privacy policy</a> · <a href="/legal/refunds.html" data-lang-link="en" aria-current="page">Refund policy</a></p>
+</div>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var lang = q.get("lang") === "en" ? "en" : "es";
+  function apply(l) {
+    lang = l;
+    document.documentElement.lang = l;
+    document.querySelectorAll("[data-lang]").forEach(function (el) { el.hidden = el.getAttribute("data-lang") !== l; });
+    document.querySelectorAll("[data-lang-link]").forEach(function (a) { a.href = a.getAttribute("href").split("?")[0] + "?lang=" + l; });
+    document.querySelectorAll("[data-back], #home-link").forEach(function (a) { a.href = l === "en" ? "/?lang=en" : "/"; });
+    document.getElementById("btn-es").classList.toggle("active", l === "es");
+    document.getElementById("btn-en").classList.toggle("active", l === "en");
+    var t = document.querySelector('.doc[data-lang="' + l + '"] h1');
+    if (t) document.title = t.textContent + " — RelateReady";
+  }
+  document.getElementById("btn-es").onclick = function () { apply("es"); };
+  document.getElementById("btn-en").onclick = function () { apply("en"); };
+  apply(lang);
+})();
+</script>
+</body>
+</html>
