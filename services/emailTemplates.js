@@ -96,6 +96,10 @@ function extendedReportEmail({ name, lang, resultsUrl, session }) {
   const bookingUrl = BOOKING_LINKS[lang] || BOOKING_LINKS.es;
   const firstName = firstNameOf(name, lang);
   const c = copyFor(lang);
+  // La sesión gratuita solo se menciona si se le ofrece a la persona (promoción o
+  // SESSION_OFFER_ENABLED, ver services/sessionDeadline.js). Sin objeto `session`
+  // se conserva el comportamiento anterior.
+  const offered = !session || session.offered !== false;
   const expired = !!(session && session.expired);
   const deadline = deadlineLine(lang, session);
 
@@ -103,7 +107,10 @@ function extendedReportEmail({ name, lang, resultsUrl, session }) {
   const bullets = c.bullets
     .map(([lead, rest]) => `<li style="margin:0 0 8px;"><strong>${lead}</strong>${rest}</li>`)
     .join("");
-  const sessionBlock = `
+  const sessionBlock = !offered
+    ? `
+          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">${lang === "en" ? "If you have any question about your report, just reply to this email." : "Si tienes alguna pregunta sobre tu informe, responde a este correo."}</p>`
+    : `
           <p style="font-size:15px;line-height:1.6;margin:0 0 12px;">${c.intro}</p>
           <ul style="font-size:15px;line-height:1.5;margin:0 0 16px;padding-left:22px;">${bullets}</ul>
           <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">${c.closing}</p>
@@ -112,7 +119,7 @@ function extendedReportEmail({ name, lang, resultsUrl, session }) {
 
   if (lang === "en") {
     return {
-      subject: expired ? c.emailSubjectExpired : c.emailSubject,
+      subject: expired || !offered ? c.emailSubjectExpired : c.emailSubject,
       html: shell({
         lang,
         bodyHtml: `
@@ -124,7 +131,7 @@ function extendedReportEmail({ name, lang, resultsUrl, session }) {
     };
   }
   return {
-    subject: expired ? c.emailSubjectExpired : c.emailSubject,
+    subject: expired || !offered ? c.emailSubjectExpired : c.emailSubject,
     html: shell({
       lang,
       bodyHtml: `
@@ -172,7 +179,7 @@ function pendingReportReminderEmail({ name, lang, resultsUrl, promoUntil }) {
         bodyHtml: `
           <p style="font-size:16px;margin:0 0 16px;">Hi ${firstName},</p>
           <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">A little while ago you completed the RelateReady relationship-readiness test — your 8-pillar summary is ready and waiting for you.</p>
-          <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Whenever you're ready, your Extended Report goes deeper into each pillar, with a personalized action plan and a free 60-minute mentoring session included.</p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Whenever you're ready, your Extended Report goes deeper into each pillar, with a personalized action plan and our digital book \"You First\" as a gift.</p>
           <p style="margin:0;">${button(resultsUrl, "View my results")}</p>
         `,
       }),
@@ -199,7 +206,7 @@ function pendingReportReminderEmail({ name, lang, resultsUrl, promoUntil }) {
       bodyHtml: `
         <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
         <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Hace un tiempo completaste el test de RelateReady — tu resumen de los 8 pilares ya está listo y te espera.</p>
-        <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Cuando quieras, tu Informe Extendido profundiza en cada pilar, con un plan de acción personalizado y una sesión de mentoría gratuita de 60 minutos incluida.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Cuando quieras, tu Informe Extendido profundiza en cada pilar, con un plan de acción personalizado y nuestro libro digital \"Tú Primero\" de regalo.</p>
         <p style="margin:0;">${button(resultsUrl, "Ver mis resultados")}</p>
       `,
     }),

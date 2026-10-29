@@ -64,6 +64,8 @@ async function generatePdfForSubmission(sub) {
     scoreResult: sub.scoreResult,
     bandContentByCode,
     qualitativeAnswers: sub.qualitativeAnswers,
+    // Solo se menciona la sesión gratis en el plan si a esta persona se le ofrece.
+    sessionOffered: sessionInfoFor(sub).offered,
   });
 
   return generateExtendedReportPDF({
@@ -73,6 +75,8 @@ async function generatePdfForSubmission(sub) {
     aiSections,
     qualitativeAnswers: sub.qualitativeAnswers,
     session: sessionInfoFor(sub),
+    // El libro "Tú Primero"/"You First" es regalo de quien compró el informe.
+    bookGift: sub.payment_status === "paid",
   });
 }
 
@@ -89,6 +93,7 @@ async function sendExtendedReportEmail(sub, pdf, baseUrl) {
     lang: sub.lang === "en" ? "en" : "es",
     resultsUrl: `${baseUrl}/?sid=${sub.id}`,
     session: sessionInfoFor(sub),
+    bookGift: sub.payment_status === "paid",
   });
   const result = await sendMail({
     to: sub.email,

@@ -32,11 +32,11 @@
       intakeTitle: "Antes de empezar",
       intakeIntro1: "RelateReady es una herramienta de autoconocimiento que te ayuda a descubrir qué está favoreciendo y qué puede estar limitando tu capacidad para construir una relación de pareja sana, sólida y duradera. A través de la evaluación de tus 8 pilares relacionales, obtienes una visión clara y objetiva de tus fortalezas, tus áreas de oportunidad, y los aspectos que puedes trabajar para relacionarte mejor contigo mismo y con tu pareja.",
       intakeIntro2: "Y no importa en qué momento de tu vida estés: puede ayudarte a fortalecer la relación que ya tienes, a prepararte para iniciar una nueva, o a avanzar después de una ruptura.",
-      intakeIntro3: "Al completar el test, recibes un resumen de tus resultados sin costo. Y si quieres profundizar en tu proceso, puedes acceder a tu Informe Extendido, que incluye un análisis detallado, un plan de acción personalizado, y una sesión de mentoría gratuita para ayudarte a transformar tus resultados en cambios reales.",
+      intakeIntro3: "Al completar el test, recibes un resumen de tus resultados sin costo. Y si quieres profundizar en tu proceso, puedes acceder a tu Informe Extendido, que incluye un análisis detallado, y un plan de acción personalizado para ayudarte a transformar tus resultados en cambios reales.",
       durationChip: "10 a 15 minutos",
       privacyChip: "Tus datos, protegidos",
       calloutStrong: "Para iniciar tu proceso",
-      calloutRest: " necesitamos tu nombre, correo, teléfono y dónde vives (ciudad y país; si estás en Estados Unidos, también tu estado). Los usamos únicamente para enviarte tu informe y coordinar tu sesión de mentoring gratuita — nunca para spam.",
+      calloutRest: " necesitamos tu nombre, correo, teléfono y dónde vives (ciudad y país; si estás en Estados Unidos, también tu estado). Los usamos únicamente para enviarte tu informe y comunicarnos contigo sobre tus resultados — nunca para spam.",
       nameLabel: "Tu nombre",
       emailLabel: "Tu correo",
       phoneLabel: "Tu teléfono",
@@ -72,6 +72,9 @@
       extendedTitle: "¿Quieres el detalle completo?",
       extendedIntro: "El Informe Extendido incluye tus 8 dimensiones completas, recomendaciones concretas, 5 secciones escritas especialmente para ti por IA, y tu plan de acción a 3 semanas.",
       freeSessionNote: "Además, al adquirir tu Informe Extendido recibes una sesión de mentoring gratuita de 60 minutos para revisarlo con un mentor profesional: así no lo interpretas por tu cuenta.",
+      bookGiftNote: "Además, al adquirir tu Informe Extendido recibes de regalo el libro digital \"Tú Primero\", para seguir trabajando tus 8 pilares.",
+      bookGiftLabel: "De regalo contigo",
+      bookGiftCopy: 'Tu Informe Extendido incluye <strong>"Tú Primero"</strong>: <strong>el libro digital</strong> diseñado para profundizar en tus 8 pilares y acompañarte semanas después de leer tu informe. Lo descargas en cuanto se confirma tu compra.',
       bookTeaserLabel: "Además, recibes",
       bookTeaserCopy: 'Tu Informe Extendido es solo el primer paso. El siguiente es tu <strong>sesión de mentoría indagatoria gratuita de 60 minutos</strong> con uno de los mentores de nuestro equipo — y ahí, exclusivamente ahí, recibirás <strong>"Tú Primero"</strong>: <strong>el libro digital gratuito</strong> diseñado para profundizar en tus 8 pilares y acompañarte semanas después de esa conversación. No está a la venta ni disponible por ningún otro medio: es una guía reservada para quienes completan el proceso, informe y sesión de mentoría.',
       scheduleSessionTitle: "Tu sesión de mentoring para revisar tu informe",
@@ -126,11 +129,11 @@
       intakeTitle: "Before you start",
       intakeIntro1: "RelateReady is a self-knowledge tool that helps you discover what's supporting — and what may be limiting — your ability to build a healthy, solid, lasting relationship. Through the evaluation of your 8 relational pillars, you get a clear, objective view of your strengths, your areas of opportunity, and the aspects you can work on to relate better with yourself and with your partner.",
       intakeIntro2: "And no matter what point you're at in your life, it can help you: strengthen the relationship you already have, prepare to start a new one, or move forward after a breakup.",
-      intakeIntro3: "When you complete the test, you get a summary of your results at no cost. And if you want to go deeper, you can access your Extended Report, which includes a detailed analysis, a personalized action plan, and a free mentoring session to help you turn your results into real change.",
+      intakeIntro3: "When you complete the test, you get a summary of your results at no cost. And if you want to go deeper, you can access your Extended Report, which includes a detailed analysis and a personalized action plan to help you turn your results into real change.",
       durationChip: "10 to 15 minutes",
       privacyChip: "Your data, protected",
       calloutStrong: "To start your process",
-      calloutRest: " we need your name, email, phone, and where you live (city and country; if you are in the United States, your state too). We only use this to send you your report and coordinate your free mentoring session — never for spam.",
+      calloutRest: " we need your name, email, phone, and where you live (city and country; if you are in the United States, your state too). We only use this to send you your report and to contact you about your results — never for spam.",
       nameLabel: "Your name",
       emailLabel: "Your email",
       phoneLabel: "Your phone",
@@ -166,6 +169,9 @@
       extendedTitle: "Want the full detail?",
       extendedIntro: "The Extended Report includes all 8 full dimensions, concrete recommendations, 5 sections written specifically for you by AI, and your 3-week action plan.",
       freeSessionNote: "Plus, getting your Extended Report includes a free 60-minute mentoring session to review it with a professional mentor, so you don't have to interpret it on your own.",
+      bookGiftNote: "Plus, getting your Extended Report includes the digital book \"You First\" as a gift, to keep working on your 8 pillars.",
+      bookGiftLabel: "A gift with your purchase",
+      bookGiftCopy: 'Your Extended Report includes <strong>"You First"</strong>: <strong>the digital book</strong> designed to deepen your work on the 8 pillars and stay with you for weeks after you read your report. You download it as soon as your purchase is confirmed.',
       bookTeaserLabel: "Plus, you get",
       bookTeaserCopy: 'Your Extended Report is only the first step. The next one is your <strong>free 60-minute discovery mentoring session</strong> with one of our team mentors — and that\'s the exclusive moment you\'ll receive <strong>"You First"</strong>: <strong>the free digital book</strong> designed to deepen your work on the 8 pillars and stay with you long after that conversation ends. It isn\'t for sale anywhere else: it\'s reserved for those who complete the process — report and mentoring session.',
       scheduleSessionTitle: "Your mentoring session to review your report",
@@ -849,6 +855,12 @@
     // Beneficios, qué es y qué no es, y el plazo (si tiene). Si el plazo ya
     // venció, en vez del botón sale el aviso para responder el correo del informe.
     const sess = state.session || {};
+    // La sesión gratuita solo se muestra a quien se le ofrece (promoción / plazo de
+    // campaña, o SESSION_OFFER_ENABLED). El servidor lo decide: sess.offered.
+    const sessionOfferedToUser = !!sess.offered;
+    // Antes de comprar: el aviso de la sesión solo con promoción vigente o con el
+    // interruptor encendido; si no, se anuncia el libro de regalo.
+    const sessionPitch = showPromo || !!state.meta.sessionOfferEnabled;
     const sessDate = humanDate(sess.until);
     const sessNote = sessDate ? (sess.expired ? t("sessionExpired") : t("sessionDeadline")).replace("{d}", sessDate) : "";
     const sessionBlockHtml = `
@@ -887,7 +899,7 @@
 
     const payAreaHtml = state.paid
       ? `<a class="primary" style="text-decoration:none;display:inline-block" href="/api/report/extended/${state.submissionId}" target="_blank">${t("downloadExtended")}</a>
-         ${sessionBlockHtml}`
+         ${sessionOfferedToUser ? sessionBlockHtml : ""}`
       : state.meta.payphoneEnabled
       ? `<button class="${payBtnClass}" id="btn-pay">${t("payBtnRealLabel")} — $${priceStr}</button>
          <p class="hint">${t("payHint")}</p>
@@ -928,7 +940,7 @@
         <img src="/assets/hero-home.jpg" alt="RelateReady" class="hero-image" />
         <h2>${t("extendedTitle")}</h2>
         <p>${t("extendedIntro")}</p>
-        ${!state.paid ? `<p class="bonus-note">${t("freeSessionNote")}</p>` : ""}
+        ${!state.paid ? `<p class="bonus-note">${t(sessionPitch ? "freeSessionNote" : "bookGiftNote")}</p>` : ""}
         <div id="pay-area">${promoPayAreaHtml}</div>
       </div>
       ${state.paid ? referralBlockHtml : ""}
@@ -937,8 +949,8 @@
           ? `<div class="card book-teaser">
         <img src="${BOOK_COVERS[state.lang] || BOOK_COVERS.es}" alt="" class="book-teaser-cover" />
         <div class="book-teaser-text">
-          <p class="book-teaser-label">${t("bookTeaserLabel")}</p>
-          <p>${t("bookTeaserCopy")}</p>
+          <p class="book-teaser-label">${t(sessionPitch ? "bookTeaserLabel" : "bookGiftLabel")}</p>
+          <p>${t(sessionPitch ? "bookTeaserCopy" : "bookGiftCopy")}</p>
         </div>
       </div>`
           : ""
