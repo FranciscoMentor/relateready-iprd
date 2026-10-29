@@ -84,7 +84,12 @@
       payBtnLabel: "Desbloquear Informe Extendido",
       payBtnRealLabel: "Pagar Informe Extendido",
       simulatedTag: "simulado",
-      payHint: "Se abrirá una pestaña nueva para completar el pago de forma segura con Payphone. Cuando termines, vuelve a esta pestaña.",
+      payHint: "Se abrirá una pestaña nueva para completar el pago de forma segura con Payphone. No la cierres hasta que te traiga de vuelta aquí: así se confirma tu pago.",
+      iabTitle: "Para pagar de forma segura, abre esta página en Safari o Chrome",
+      iabBody: "El pago no funciona bien dentro de Instagram o Facebook. Toca los tres puntos (⋯) y elige «Abrir en el navegador», o copia el enlace y pégalo en tu navegador. Tus resultados te esperan ahí.",
+      iabCopy: "Copiar enlace",
+      iabCopied: "Enlace copiado",
+      iabContinue: "Continuar aquí de todos modos",
       verifyBtn: "Ya pagué — verificar",
       verifying: "Verificando...",
       paymentNotConfirmed: "Todavía no detectamos tu pago. Si ya completaste el pago hace unos segundos, espera un momento y vuelve a intentar.",
@@ -173,7 +178,12 @@
       payBtnLabel: "Unlock Extended Report",
       payBtnRealLabel: "Pay for Extended Report",
       simulatedTag: "simulated",
-      payHint: "A new tab will open to complete your payment securely with Payphone. When you're done, come back to this tab.",
+      payHint: "A new tab will open to complete your payment securely with Payphone. Don't close it until it brings you back here: that's how your payment is confirmed.",
+      iabTitle: "To pay securely, open this page in Safari or Chrome",
+      iabBody: "Payment doesn't work well inside Instagram or Facebook. Tap the three dots (⋯) and choose “Open in browser”, or copy the link and paste it into your browser. Your results are waiting there.",
+      iabCopy: "Copy link",
+      iabCopied: "Link copied",
+      iabContinue: "Continue here anyway",
       verifyBtn: "I already paid — verify",
       verifying: "Verifying...",
       paymentNotConfirmed: "We haven't detected your payment yet. If you just completed it, wait a moment and try again.",
@@ -206,22 +216,32 @@
   };
 
   // Eventos del píxel de Meta (si el píxel no carga, no pasa nada).
-  function trackPixel(kind, name, data) {
-    try { if (typeof fbq === "function") fbq(kind, name, data || {}); } catch (e) {}
-  }
-  // Compra del Informe Extendido (solo pagos reales, una vez por envío).
-  function trackPurchaseOnce(sid) {
+  function trackPixel(kind, name, data, options) {
     try {
-      const key = "rr_purchase_" + sid;
-      if (sessionStorage.getItem(key)) return;
-      sessionStorage.setItem(key, "1");
+      if (typeof fbq !== "function") return;
+      if (options) fbq(kind, name, data || {}, options);
+      else fbq(kind, name, data || {});
     } catch (e) {}
-    trackPixel("track", "Purchase", { value: 14, currency: "USD" });
+  }
+  // Compra del Informe Extendido: solo con un pago de Payphone confirmado por el
+  // servidor (valor real y moneda salen de ahí), una sola vez por transacción
+  // (el id de la transacción es el event_id, así Meta también evita duplicados).
+  function trackPurchaseOnce(purchase) {
+    if (!purchase || !purchase.eventId) return;
+    try {
+      const key = "rr_purchase_" + purchase.eventId;
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, "1");
+    } catch (e) {}
+    trackPixel("track", "Purchase", { value: Number(purchase.value), currency: purchase.currency || "USD" }, { eventID: purchase.eventId });
   }
 
   // Enlaces de agendamiento para la sesión de mentoría gratuita de 60 min
   // incluida con el Informe Extendido (uno por idioma). Si Francisco necesita
   // cambiarlos en el futuro, basta con actualizar estas dos URLs.
+  // Navegador interno de Instagram / Facebook: Payphone no admite webviews.
+  const IN_APP_BROWSER = /Instagram|FBAN|FBAV|FB_IAB|FBIOS|FB4A|FBSS/i.test(navigator.userAgent);
+
   const BOOKING_LINKS = {
     es: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/eMJ5GQhw_0W_-z2cJN-S9g2",
     en: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/K4DmDOt-kUSplfAlddYmbw2",
@@ -973,9 +993,29 @@
         const btn = e.target;
         const msg = document.getElementById("pay-msg");
         msg.style.display = "none";
+        if (IN_APP_BROWSER && !state.iabContinue) {
+          // Payphone no admite webviews: se pide abrir el enlace en el navegador.
+          if (!document.getElementById("iab-pay")) {
+            const box = document.createElement("div");
+            box.id = "iab-pay";
+            box.className = "card";
+            box.style.marginTop = "12px";
+            box.innerHTML = `<h3 style="margin:0 0 8px">${t("iabTitle")}</h3><p>${t("iabBody")}</p>
+              <button type="button" class="primary" id="iab-copy">${t("iabCopy")}</button>
+              <button type="button" class="secondary" id="iab-go" style="margin-left:8px">${t("iabContinue")}</button>`;
+            btn.parentNode.insertBefore(box, btn.nextSibling);
+            document.getElementById("iab-copy").addEventListener("click", async (ev) => {
+              const link = `${location.origin}/?sid=${state.submissionId}`;
+              try { await navigator.clipboard.writeText(link); ev.target.textContent = t("iabCopied"); }
+              catch (err) { window.prompt(link, link); }
+            });
+            document.getElementById("iab-go").addEventListener("click", () => { state.iabContinue = true; btn.click(); });
+          }
+          return;
+        }
         btn.disabled = true;
         btn.textContent = t("paying");
-        trackPixel("track", "InitiateCheckout", { value: 14, currency: "USD" });
+        trackPixel("track", "InitiateCheckout", { value: Number(priceStr), currency: "USD" });
         try {
           const res = await fetch(`/api/payment/prepare/${state.submissionId}`, { method: "POST" });
           const data = await res.json();
@@ -1000,7 +1040,7 @@
           const res = await fetch(`/api/submission/${state.submissionId}/status`);
           const data = await res.json();
           if (data.paymentStatus === "paid" || data.paymentStatus === "simulated" || data.paymentStatus === "free") {
-            if (data.paymentStatus === "paid") trackPurchaseOnce(state.submissionId);
+            trackPurchaseOnce(data.purchase);
             state.paid = true;
             renderResults();
             return;
@@ -1078,6 +1118,11 @@
   // Al volver de la pestaña de pago de Payphone, la URL trae ?sid=<envío>
   // (y, si el pago se completó, también ?id=...&clientTransactionId=... que
   // añade Payphone). Reconstruye el estado a partir de esos parámetros.
+  function showConfirming() {
+    const lang = /^es/i.test(navigator.language || "") ? "es" : "en";
+    app.innerHTML = `<div class="card"><p style="font-size:16px;text-align:center;margin:20px 0;">${lang === "en" ? "Confirming your payment… please don't close this window." : "Confirmando tu pago… por favor no cierres esta ventana."}</p></div>`;
+  }
+
   async function restoreFromPayphoneReturn() {
     const params = new URLSearchParams(window.location.search);
     const sid = params.get("sid");
@@ -1088,10 +1133,17 @@
     history.replaceState({}, "", window.location.pathname); // limpia la URL
 
     if (payphoneId && clientTransactionId) {
-      try {
-        await fetch(`/api/payment/confirm/${sid}?id=${encodeURIComponent(payphoneId)}&clientTransactionId=${encodeURIComponent(clientTransactionId)}`);
-      } catch (e) {
-        console.error("No se pudo confirmar el pago:", e);
+      // Payphone revierte el pago si no se confirma en 5 minutos: se confirma de
+      // inmediato al volver, y se reintenta si hay un fallo de red.
+      showConfirming();
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const r = await fetch(`/api/payment/confirm/${sid}?id=${encodeURIComponent(payphoneId)}&clientTransactionId=${encodeURIComponent(clientTransactionId)}`);
+          if (r.status < 500 && r.status !== 429) break;
+        } catch (e) {
+          console.error("No se pudo confirmar el pago:", e);
+        }
+        await new Promise((ok) => setTimeout(ok, 1500));
       }
     }
 
@@ -1103,7 +1155,7 @@
     state.scoreSummary = data.scoreSummary;
     state.referralTriggered = data.referralTriggered;
     state.paid = data.paymentStatus === "paid" || data.paymentStatus === "simulated" || data.paymentStatus === "free";
-    if (data.paymentStatus === "paid") trackPurchaseOnce(sid);
+    trackPurchaseOnce(data.purchase);
     state.step = "results";
     return true;
   }

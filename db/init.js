@@ -160,6 +160,28 @@ db.exec(`
     last_sync_at TEXT NOT NULL
   );
 `);
+// Pagos con Payphone: un renglón por intento de pago (services/payments.js).
+// El informe solo se desbloquea cuando el servidor confirma la transacción con
+// Payphone y el renglón queda en "approved" con el monto correcto.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    submission_id TEXT NOT NULL,
+    client_tx_id TEXT NOT NULL UNIQUE,
+    amount_cents INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'USD',
+    status TEXT NOT NULL DEFAULT 'created',
+    provider TEXT NOT NULL DEFAULT 'payphone',
+    payphone_id TEXT,
+    authorization_code TEXT,
+    card_brand TEXT,
+    status_code INTEGER,
+    created_at TEXT NOT NULL,
+    confirmed_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_payments_submission ON payments (submission_id);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payphone_approved ON payments (payphone_id) WHERE status = 'approved' AND payphone_id IS NOT NULL;
+`);
 // Pausa rápida del seguimiento desde el panel (/admin/seguimiento-sesion).
 db.exec(`
   CREATE TABLE IF NOT EXISTS session_nudge_pause (
