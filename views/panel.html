@@ -111,6 +111,7 @@
     <button class="navlink" data-nav="invitar">Invitar</button>
     <button class="navlink" data-nav="referidos">Referidos</button>
     <button class="navlink" data-nav="campana">Campañas con código</button>
+    <button class="navlink" data-nav="ventas">Ventas</button>
     <button class="navlink" data-nav="calendario">Calendario</button>
     <a href="/admin" class="exit" style="text-decoration:none;">Admin básico</a>
     <a href="/admin/logout" class="exit">Cerrar sesión</a>
@@ -125,7 +126,7 @@
       <div class="stat-card"><div class="stat-num" id="kpiTotal">—</div><div class="stat-label">Total de envíos</div></div>
       <div class="stat-card"><div class="stat-num" id="kpiConversion">—</div><div class="stat-label">Conversión a informe pagado</div></div>
       <div class="stat-card"><div class="stat-num" id="kpiReferral">—</div><div class="stat-label">Protocolo de derivación activado</div></div>
-      <div class="stat-card"><div class="stat-num" id="kpiRevenue">—</div><div class="stat-label">Ingresos aprox. (informes pagados)</div></div>
+      <div class="stat-card"><div class="stat-num" id="kpiRevenue">—</div><div class="stat-label">Ingresos reales (compras con Payphone)</div></div>
     </div>
 
     <div class="card">
@@ -223,6 +224,28 @@
           <tbody id="referralsBody"><tr><td colspan="5" style="text-align:center;color:#999;padding:30px;">Cargando…</td></tr></tbody>
         </table>
       </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ VENTAS ═══════════════════ -->
+  <section class="section" id="sec-ventas">
+    <p class="muted" id="ventasNote" style="margin:0 0 14px;">Compras reales = pagos aprobados y verificados con Payphone. Los códigos gratis y las marcas manuales del panel se cuentan aparte y nunca suman ingresos.</p>
+    <div class="stats" id="ventasCards" style="grid-template-columns:repeat(4,1fr);"></div>
+    <div class="card">
+      <h2 style="margin:0 0 4px;font-size:15px;">Embudo y costo por compra, por campaña (utm_campaign)</h2>
+      <p class="muted" style="margin:0 0 14px;">Escribe en "Gasto en anuncios" el total en dólares que llevas gastado en Meta en esa campaña y pulsa Guardar: el costo por compra se calcula con las compras reales. Todo el historial, sin filtro de fechas.</p>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Campaña</th><th>Tests</th><th>Resumen visto</th><th>Pago iniciado</th><th>Compras</th><th>Ingresos</th><th>Códigos</th><th>Gasto en anuncios (USD)</th><th>Costo por compra</th><th>Ingresos / gasto</th></tr></thead>
+        <tbody id="ventasCampaigns"><tr><td colspan="10" style="text-align:center;color:#999;padding:24px;">Cargando…</td></tr></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h2 style="margin:0 0 4px;font-size:15px;">Compras</h2>
+      <p class="muted" style="margin:0 0 14px;">Si devuelves el dinero a alguien, primero haz el reembolso en el panel de Payphone y luego pulsa "Registrar reembolso": deja de contar como venta y se desactivan su informe y su libro.</p>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Fecha</th><th>Persona</th><th>Origen</th><th>Monto</th><th>Transacción Payphone</th><th>Libro</th><th></th></tr></thead>
+        <tbody id="ventasList"><tr><td colspan="7" style="text-align:center;color:#999;padding:24px;">Cargando…</td></tr></tbody>
+      </table></div>
     </div>
   </section>
 
@@ -345,6 +368,16 @@
   const BAND_LABEL = { f:"Fortaleza", m:"Funcional", d:"Área de desarrollo" };
   const STATUS_LABEL = { pending:"Pendiente de pago", simulated:"Simulado (prueba)", paid:"Pagado", free:"Cortesía / código gratis" };
   const STATUS_COLOR = { pending:"#999", simulated:"#9C6B14", paid:"#3F6B4F", free:"#B5732A" };
+  // Etiqueta con el ORIGEN real del desbloqueo (ver services/sales.js): compra real de Payphone,
+  // código gratis o marca manual del panel (sin pago verificado).
+  function statusLabelFor(r) {
+    if (r.payment_status === "paid") {
+      if (r.sale_source === "payphone") return "Pagado · Payphone";
+      if (r.sale_source === "manual") return "Marca manual (sin pago verificado)";
+      if (r.sale_source === "legacy") return "Pagado (anterior al registro de pagos)";
+    }
+    return STATUS_LABEL[r.payment_status] || r.payment_status;
+  }
   const FOLLOWUP_LABEL = { nuevo:"Nuevo", contactado:"Contactado", sesion_agendada:"Sesión agendada", sesion_realizada:"Sesión realizada", cliente_mentoring:"Cliente de mentoría", sin_interes:"Sin interés" };
   const FOLLOWUP_COLOR = { nuevo:"#B5732A", contactado:"#6B6259", sesion_agendada:"#2E7D32", sesion_realizada:"#1565C0", cliente_mentoring:"#2A2A28", sin_interes:"#999" };
   // Estado real del correo de confirmación del Informe Extendido (con el PDF
@@ -377,8 +410,68 @@
         loadReferrals();
       }
       if (link.dataset.nav === "campana") { loadCampaign().then(() => campSyncSessions(true)); }
+      if (link.dataset.nav === "ventas") { loadVentas(); }
     });
   });
+
+  // ── Ventas (compras reales de Payphone, códigos y marcas manuales) ──
+  const SALE_SOURCE_LABEL = { payphone:"Payphone (real)", manual:"Marca manual", legacy:"Pagado (anterior)", refunded:"Reembolsado", simulated:"Simulado", code:"Código gratis" };
+  const SALE_SOURCE_COLOR = { payphone:"#3F6B4F", manual:"#9C6B14", legacy:"#6B6259", refunded:"#9C3B2E", simulated:"#999", code:"#B5732A" };
+  const usd = (cents) => "$" + (Number(cents || 0) / 100).toFixed(2);
+  async function loadVentas() {
+    try {
+      const res = await fetch("/admin/api/ventas");
+      if (!res.ok) throw new Error();
+      const d = await res.json();
+      const t = d.totals;
+      const totalSpend = d.campaigns.reduce((a, c) => a + (c.spendCents || 0), 0);
+      const card = (n, l) => `<div class="stat-card"><div class="stat-num">${n}</div><div class="stat-label">${esc(l)}</div></div>`;
+      document.getElementById("ventasCards").innerHTML =
+        card(t.payphone, "Compras reales (Payphone)") + card(usd(t.revenueCents), "Ingresos reales") +
+        card(t.checkoutStarted, "Personas que iniciaron el pago") + card(t.payphone && t.tests ? (t.payphone / t.tests * 100).toFixed(1) + "%" : "0%", "Tests que compraron") +
+        card(t.code, "Informes gratis con código") + card(t.manual + (t.legacy ? " (+" + t.legacy + " anteriores)" : ""), "Marcas manuales (no son compras)") +
+        card(t.refundedCount + (t.refundedCount ? " · " + usd(t.refundedCents) : ""), "Reembolsos registrados") +
+        card(t.payphone && totalSpend ? usd(totalSpend / t.payphone) : "—", "Costo por compra (gasto total / compras)");
+      document.getElementById("ventasCampaigns").innerHTML = d.campaigns.length ? d.campaigns.map(c => `<tr>
+        <td>${esc(c.campaign)}</td><td>${c.tests}</td><td>${c.summaryViewed}</td><td>${c.checkoutStarted}</td><td><strong>${c.purchases}</strong></td><td>${usd(c.revenueCents)}</td><td>${c.codes}</td>
+        <td style="white-space:nowrap;"><input type="number" min="0" step="0.01" value="${c.spendCents ? (c.spendCents / 100).toFixed(2) : ""}" placeholder="0.00" style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;" data-spend="${esc(c.campaign)}"> <button class="btn small" data-save-spend="${esc(c.campaign)}">Guardar</button></td>
+        <td>${c.costPerPurchaseCents !== null ? usd(c.costPerPurchaseCents) : "—"}</td><td>${c.roas !== null ? c.roas + "×" : "—"}</td></tr>`).join("")
+        : '<tr><td colspan="10" style="text-align:center;color:#999;padding:24px;">Todavía no hay datos.</td></tr>';
+      document.querySelectorAll("[data-save-spend]").forEach(btn => btn.addEventListener("click", async () => {
+        const key = btn.getAttribute("data-save-spend");
+        const input = Array.from(document.querySelectorAll("[data-spend]")).find(i => i.getAttribute("data-spend") === key);
+        btn.disabled = true;
+        try {
+          const r = await fetch("/admin/api/ventas/gasto", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ campaign: key, amountUsd: input.value === "" ? 0 : input.value }) });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error || "Error");
+          await loadVentas();
+        } catch (e) { alert("No se pudo guardar el gasto: " + e.message); btn.disabled = false; }
+      }));
+      document.getElementById("ventasList").innerHTML = d.sales.length ? d.sales.map(s => `<tr>
+        <td>${esc((s.date || "").slice(0, 10))}</td>
+        <td><strong>${esc(s.name)}</strong><br><span class="muted">${esc(s.email) || "—"}</span></td>
+        <td><span class="badge" style="background:${SALE_SOURCE_COLOR[s.source] || "#999"}">${esc(SALE_SOURCE_LABEL[s.source] || s.source)}</span></td>
+        <td>${s.amountCents !== null && s.amountCents !== undefined ? usd(s.amountCents) + " " + esc(s.currency || "") : "—"}</td>
+        <td>${esc(s.transactionId || "—")}${s.authorizationCode ? '<br><span class="muted">Aut. ' + esc(s.authorizationCode) + "</span>" : ""}</td>
+        <td>${s.source === "refunded" ? "—" : (s.bookDownloads ? "Descargado (" + s.bookDownloads + ")" : "No todavía")}</td>
+        <td>${s.source === "payphone" && s.paymentId ? `<button class="btn ghost small" data-refund="${s.paymentId}" data-refund-name="${esc(s.name)}">Registrar reembolso</button>` : (s.source === "refunded" ? '<span class="muted">' + esc((s.refundedAt || "").slice(0, 10)) + "</span>" : "")}</td></tr>`).join("")
+        : '<tr><td colspan="7" style="text-align:center;color:#999;padding:24px;">Todavía no hay compras.</td></tr>';
+      document.querySelectorAll("[data-refund]").forEach(btn => btn.addEventListener("click", async () => {
+        const who = btn.getAttribute("data-refund-name");
+        if (!confirm("¿Registrar el reembolso de " + who + "? Haz primero la devolución en el panel de Payphone. Su informe y su libro se desactivarán.")) return;
+        btn.disabled = true;
+        try {
+          const r = await fetch("/admin/api/ventas/reembolso/" + btn.getAttribute("data-refund"), { method:"POST" });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error || "Error");
+          await loadVentas(); loadKpis();
+        } catch (e) { alert("No se pudo registrar: " + e.message); btn.disabled = false; }
+      }));
+    } catch (e) {
+      document.getElementById("ventasNote").textContent = "No se pudieron cargar las ventas. Recarga la página e inicia sesión de nuevo si es necesario.";
+    }
+  }
 
   // ── Estado local de resultados ──
   let allResults = [];
@@ -635,9 +728,9 @@
       document.getElementById("campCards").innerHTML =
         card(s.tests, "Tests completados") + card(s.redeemed + " · " + campPct(s.redeemed, s.tests), "Canjes de " + d.code) +
         card(s.reportGenerated, "Informes generados") + card(s.emailSent, "Correos del informe enviados") +
-        card(s.sessions, "Sesiones marcadas") + card(s.paid, "Compras de $14") +
-        card(s.notConverted, "Sin canje ni pago") + card(s.fromMeta, "Llegaron de un anuncio de Meta");
-      const steps = [["Tests completados", s.tests], ["Resumen visto (con tarjeta)", s.summaryViewed || 0], ["Pulsó \"Desbloquear\"", s.unlockClicked || 0], ["Canjearon " + d.code, s.redeemed], ["Informe generado", s.reportGenerated], ["Correo enviado", s.emailSent], ["Sesión marcada", s.sessions]];
+        card(s.sessions, "Sesiones marcadas") + card(s.paid, "Compras reales (Payphone)") +
+        card(s.notConverted, "Sin canje ni pago") + card(s.fromMeta, "Llegaron de un anuncio de Meta") + card(s.manual || 0, "Marcas manuales (no son compras)");
+      const steps = [["Tests completados", s.tests], ["Resumen visto", s.summaryViewed || 0], ["Pulsó \"Desbloquear\"", s.unlockClicked || 0], ["Pago iniciado (Payphone)", s.checkoutStarted || 0], ["Compra real (Payphone)", s.paid || 0], ["Canjearon " + d.code, s.redeemed], ["Informe generado", s.reportGenerated], ["Correo enviado", s.emailSent], ["Sesión marcada", s.sessions]];
       const max = Math.max(1, s.tests);
       document.getElementById("campFunnel").innerHTML = steps.map(([l, n]) => `
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
@@ -736,7 +829,7 @@
         <td><strong>${esc(r.name)}</strong><br><span class="muted">${esc(r.email)||"—"}${r.phone?" · "+esc(r.phone):""}</span></td>
         <td>${r.lang==="en"?"Inglés":"Español"}</td>
         <td>${r.overall_average!==null?r.overall_average:"—"}</td>
-        <td><span class="badge" style="background:${STATUS_COLOR[r.payment_status]||'#999'}">${STATUS_LABEL[r.payment_status]||r.payment_status}</span></td>
+        <td><span class="badge" style="background:${STATUS_COLOR[r.payment_status]||'#999'}">${statusLabelFor(r)}</span></td>
         <td>${r.referral_triggered?'<span style="color:#9C3B2E;font-weight:600;">⚠ Sí</span>':'—'}</td>
         <td><span class="badge" style="background:${FOLLOWUP_COLOR[r.follow_up_status]||'#999'}">${FOLLOWUP_LABEL[r.follow_up_status]||r.follow_up_status}</span></td>
         <td>${esc((r.created_at||"").slice(0,10))}</td>
@@ -807,7 +900,7 @@
           <div class="s-name">${esc(r.name)}</div>
           <div class="s-meta">${esc((r.created_at||"").slice(0,10))} · Promedio ${r.overall_average!==null?r.overall_average:"—"}</div>
         </div>
-        <span class="badge" style="background:${STATUS_COLOR[r.payment_status]||'#999'}">${STATUS_LABEL[r.payment_status]||r.payment_status}</span>
+        <span class="badge" style="background:${STATUS_COLOR[r.payment_status]||'#999'}">${statusLabelFor(r)}</span>
       </div>`).join("") : '<p class="muted">Todavía no hay envíos.</p>';
     box.querySelectorAll("[data-id]").forEach(el=>el.addEventListener("click", ()=>openDetailModal(el.dataset.id)));
   }
@@ -866,7 +959,7 @@
       ${qual}
 
       <h2 style="margin-top:16px;">Pago y protocolo</h2>
-      <p style="font-size:13px;margin:0 0 6px;"><strong>Estado:</strong> <span class="badge" style="background:${STATUS_COLOR[r.payment_status]||'#999'}">${STATUS_LABEL[r.payment_status]||r.payment_status}</span></p>
+      <p style="font-size:13px;margin:0 0 6px;"><strong>Estado:</strong> <span class="badge" style="background:${STATUS_COLOR[r.payment_status]||'#999'}">${statusLabelFor(r)}</span></p>
       <p style="font-size:13px;margin:0 0 6px;"><strong>Protocolo de derivación:</strong> ${r.referral_triggered ? '<span style="color:#9C3B2E;font-weight:700;">Sí, activado</span>' : "No"}</p>
       <p style="font-size:13px;margin:0 0 10px;"><strong>Link de resultados:</strong> <button class="link-btn" id="d-copy-link">Copiar link</button></p>
       ${r.payment_status !== "pending" ? `<p style="font-size:13px;"><a href="/api/report/extended/${r.id}" target="_blank" class="link-btn" style="text-decoration:none;">Ver / descargar informe extendido (PDF)</a></p>` : `<button class="btn small" id="d-mark-paid">Marcar como pagado</button> <button class="btn small ghost" id="d-resend-summary">Reenviar link de resultados</button>`}

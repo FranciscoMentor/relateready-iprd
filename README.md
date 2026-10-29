@@ -154,3 +154,12 @@ documentos ya aprobados en `C:\Users\Francisco\Documents\Test IPRD`:
 Si corriges algo en esos documentos, el código de este proyecto (especialmente
 `data/items.js`, `data/reportContent.js` y `services/aiAnalysis.js`) debe
 actualizarse a mano para que coincidan.
+
+## Venta del Informe Extendido con Payphone (2026-10)
+
+- **Cobro**: `routes/api.js` (`/api/payment/prepare|confirm`) + `services/payments.js`. Cada intento queda en la tabla `payments`; el informe solo se desbloquea cuando el servidor confirma con Payphone (monto, moneda, id de transacción y dueño del pago). El precio sale de `EXTENDED_PRICE_CENTS` (Render; 1499 = $14.99).
+- **Sesión gratis**: ya no va con la compra. Solo se ofrece con promoción/plazo (`services/sessionDeadline.js`, campo `offered`) o con `SESSION_OFFER_ENABLED=true`.
+- **Libro de regalo**: PDFs en `private/books/` (no públicos), descarga con enlace firmado de 30 días (`services/bookDownload.js`, `GET /api/book/:id?t=...`, secreto `BOOK_LINK_SECRET` o `SESSION_SECRET`). Solo para informes pagados.
+- **Legales**: `public/legal/terms.html`, `privacy.html`, `refunds.html` (ES/EN).
+- **Panel**: pestaña "Ventas" de `/panel-control` (`routes/sales.js`, `services/sales.js`): compras reales de Payphone vs códigos vs marcas manuales, embudo y costo por compra por campaña (el gasto en Meta se captura a mano), y registro de reembolsos.
+- **Pixel de Meta**: `InitiateCheckout` al iniciar el pago y `Purchase` una sola vez por transacción (`event_id` = id de la transacción), solo después de la confirmación del servidor.

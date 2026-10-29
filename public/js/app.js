@@ -1001,8 +1001,10 @@
     // Botón de un clic: pide al servidor el canje con el código promocional
     // (el código no viaja al navegador). Misma pantalla final que el canje manual.
     const promoBtns = Array.from(document.querySelectorAll(".promo-unlock"));
+    // Embudo: "resumen visto" para toda persona que ve sus resultados bloqueados
+    // (con o sin promoción), una vez por sesión del navegador.
+    if (!state.paid) trackFunnelOnce("SummaryViewed", "summary_viewed");
     if (promoBtns.length) {
-      trackFunnelOnce("SummaryViewed", "summary_viewed");
       const setPromoBusy = (busy) => promoBtns.forEach((b) => { b.disabled = busy; b.textContent = busy ? t("promoWorking") : t("promoBtn"); });
       promoBtns.forEach((promoBtn) => promoBtn.addEventListener("click", async () => {
         if (promoBtn.disabled) return;
