@@ -29,7 +29,8 @@
 
 const db = require("../db/init");
 const { sendMail, GRAPH_MAIL_ENABLED } = require("./graphMail");
-const { speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail } = require("./emailTemplates");
+const { speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail, speedDatingPostponedEmail } = require("./emailTemplates");
+const { isValidAccessCode } = require("./accessCodes");
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // cada hora
 const FIRST_CHECK_DELAY_MS = 4 * 60 * 1000; // 4 min después de arrancar (reminderScheduler usa 2, speedDatingScheduler usa 3)
@@ -152,6 +153,65 @@ async function sendSameDayReminder(eventId) {
   return { ok: true };
 }
 
+// ── Aviso de aplazamiento del evento + regalo del Informe Extendido ─────
+// Botón del panel (routes/speedDatingAdmin.js). Manda a cada asistente
+// activo con correo que todavía no lo tenga marcado (postponed_sent_at), con
+// el código VIP de regalo. Se niega a enviar si el código no está en
+// FREE_ACCESS_CODES (Render), para no regalar un código que no funciona.
+const POSTPONE_GIFT_CODE = "FREE888";
+
+function postponementEmailFor(event, name) {
+  return speedDatingPostponedEmail({
+    name,
+    eventName: event.name,
+    eventDate: event.event_date,
+    isTomorrow: event.event_date ? daysUntil(event.event_date) === 1 : false,
+    giftCode: POSTPONE_GIFT_CODE,
+    testUrl: `${baseUrl()}/`,
+  });
+}
+
+function pendingPostponementAttendees(eventId) {
+  return db
+    .prepare(
+      `SELECT * FROM sd_attendees
+       WHERE event_id = ? AND cancelled_at IS NULL
+         AND email IS NOT NULL AND TRIM(email) <> ''
+         AND postponed_sent_at IS NULL`
+    )
+    .all(eventId);
+}
+
+async function sendPostponementNotice(eventId) {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(eventId);
+  if (!event) return { ok: false, reason: "event_not_found" };
+  if (!isValidAccessCode(POSTPONE_GIFT_CODE)) return { ok: false, reason: "gift_code_not_in_FREE_ACCESS_CODES" };
+
+  let sent = 0;
+  for (const attendee of pendingPostponementAttendees(event.id)) {
+    const { subject, html } = postponementEmailFor(event, attendee.name);
+    const result = await sendMail({ to: attendee.email, subject, html });
+    if (result.sent) {
+      db.prepare("UPDATE sd_attendees SET postponed_sent_at = ? WHERE id = ?").run(new Date().toISOString(), attendee.id);
+      sent += 1;
+      console.log(`[speedDatingReminderScheduler] aviso de aplazamiento enviado a ${attendee.email} (evento ${event.name}).`);
+    }
+  }
+  return { ok: true, sent };
+}
+
+// Prueba: manda UN correo de ejemplo a la dirección indicada, sin marcar a
+// nadie como enviado.
+async function sendPostponementTest(eventId, toEmail) {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(eventId);
+  if (!event) return { ok: false, reason: "event_not_found" };
+  const to = String(toEmail || "").trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return { ok: false, reason: "invalid_email" };
+  const { subject, html } = postponementEmailFor(event, "Francisco");
+  const result = await sendMail({ to, subject: `[PRUEBA] ${subject}`, html });
+  return { ok: !!result.sent };
+}
+
 async function runOnce() {
   const events = db
     .prepare(`SELECT * FROM sd_events WHERE status = 'registro' AND event_date IS NOT NULL`)
@@ -177,4 +237,4 @@ function start() {
   console.log("[speedDatingReminderScheduler] Activo — revisa cada hora si hay eventos a 3 o 1 día de distancia.");
 }
 
-module.exports = { start, runOnce, resendReminder1dCorrected, sendSameDayReminder };
+module.exports = { start, runOnce, resendReminder1dCorrected, sendSameDayReminder, sendPostponementNotice, sendPostponementTest, pendingPostponementAttendees };

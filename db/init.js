@@ -408,6 +408,14 @@ addSdAttendeesColumnIfMissing("reminder_1d_sent_at", "reminder_1d_sent_at TEXT")
 // doble clic por accidente.
 addSdAttendeesColumnIfMissing("reminder_sameday_sent_at", "reminder_sameday_sent_at TEXT");
 
+// ── Migración: aviso de aplazamiento del evento (2026-11) ────────────────
+// postponed_sent_at: cuándo (si ya se envió) el correo de "posponemos el
+// evento" con el regalo del Informe Extendido (ver speedDatingPostponedEmail
+// en services/emailTemplates.js y sendPostponementNotice en services/
+// speedDatingReminderScheduler.js). NULL = todavía no se le ha enviado;
+// evita duplicados si se pulsa el botón dos veces.
+addSdAttendeesColumnIfMissing("postponed_sent_at", "postponed_sent_at TEXT");
+
 // ── Migración: lista de espera cuando un evento se llena (2026-09) ───────
 // sd_waitlist: cuando alguien intenta registrarse a un evento que ya
 // alcanzó su aforo máximo (routes/speedDatingPublic.js, POST

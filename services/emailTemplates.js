@@ -30,7 +30,7 @@ const BOOKING_LINKS = {
   en: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/K4DmDOt-kUSplfAlddYmbw2",
 };
 
-function shell({ bodyHtml, lang, footerExtra }) {
+function shell({ bodyHtml, lang, footerExtra, afterHeaderHtml }) {
   const footer =
     (lang === "en" ? "RelateReady — a project by Adamantine Mentoring." : "RelateReady — un proyecto de Adamantine Mentoring.") +
     (footerExtra ? `<br>${footerExtra}` : "");
@@ -50,6 +50,7 @@ function shell({ bodyHtml, lang, footerExtra }) {
                 <img src="${LOGO_URL}" alt="RelateReady" height="28" style="display:block;height:28px;width:auto;border:0;" />
               </td>
             </tr>
+            ${afterHeaderHtml || ""}
             <tr>
               <td style="padding:28px;">
                 ${bodyHtml}
@@ -902,5 +903,52 @@ function sessionNudgeEmail({ name, lang, session, second }) {
   };
 }
 
-module.exports = { sessionNudgeEmail, sessionReminderEmail, extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail, speedDatingSurveyEmail, speedDatingSurveyReminderEmail, testInvitationEmail, testInvitationWhatsappText };
+// Aviso de aplazamiento del evento (speed dating / ENCUENTRO) con regalo del
+// Informe Extendido vía código VIP — lo envía el botón "Enviar aviso de
+// aplazamiento" del panel del evento (ver services/speedDatingReminderScheduler.js,
+// sendPostponementNotice). Lleva el logo de RelateReady (encabezado) y el de
+// Mila Rooftop (franja negra debajo, porque el logo es dorado sobre negro).
+// isTomorrow = true cuando el evento es al día siguiente ("mañana").
+function speedDatingPostponedEmail({ name, eventName, eventDate, isTomorrow, giftCode, testUrl }) {
+  const firstName = firstNameOf(name, "es");
+  const formattedDate = eventDate
+    ? new Date(`${eventDate}T00:00:00`).toLocaleDateString("es-EC", { weekday: "long", day: "numeric", month: "long" })
+    : null;
+  const whenPhrase = isTomorrow ? "mañana" + (formattedDate ? `, ${formattedDate}` : "") : formattedDate ? `el ${formattedDate}` : "próximamente";
+  const code = escapeHtml(giftCode);
+  const evName = escapeHtml(eventName || "ENCUENTRO");
+  const greeting = firstName ? `Hola ${escapeHtml(firstName)},` : "Hola,";
+  const milaBand = `<tr>
+              <td align="center" style="background:#000000;padding:16px 28px;">
+                <img src="${BASE_URL}/assets/mila-rooftop-logo.png" alt="Mila Rooftop" width="150" style="display:block;width:150px;max-width:100%;height:auto;border:0;margin:0 auto;" />
+              </td>
+            </tr>`;
+  const bodyHtml = `
+                <h1 style="font-size:24px;line-height:1.25;margin:0 0 18px;font-weight:normal;">Posponemos ENCUENTRO — y queremos compensarte</h1>
+                <p style="font-size:16px;margin:0 0 16px;">${greeting}</p>
+                <p style="font-size:15px;line-height:1.65;margin:0 0 16px;">Te pedimos disculpas: tenemos que <strong>posponer ${evName}</strong>, que estaba previsto para ${whenPhrase}.</p>
+                <p style="font-size:15px;line-height:1.65;margin:0 0 16px;">ENCUENTRO funciona solo cuando hay un balance parejo entre mujeres y hombres. Hasta hoy no hemos recibido suficientes inscripciones de mujeres, y con ese número no podemos ofrecerte una noche de verdadero encuentro. Preferimos posponer a darte una experiencia a medias.</p>
+                <p style="font-size:15px;line-height:1.65;margin:0 0 22px;">Gracias por inscribirte y por tu confianza. Te escribiremos apenas confirmemos la nueva fecha.</p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#F4EBDD;border-left:4px solid ${ACCENT};padding:18px 20px;border-radius:4px;">
+                  <p style="font-size:12px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;color:${ACCENT};margin:0 0 8px;">Un regalo de Mila Rooftop para ti</p>
+                  <p style="font-size:15px;line-height:1.6;margin:0 0 14px;">Como compensación, en nombre de Mila Rooftop te regalamos tu <strong>Informe Extendido del test RelateReady</strong>: el informe completo sobre tu estilo en las relaciones, en PDF.</p>
+                  <p style="font-size:14px;margin:0 0 6px;color:${MUTED};">Tu código de regalo</p>
+                  <p style="margin:0 0 16px;"><span style="display:inline-block;background:#ffffff;border:1px dashed ${ACCENT};border-radius:6px;padding:10px 20px;font-family:'Courier New',monospace;font-size:24px;letter-spacing:3px;font-weight:bold;">${code}</span></p>
+                  <ol style="font-size:14.5px;line-height:1.7;margin:0 0 18px;padding-left:20px;">
+                    <li>Haz el test (toma unos 10 minutos).</li>
+                    <li>Cuando veas tus resultados, toca «¿Tienes un código de acceso gratuito?».</li>
+                    <li>Escribe <strong>${code}</strong> y toca «Canjear código».</li>
+                    <li>Descarga tu informe completo — también te lo enviaremos a tu correo.</li>
+                  </ol>
+                  ${button(testUrl, "Hacer el test de RelateReady")}
+                </td></tr></table>
+                <p style="font-size:15px;line-height:1.65;margin:0 0 6px;">Gracias por tu comprensión. Nos vemos pronto.</p>
+                <p style="font-size:15px;line-height:1.65;margin:0;">Francisco Rosero<br><span style="color:${MUTED};font-size:13px;">RelateReady · Adamantine Mentoring, junto con Mila Rooftop</span></p>`;
+  return {
+    subject: "Posponemos ENCUENTRO — y un regalo de Mila Rooftop para ti",
+    html: shell({ lang: "es", bodyHtml, afterHeaderHtml: milaBand }),
+  };
+}
+
+module.exports = { speedDatingPostponedEmail, sessionNudgeEmail, sessionReminderEmail, extendedReportEmail, pendingReportReminderEmail, speedDatingMatchEmail, speedDatingWelcomeEmail, speedDatingWaitlistEmail, speedDatingReminder3dEmail, speedDatingReminder1dEmail, speedDatingSameDayReminderEmail, speedDatingSurveyEmail, speedDatingSurveyReminderEmail, testInvitationEmail, testInvitationWhatsappText };
 

@@ -462,6 +462,7 @@ router.get("/:eventId", (req, res) => {
 
   // Cuántas personas recibirían el recordatorio de la encuesta (ver tarjeta
   // "Recordatorio de encuesta" más abajo).
+  const postponePending = speedDatingReminderScheduler.pendingPostponementAttendees(event.id).length;
   const surveyReminderPending = event.status === "finalizado" ? speedDatingSurveyScheduler.pendingSurveyReminderAttendees(event.id).length : 0;
 
   const waitlist = db.prepare("SELECT * FROM sd_waitlist WHERE event_id = ? ORDER BY created_at ASC").all(event.id);
@@ -729,6 +730,18 @@ router.get("/:eventId", (req, res) => {
         <button type="submit" class="btn small" ${surveyReminderPending === 0 ? "disabled" : ""}>Enviar recordatorio de encuesta</button>
       </form>
     </div>` : ""}
+
+    <div class="card">
+      <h2 style="margin:0 0 6px;font-size:15px;">Aviso de aplazamiento del evento</h2>
+      <p class="muted" style="margin:0 0 12px;">Envía a los asistentes activos el correo "Posponemos ENCUENTRO" con el regalo del Informe Extendido (código FREE888, logos de RelateReady y Mila Rooftop). Cada persona lo recibe una sola vez. Personas que lo recibirían ahora: <strong>${postponePending}</strong>. Pulsa primero la prueba para verlo en tu correo.</p>
+      <form method="POST" action="/admin/encuentros/${event.id}/aviso-aplazamiento-prueba" style="margin:0 0 12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="email" name="to" value="franciscorosero@adamantinehealing.onmicrosoft.com" required style="flex:1;min-width:240px;padding:8px;border:1px solid #d9d0c1;border-radius:6px;">
+        <button type="submit" class="btn small ghost">Enviar prueba a este correo</button>
+      </form>
+      <form method="POST" action="/admin/encuentros/${event.id}/aviso-aplazamiento" onsubmit="return confirm('¿Enviar el aviso de aplazamiento a ${postponePending} persona(s)? Esta acción no se puede deshacer.');">
+        <button type="submit" class="btn small" ${postponePending === 0 ? "disabled" : ""}>Enviar aviso de aplazamiento a todos</button>
+      </form>
+    </div>
 
     <div class="card">
       <h2 style="margin:0 0 6px;font-size:15px;">Reenviar recordatorio de 1 día antes</h2>
@@ -1405,6 +1418,32 @@ router.post("/:eventId/reenviar-recordatorio-1d", async (req, res) => {
     await speedDatingReminderScheduler.resendReminder1dCorrected(req.params.eventId);
   } catch (err) {
     console.error("[speedDatingAdmin] Error reenviando recordatorio de 1 día corregido —", err.message);
+  }
+  res.redirect(backTo);
+});
+
+// POST /:eventId/aviso-aplazamiento-prueba — un correo de ejemplo del aviso
+// de aplazamiento a la dirección indicada (no marca a nadie como enviado).
+router.post("/:eventId/aviso-aplazamiento-prueba", express.urlencoded({ extended: true }), async (req, res) => {
+  const backTo = `/admin/encuentros/${req.params.eventId}`;
+  try {
+    const r = await speedDatingReminderScheduler.sendPostponementTest(req.params.eventId, (req.body || {}).to);
+    if (!r.ok) console.error("[speedDatingAdmin] Prueba del aviso de aplazamiento no enviada —", r.reason || "error de envío");
+  } catch (err) {
+    console.error("[speedDatingAdmin] Error enviando prueba del aviso de aplazamiento —", err.message);
+  }
+  res.redirect(backTo);
+});
+
+// POST /:eventId/aviso-aplazamiento — envía el aviso de aplazamiento (con el
+// regalo del Informe Extendido) a todos los asistentes activos pendientes.
+router.post("/:eventId/aviso-aplazamiento", async (req, res) => {
+  const backTo = `/admin/encuentros/${req.params.eventId}`;
+  try {
+    const r = await speedDatingReminderScheduler.sendPostponementNotice(req.params.eventId);
+    if (!r.ok) console.error("[speedDatingAdmin] Aviso de aplazamiento no enviado —", r.reason);
+  } catch (err) {
+    console.error("[speedDatingAdmin] Error enviando el aviso de aplazamiento —", err.message);
   }
   res.redirect(backTo);
 });
