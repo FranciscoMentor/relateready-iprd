@@ -93,14 +93,10 @@ function firstNameOf(name, lang) {
 
 // Se envía la primera vez que alguien genera su Informe Extendido (pago ya
 // confirmado) — ver routes/api.js, GET /api/report/extended/:id.
-function extendedReportEmail({ name, lang, resultsUrl, session, bookUrl, receipt }) {
+function extendedReportEmail({ name, lang, resultsUrl, session }) {
   const bookingUrl = BOOKING_LINKS[lang] || BOOKING_LINKS.es;
   const firstName = firstNameOf(name, lang);
   const c = copyFor(lang);
-  // La sesión gratuita solo se menciona si se le ofrece a la persona (promoción o
-  // SESSION_OFFER_ENABLED, ver services/sessionDeadline.js). Sin objeto `session`
-  // se conserva el comportamiento anterior.
-  const offered = !session || session.offered !== false;
   const expired = !!(session && session.expired);
   const deadline = deadlineLine(lang, session);
 
@@ -108,32 +104,7 @@ function extendedReportEmail({ name, lang, resultsUrl, session, bookUrl, receipt
   const bullets = c.bullets
     .map(([lead, rest]) => `<li style="margin:0 0 8px;"><strong>${lead}</strong>${rest}</li>`)
     .join("");
-  // Recibo de la compra (solo pagos reales de Payphone) y regalo del libro (quien compró).
-  const en = lang === "en";
-  const T2 = (es, enT) => (en ? enT : es);
-  const rcell = (label, value) => `<tr><td style="padding:4px 14px 4px 0;color:${MUTED};font-size:14px;">${label}</td><td style="padding:4px 0;font-size:14px;">${escapeHtml(value)}</td></tr>`;
-  const receiptBlock = receipt
-    ? `
-          <p style="font-size:15px;line-height:1.6;margin:0 0 6px;"><strong>${T2("Tu recibo", "Your receipt")}</strong></p>
-          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">
-            ${rcell(T2("Producto", "Product"), T2("Informe Extendido RelateReady", "RelateReady Extended Report"))}
-            ${rcell(T2("Monto", "Amount"), receipt.amountText)}
-            ${rcell(T2("Fecha", "Date"), receipt.dateText)}
-            ${receipt.transactionId ? rcell(T2("Transacción Payphone", "Payphone transaction"), receipt.transactionId) : ""}
-            ${receipt.authorizationCode ? rcell(T2("Autorización", "Authorization"), receipt.authorizationCode) : ""}
-          </table>
-          <p style="font-size:13px;line-height:1.5;margin:-8px 0 18px;color:${MUTED};">${T2("En tu estado de cuenta el cobro puede aparecer como «CONSUMO PAY-CUENCA» o similar: es Payphone, nuestra pasarela de pago.", "On your card statement the charge may appear as “CONSUMO PAY-CUENCA” or similar: that's Payphone, our payment processor.")}</p>`
-    : "";
-  const giftBlock = bookUrl
-    ? `
-          <p style="font-size:15px;line-height:1.6;margin:0 0 12px;"><strong>${T2("Tu regalo: el libro digital \"Tú Primero\"", "Your gift: the digital book \"You First\"")}</strong> ${T2("— una guía para seguir trabajando tus 8 pilares después de leer tu informe.", "— a guide to keep working on your 8 pillars after you read your report.")}</p>
-          <p style="margin:0 0 8px;">${button(bookUrl, T2("Descargar el libro", "Download the book"))}</p>
-          <p style="font-size:13px;line-height:1.5;margin:0 0 18px;color:${MUTED};">${T2("Este enlace es válido por 30 días. Después puedes descargarlo cuando quieras desde tu pantalla de resultados (enlace al final de este correo).", "This link is valid for 30 days. After that you can download it anytime from your results screen (link at the bottom of this email).")}</p>`
-    : "";
-  const sessionBlock = !offered
-    ? `
-          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">${lang === "en" ? "If you need any help or have a question about your report, just reply to this email." : "Si necesitas ayuda o tienes alguna pregunta sobre tu informe, responde a este correo."}</p>`
-    : `
+  const sessionBlock = `
           <p style="font-size:15px;line-height:1.6;margin:0 0 12px;">${c.intro}</p>
           <ul style="font-size:15px;line-height:1.5;margin:0 0 16px;padding-left:22px;">${bullets}</ul>
           <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">${c.closing}</p>
@@ -142,24 +113,24 @@ function extendedReportEmail({ name, lang, resultsUrl, session, bookUrl, receipt
 
   if (lang === "en") {
     return {
-      subject: expired || !offered ? c.emailSubjectExpired : c.emailSubject,
+      subject: expired ? c.emailSubjectExpired : c.emailSubject,
       html: shell({
         lang,
         bodyHtml: `
           <p style="font-size:16px;margin:0 0 16px;">Hi ${firstName},</p>
-          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thank you for getting your RelateReady Extended Report. You'll find it attached to this email as a PDF, and you can also view it online anytime through the link below.</p>${receiptBlock}${giftBlock}${sessionBlock}
+          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thank you for getting your RelateReady Extended Report. You'll find it attached to this email as a PDF, and you can also view it online anytime through the link below.</p>${sessionBlock}
           <p style="margin:20px 0 0;"><a href="${resultsUrl}" style="color:${ACCENT};font-size:14px;">View your results online</a></p>
         `,
       }),
     };
   }
   return {
-    subject: expired || !offered ? c.emailSubjectExpired : c.emailSubject,
+    subject: expired ? c.emailSubjectExpired : c.emailSubject,
     html: shell({
       lang,
       bodyHtml: `
         <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
-        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Gracias por adquirir tu Informe Extendido de RelateReady. Lo encontrarás adjunto a este correo en PDF y también podrás consultarlo en línea cuando quieras, a través del enlace que aparece abajo.</p>${receiptBlock}${giftBlock}${sessionBlock}
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Gracias por adquirir tu Informe Extendido de RelateReady. Lo encontrarás adjunto a este correo en PDF y también podrás consultarlo en línea cuando quieras, a través del enlace que aparece abajo.</p>${sessionBlock}
         <p style="margin:20px 0 0;"><a href="${resultsUrl}" style="color:${ACCENT};font-size:14px;">Ver tus resultados en línea</a></p>
       `,
     }),
@@ -202,7 +173,7 @@ function pendingReportReminderEmail({ name, lang, resultsUrl, promoUntil }) {
         bodyHtml: `
           <p style="font-size:16px;margin:0 0 16px;">Hi ${firstName},</p>
           <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">A little while ago you completed the RelateReady relationship-readiness test — your 8-pillar summary is ready and waiting for you.</p>
-          <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Whenever you're ready, your Extended Report goes deeper into each pillar, with a personalized action plan and our digital book \"You First\" as a gift.</p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Whenever you're ready, your Extended Report goes deeper into each pillar, with a personalized action plan and a free 60-minute mentoring session included.</p>
           <p style="margin:0;">${button(resultsUrl, "View my results")}</p>
         `,
       }),
@@ -229,7 +200,7 @@ function pendingReportReminderEmail({ name, lang, resultsUrl, promoUntil }) {
       bodyHtml: `
         <p style="font-size:16px;margin:0 0 16px;">Hola ${firstName},</p>
         <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Hace un tiempo completaste el test de RelateReady — tu resumen de los 8 pilares ya está listo y te espera.</p>
-        <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Cuando quieras, tu Informe Extendido profundiza en cada pilar, con un plan de acción personalizado y nuestro libro digital \"Tú Primero\" de regalo.</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Cuando quieras, tu Informe Extendido profundiza en cada pilar, con un plan de acción personalizado y una sesión de mentoría gratuita de 60 minutos incluida.</p>
         <p style="margin:0;">${button(resultsUrl, "Ver mis resultados")}</p>
       `,
     }),

@@ -27,20 +27,16 @@
   const I18N = {
     es: {
       slogan: "<em>Listos por dentro. Listos en pareja:</em><br>la preparación empieza contigo, no con la otra persona.",
-      payCards: "Aceptamos tarjetas de débito y crédito Visa y Mastercard de cualquier país (Diners y Discover, solo emitidas en Ecuador). En tu estado de cuenta el cobro puede aparecer como «CONSUMO PAY-CUENCA» o similar: es Payphone, nuestra pasarela de pago.",
-      legalTerms: "Términos",
-      legalPrivacy: "Privacidad",
-      payTerms: 'Al pagar aceptas los <a href="{terms}" target="_blank" rel="noopener">Términos y condiciones</a> y la <a href="{privacy}" target="_blank" rel="noopener">Política de privacidad</a>.',
       footerBefore: "Desarrollado por",
       footerAfter: "Índice de Desarrollo y Fortalecimiento Relacional",
       intakeTitle: "Antes de empezar",
       intakeIntro1: "RelateReady es una herramienta de autoconocimiento que te ayuda a descubrir qué está favoreciendo y qué puede estar limitando tu capacidad para construir una relación de pareja sana, sólida y duradera. A través de la evaluación de tus 8 pilares relacionales, obtienes una visión clara y objetiva de tus fortalezas, tus áreas de oportunidad, y los aspectos que puedes trabajar para relacionarte mejor contigo mismo y con tu pareja.",
       intakeIntro2: "Y no importa en qué momento de tu vida estés: puede ayudarte a fortalecer la relación que ya tienes, a prepararte para iniciar una nueva, o a avanzar después de una ruptura.",
-      intakeIntro3: "Al completar el test, recibes un resumen de tus resultados sin costo. Y si quieres profundizar en tu proceso, puedes acceder a tu Informe Extendido, que incluye un análisis detallado, y un plan de acción personalizado para ayudarte a transformar tus resultados en cambios reales.",
+      intakeIntro3: "Al completar el test, recibes un resumen de tus resultados sin costo. Y si quieres profundizar en tu proceso, puedes acceder a tu Informe Extendido, que incluye un análisis detallado, un plan de acción personalizado, y una sesión de mentoría gratuita para ayudarte a transformar tus resultados en cambios reales.",
       durationChip: "10 a 15 minutos",
       privacyChip: "Tus datos, protegidos",
       calloutStrong: "Para iniciar tu proceso",
-      calloutRest: " necesitamos tu nombre, correo, teléfono y dónde vives (ciudad y país; si estás en Estados Unidos, también tu estado). Los usamos únicamente para enviarte tu informe y comunicarnos contigo sobre tus resultados — nunca para spam.",
+      calloutRest: " necesitamos tu nombre, correo, teléfono y dónde vives (ciudad y país; si estás en Estados Unidos, también tu estado). Los usamos únicamente para enviarte tu informe y coordinar tu sesión de mentoring gratuita — nunca para spam.",
       nameLabel: "Tu nombre",
       emailLabel: "Tu correo",
       phoneLabel: "Tu teléfono",
@@ -76,12 +72,6 @@
       extendedTitle: "¿Quieres el detalle completo?",
       extendedIntro: "El Informe Extendido incluye tus 8 dimensiones completas, recomendaciones concretas, 5 secciones escritas especialmente para ti por IA, y tu plan de acción a 3 semanas.",
       freeSessionNote: "Además, al adquirir tu Informe Extendido recibes una sesión de mentoring gratuita de 60 minutos para revisarlo con un mentor profesional: así no lo interpretas por tu cuenta.",
-      bookGiftNote: "Además, al adquirir tu Informe Extendido recibes de regalo el libro digital \"Tú Primero\", para seguir trabajando tus 8 pilares.",
-      bookDownloadTitle: "Tu regalo: el libro \"Tú Primero\"",
-      bookDownloadText: "Una guía para seguir trabajando tus 8 pilares después de leer tu informe. También te lo enviamos por correo.",
-      bookDownloadBtn: "Descargar el libro (PDF)",
-      bookGiftLabel: "De regalo contigo",
-      bookGiftCopy: 'Tu Informe Extendido incluye <strong>"Tú Primero"</strong>: <strong>el libro digital</strong> diseñado para profundizar en tus 8 pilares y acompañarte semanas después de leer tu informe. Lo descargas en cuanto se confirma tu compra.',
       bookTeaserLabel: "Además, recibes",
       bookTeaserCopy: 'Tu Informe Extendido es solo el primer paso. El siguiente es tu <strong>sesión de mentoría indagatoria gratuita de 60 minutos</strong> con uno de los mentores de nuestro equipo — y ahí, exclusivamente ahí, recibirás <strong>"Tú Primero"</strong>: <strong>el libro digital gratuito</strong> diseñado para profundizar en tus 8 pilares y acompañarte semanas después de esa conversación. No está a la venta ni disponible por ningún otro medio: es una guía reservada para quienes completan el proceso, informe y sesión de mentoría.',
       scheduleSessionTitle: "Tu sesión de mentoring para revisar tu informe",
@@ -94,12 +84,7 @@
       payBtnLabel: "Desbloquear Informe Extendido",
       payBtnRealLabel: "Pagar Informe Extendido",
       simulatedTag: "simulado",
-      payHint: "Se abrirá una pestaña nueva para completar el pago de forma segura con Payphone. No la cierres hasta que te traiga de vuelta aquí: así se confirma tu pago.",
-      iabTitle: "Para pagar de forma segura, abre esta página en Safari o Chrome",
-      iabBody: "El pago no funciona bien dentro de Instagram o Facebook. Toca los tres puntos (⋯) y elige «Abrir en el navegador», o copia el enlace y pégalo en tu navegador. Tus resultados te esperan ahí.",
-      iabCopy: "Copiar enlace",
-      iabCopied: "Enlace copiado",
-      iabContinue: "Continuar aquí de todos modos",
+      payHint: "Se abrirá una pestaña nueva para completar el pago de forma segura con Payphone. Cuando termines, vuelve a esta pestaña.",
       verifyBtn: "Ya pagué — verificar",
       verifying: "Verificando...",
       paymentNotConfirmed: "Todavía no detectamos tu pago. Si ya completaste el pago hace unos segundos, espera un momento y vuelve a intentar.",
@@ -131,20 +116,16 @@
     },
     en: {
       slogan: "<em>Ready Within. Ready Together —</em><br>readiness starts with you, not the other person.",
-      payCards: "We accept Visa and Mastercard debit and credit cards from any country (Diners and Discover only if issued in Ecuador). On your statement the charge may appear as “CONSUMO PAY-CUENCA” or similar: that's Payphone, our payment processor.",
-      legalTerms: "Terms",
-      legalPrivacy: "Privacy",
-      payTerms: 'By paying you accept the <a href="{terms}" target="_blank" rel="noopener">Terms and conditions</a> and the <a href="{privacy}" target="_blank" rel="noopener">Privacy policy</a>.',
       footerBefore: "Developed by",
       footerAfter: "Relationship Development and Strengthening Index",
       intakeTitle: "Before you start",
       intakeIntro1: "RelateReady is a self-knowledge tool that helps you discover what's supporting — and what may be limiting — your ability to build a healthy, solid, lasting relationship. Through the evaluation of your 8 relational pillars, you get a clear, objective view of your strengths, your areas of opportunity, and the aspects you can work on to relate better with yourself and with your partner.",
       intakeIntro2: "And no matter what point you're at in your life, it can help you: strengthen the relationship you already have, prepare to start a new one, or move forward after a breakup.",
-      intakeIntro3: "When you complete the test, you get a summary of your results at no cost. And if you want to go deeper, you can access your Extended Report, which includes a detailed analysis and a personalized action plan to help you turn your results into real change.",
+      intakeIntro3: "When you complete the test, you get a summary of your results at no cost. And if you want to go deeper, you can access your Extended Report, which includes a detailed analysis, a personalized action plan, and a free mentoring session to help you turn your results into real change.",
       durationChip: "10 to 15 minutes",
       privacyChip: "Your data, protected",
       calloutStrong: "To start your process",
-      calloutRest: " we need your name, email, phone, and where you live (city and country; if you are in the United States, your state too). We only use this to send you your report and to contact you about your results — never for spam.",
+      calloutRest: " we need your name, email, phone, and where you live (city and country; if you are in the United States, your state too). We only use this to send you your report and coordinate your free mentoring session — never for spam.",
       nameLabel: "Your name",
       emailLabel: "Your email",
       phoneLabel: "Your phone",
@@ -180,12 +161,6 @@
       extendedTitle: "Want the full detail?",
       extendedIntro: "The Extended Report includes all 8 full dimensions, concrete recommendations, 5 sections written specifically for you by AI, and your 3-week action plan.",
       freeSessionNote: "Plus, getting your Extended Report includes a free 60-minute mentoring session to review it with a professional mentor, so you don't have to interpret it on your own.",
-      bookGiftNote: "Plus, getting your Extended Report includes the digital book \"You First\" as a gift, to keep working on your 8 pillars.",
-      bookDownloadTitle: "Your gift: the book \"You First\"",
-      bookDownloadText: "A guide to keep working on your 8 pillars after you read your report. We also sent it to your email.",
-      bookDownloadBtn: "Download the book (PDF)",
-      bookGiftLabel: "A gift with your purchase",
-      bookGiftCopy: 'Your Extended Report includes <strong>"You First"</strong>: <strong>the digital book</strong> designed to deepen your work on the 8 pillars and stay with you for weeks after you read your report. You download it as soon as your purchase is confirmed.',
       bookTeaserLabel: "Plus, you get",
       bookTeaserCopy: 'Your Extended Report is only the first step. The next one is your <strong>free 60-minute discovery mentoring session</strong> with one of our team mentors — and that\'s the exclusive moment you\'ll receive <strong>"You First"</strong>: <strong>the free digital book</strong> designed to deepen your work on the 8 pillars and stay with you long after that conversation ends. It isn\'t for sale anywhere else: it\'s reserved for those who complete the process — report and mentoring session.',
       scheduleSessionTitle: "Your mentoring session to review your report",
@@ -198,12 +173,7 @@
       payBtnLabel: "Unlock Extended Report",
       payBtnRealLabel: "Pay for Extended Report",
       simulatedTag: "simulated",
-      payHint: "A new tab will open to complete your payment securely with Payphone. Don't close it until it brings you back here: that's how your payment is confirmed.",
-      iabTitle: "To pay securely, open this page in Safari or Chrome",
-      iabBody: "Payment doesn't work well inside Instagram or Facebook. Tap the three dots (⋯) and choose “Open in browser”, or copy the link and paste it into your browser. Your results are waiting there.",
-      iabCopy: "Copy link",
-      iabCopied: "Link copied",
-      iabContinue: "Continue here anyway",
+      payHint: "A new tab will open to complete your payment securely with Payphone. When you're done, come back to this tab.",
       verifyBtn: "I already paid — verify",
       verifying: "Verifying...",
       paymentNotConfirmed: "We haven't detected your payment yet. If you just completed it, wait a moment and try again.",
@@ -236,40 +206,30 @@
   };
 
   // Eventos del píxel de Meta (si el píxel no carga, no pasa nada).
-  function trackPixel(kind, name, data, options) {
-    try {
-      if (typeof fbq !== "function") return;
-      if (options) fbq(kind, name, data || {}, options);
-      else fbq(kind, name, data || {});
-    } catch (e) {}
+  function trackPixel(kind, name, data) {
+    try { if (typeof fbq === "function") fbq(kind, name, data || {}); } catch (e) {}
   }
-  // Compra del Informe Extendido: solo con un pago de Payphone confirmado por el
-  // servidor (valor real y moneda salen de ahí), una sola vez por transacción
-  // (el id de la transacción es el event_id, así Meta también evita duplicados).
-  function trackPurchaseOnce(purchase) {
-    if (!purchase || !purchase.eventId) return;
+  // Compra del Informe Extendido (solo pagos reales, una vez por envío).
+  function trackPurchaseOnce(sid) {
     try {
-      const key = "rr_purchase_" + purchase.eventId;
-      if (localStorage.getItem(key)) return;
-      localStorage.setItem(key, "1");
+      const key = "rr_purchase_" + sid;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
     } catch (e) {}
-    trackPixel("track", "Purchase", { value: Number(purchase.value), currency: purchase.currency || "USD" }, { eventID: purchase.eventId });
+    trackPixel("track", "Purchase", { value: 14, currency: "USD" });
   }
 
   // Enlaces de agendamiento para la sesión de mentoría gratuita de 60 min
   // incluida con el Informe Extendido (uno por idioma). Si Francisco necesita
   // cambiarlos en el futuro, basta con actualizar estas dos URLs.
-  // Navegador interno de Instagram / Facebook: Payphone no admite webviews.
-  const IN_APP_BROWSER = /Instagram|FBAN|FBAV|FB_IAB|FBIOS|FB4A|FBSS/i.test(navigator.userAgent);
-
   const BOOKING_LINKS = {
     es: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/eMJ5GQhw_0W_-z2cJN-S9g2",
     en: "https://outlook.office.com/owa/calendar/FranciscoRoseroMentor@ADAMANTINEHEALING.onmicrosoft.com/bookings/s/K4DmDOt-kUSplfAlddYmbw2",
   };
 
-  // Portada del libro digital "Tu Primero"/"You First": regalo de quien compra el
-  // Informe Extendido (descarga con enlace firmado, ver services/bookDownload.js);
-  // con promoción se entrega en la sesión gratuita. Ver bookGift*/bookTeaser* arriba.
+  // Portada del libro digital gratuito "Tu Primero"/"You First" — se entrega
+  // exclusivamente durante la sesión de mentoría gratuita (no es parte de la
+  // compra del Informe Extendido). Ver bookTeaserLabel/bookTeaserCopy arriba.
   const BOOK_COVERS = {
     es: "/assets/tu-primero-cover-es.jpg",
     en: "/assets/you-first-cover-en.jpg",
@@ -319,7 +279,6 @@
     promoLoaded: false,
     session: null,      // { until, expired } desde /api/submission/:id/session (plazo de la sesión gratuita)
     sessionLoaded: false,
-    bookUrl: null,      // enlace firmado al libro de regalo (solo quien compró), desde /api/submission/:id/status
   };
 
   const app = document.getElementById("app");
@@ -345,11 +304,6 @@
       const res = await fetch(`/api/submission/${state.submissionId}/session`);
       if (res.ok) state.session = await res.json();
     } catch (e) { /* sin plazo */ }
-    // Enlace firmado al libro de regalo (solo quien compró lo recibe del servidor).
-    try {
-      const st = await fetch(`/api/submission/${state.submissionId}/status`, { cache: "no-store" });
-      if (st.ok) { const d = await st.json(); state.bookUrl = d.bookUrl || null; }
-    } catch (e) { /* sin libro: el correo trae el enlace */ }
     state.sessionLoaded = true;
   }
 
@@ -374,17 +328,6 @@
     document.querySelector('[data-i18n="footerBefore"]').textContent = t("footerBefore");
     document.querySelector('[data-i18n="footerAfter"]').textContent = t("footerAfter");
     document.querySelector('[data-i18n="slogan"]').innerHTML = t("slogan");
-    // Enlaces legales del pie: se abren en pestaña nueva para no perder el avance del test.
-    const nav = document.getElementById("legal-links");
-    if (nav) {
-      nav.innerHTML = [["terms", "legalTerms"], ["privacy", "legalPrivacy"]]
-        .map(([k, key]) => `<a href="${legalUrl(k)}" target="_blank" rel="noopener">${t(key)}</a>`)
-        .join(" · ");
-    }
-  }
-  function legalUrl(kind) { return `/legal/${kind}.html?lang=${state.lang === "en" ? "en" : "es"}`; }
-  function payTermsHtml() {
-    return t("payTerms").replace("{terms}", legalUrl("terms")).replace("{privacy}", legalUrl("privacy"));
   }
   document.getElementById("btn-es").addEventListener("click", () => setLang("es"));
   document.getElementById("btn-en").addEventListener("click", () => setLang("en"));
@@ -886,21 +829,8 @@
     // Beneficios, qué es y qué no es, y el plazo (si tiene). Si el plazo ya
     // venció, en vez del botón sale el aviso para responder el correo del informe.
     const sess = state.session || {};
-    // La sesión gratuita solo se muestra a quien se le ofrece (promoción / plazo de
-    // campaña, o SESSION_OFFER_ENABLED). El servidor lo decide: sess.offered.
-    const sessionOfferedToUser = !!sess.offered;
-    // Antes de comprar: el aviso de la sesión solo con promoción vigente o con el
-    // interruptor encendido; si no, se anuncia el libro de regalo.
-    const sessionPitch = showPromo || !!state.meta.sessionOfferEnabled;
     const sessDate = humanDate(sess.until);
     const sessNote = sessDate ? (sess.expired ? t("sessionExpired") : t("sessionDeadline")).replace("{d}", sessDate) : "";
-    const bookDownloadHtml = state.bookUrl
-      ? `<div class="session-block book-download">
-           <h2>${t("bookDownloadTitle")}</h2>
-           <p>${t("bookDownloadText")}</p>
-           <a class="primary" style="text-decoration:none;display:inline-block" href="${state.bookUrl}" onclick="try{fbq('trackCustom','BookDownload')}catch(e){}">${t("bookDownloadBtn")}</a>
-         </div>`
-      : "";
     const sessionBlockHtml = `
       <div class="session-block">
         <h2>${t("scheduleSessionTitle")}</h2>
@@ -937,13 +867,10 @@
 
     const payAreaHtml = state.paid
       ? `<a class="primary" style="text-decoration:none;display:inline-block" href="/api/report/extended/${state.submissionId}" target="_blank">${t("downloadExtended")}</a>
-         ${bookDownloadHtml}
-        ${sessionOfferedToUser ? sessionBlockHtml : ""}`
+         ${sessionBlockHtml}`
       : state.meta.payphoneEnabled
       ? `<button class="${payBtnClass}" id="btn-pay">${t("payBtnRealLabel")} — $${priceStr}</button>
          <p class="hint">${t("payHint")}</p>
-         <p class="hint">${t("payCards")}</p>
-         <p class="hint legal-hint">${payTermsHtml()}</p>
          <button class="secondary" id="btn-verify">${t("verifyBtn")}</button>
          <p class="error" id="pay-msg" style="display:none"></p>
          ${codeBlockHtml}`
@@ -981,7 +908,7 @@
         <img src="/assets/hero-home.jpg" alt="RelateReady" class="hero-image" />
         <h2>${t("extendedTitle")}</h2>
         <p>${t("extendedIntro")}</p>
-        ${!state.paid ? `<p class="bonus-note">${t(sessionPitch ? "freeSessionNote" : "bookGiftNote")}</p>` : ""}
+        ${!state.paid ? `<p class="bonus-note">${t("freeSessionNote")}</p>` : ""}
         <div id="pay-area">${promoPayAreaHtml}</div>
       </div>
       ${state.paid ? referralBlockHtml : ""}
@@ -990,8 +917,8 @@
           ? `<div class="card book-teaser">
         <img src="${BOOK_COVERS[state.lang] || BOOK_COVERS.es}" alt="" class="book-teaser-cover" />
         <div class="book-teaser-text">
-          <p class="book-teaser-label">${t(sessionPitch ? "bookTeaserLabel" : "bookGiftLabel")}</p>
-          <p>${t(sessionPitch ? "bookTeaserCopy" : "bookGiftCopy")}</p>
+          <p class="book-teaser-label">${t("bookTeaserLabel")}</p>
+          <p>${t("bookTeaserCopy")}</p>
         </div>
       </div>`
           : ""
@@ -1002,10 +929,8 @@
     // Botón de un clic: pide al servidor el canje con el código promocional
     // (el código no viaja al navegador). Misma pantalla final que el canje manual.
     const promoBtns = Array.from(document.querySelectorAll(".promo-unlock"));
-    // Embudo: "resumen visto" para toda persona que ve sus resultados bloqueados
-    // (con o sin promoción), una vez por sesión del navegador.
-    if (!state.paid) trackFunnelOnce("SummaryViewed", "summary_viewed");
     if (promoBtns.length) {
+      trackFunnelOnce("SummaryViewed", "summary_viewed");
       const setPromoBusy = (busy) => promoBtns.forEach((b) => { b.disabled = busy; b.textContent = busy ? t("promoWorking") : t("promoBtn"); });
       promoBtns.forEach((promoBtn) => promoBtn.addEventListener("click", async () => {
         if (promoBtn.disabled) return;
@@ -1048,29 +973,9 @@
         const btn = e.target;
         const msg = document.getElementById("pay-msg");
         msg.style.display = "none";
-        if (IN_APP_BROWSER && !state.iabContinue) {
-          // Payphone no admite webviews: se pide abrir el enlace en el navegador.
-          if (!document.getElementById("iab-pay")) {
-            const box = document.createElement("div");
-            box.id = "iab-pay";
-            box.className = "card";
-            box.style.marginTop = "12px";
-            box.innerHTML = `<h3 style="margin:0 0 8px">${t("iabTitle")}</h3><p>${t("iabBody")}</p>
-              <button type="button" class="primary" id="iab-copy">${t("iabCopy")}</button>
-              <button type="button" class="secondary" id="iab-go" style="margin-left:8px">${t("iabContinue")}</button>`;
-            btn.parentNode.insertBefore(box, btn.nextSibling);
-            document.getElementById("iab-copy").addEventListener("click", async (ev) => {
-              const link = `${location.origin}/?sid=${state.submissionId}`;
-              try { await navigator.clipboard.writeText(link); ev.target.textContent = t("iabCopied"); }
-              catch (err) { window.prompt(link, link); }
-            });
-            document.getElementById("iab-go").addEventListener("click", () => { state.iabContinue = true; btn.click(); });
-          }
-          return;
-        }
         btn.disabled = true;
         btn.textContent = t("paying");
-        trackPixel("track", "InitiateCheckout", { value: Number(priceStr), currency: "USD" });
+        trackPixel("track", "InitiateCheckout", { value: 14, currency: "USD" });
         try {
           const res = await fetch(`/api/payment/prepare/${state.submissionId}`, { method: "POST" });
           const data = await res.json();
@@ -1095,7 +1000,7 @@
           const res = await fetch(`/api/submission/${state.submissionId}/status`);
           const data = await res.json();
           if (data.paymentStatus === "paid" || data.paymentStatus === "simulated" || data.paymentStatus === "free") {
-            trackPurchaseOnce(data.purchase);
+            if (data.paymentStatus === "paid") trackPurchaseOnce(state.submissionId);
             state.paid = true;
             renderResults();
             return;
@@ -1173,11 +1078,6 @@
   // Al volver de la pestaña de pago de Payphone, la URL trae ?sid=<envío>
   // (y, si el pago se completó, también ?id=...&clientTransactionId=... que
   // añade Payphone). Reconstruye el estado a partir de esos parámetros.
-  function showConfirming() {
-    const lang = /^es/i.test(navigator.language || "") ? "es" : "en";
-    app.innerHTML = `<div class="card"><p style="font-size:16px;text-align:center;margin:20px 0;">${lang === "en" ? "Confirming your payment… please don't close this window." : "Confirmando tu pago… por favor no cierres esta ventana."}</p></div>`;
-  }
-
   async function restoreFromPayphoneReturn() {
     const params = new URLSearchParams(window.location.search);
     const sid = params.get("sid");
@@ -1188,17 +1088,10 @@
     history.replaceState({}, "", window.location.pathname); // limpia la URL
 
     if (payphoneId && clientTransactionId) {
-      // Payphone revierte el pago si no se confirma en 5 minutos: se confirma de
-      // inmediato al volver, y se reintenta si hay un fallo de red.
-      showConfirming();
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const r = await fetch(`/api/payment/confirm/${sid}?id=${encodeURIComponent(payphoneId)}&clientTransactionId=${encodeURIComponent(clientTransactionId)}`);
-          if (r.status < 500 && r.status !== 429) break;
-        } catch (e) {
-          console.error("No se pudo confirmar el pago:", e);
-        }
-        await new Promise((ok) => setTimeout(ok, 1500));
+      try {
+        await fetch(`/api/payment/confirm/${sid}?id=${encodeURIComponent(payphoneId)}&clientTransactionId=${encodeURIComponent(clientTransactionId)}`);
+      } catch (e) {
+        console.error("No se pudo confirmar el pago:", e);
       }
     }
 
@@ -1210,7 +1103,7 @@
     state.scoreSummary = data.scoreSummary;
     state.referralTriggered = data.referralTriggered;
     state.paid = data.paymentStatus === "paid" || data.paymentStatus === "simulated" || data.paymentStatus === "free";
-    trackPurchaseOnce(data.purchase);
+    if (data.paymentStatus === "paid") trackPurchaseOnce(sid);
     state.step = "results";
     return true;
   }

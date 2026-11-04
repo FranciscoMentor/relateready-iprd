@@ -70,19 +70,13 @@ function loadCampaign(query) {
     .all(startUtc, endUtc);
 
   const isCode = (r) => r.payment_reference === "CODE:" + code;
-  // Compras REALES: solo pagos aprobados y verificados de Payphone (tabla payments).
-  // Las marcas manuales del panel se cuentan aparte y no son compras.
-  const approvedIds = new Set(db.prepare("SELECT DISTINCT submission_id FROM payments WHERE status = 'approved'").all().map((x) => x.submission_id));
-  const startedIds = new Set(db.prepare("SELECT DISTINCT submission_id FROM payments").all().map((x) => x.submission_id));
   const campaignOf = (r) => r.utm_campaign || (r.from_meta_ad ? "(anuncio de Meta sin utm)" : "(directo o sin utm)");
 
   const redeemed = rows.filter(isCode);
   const summary = {
     tests: rows.length,
     redeemed: redeemed.length,
-    paid: rows.filter((r) => approvedIds.has(r.id)).length,
-    manual: rows.filter((r) => r.payment_status === "paid" && !approvedIds.has(r.id) && r.payment_reference === "CONFIRMADO_MANUAL_ADMIN").length,
-    checkoutStarted: rows.filter((r) => startedIds.has(r.id)).length,
+    paid: rows.filter((r) => r.payment_status === "paid").length,
     notConverted: rows.filter((r) => r.payment_status === "pending").length,
     reportGenerated: redeemed.filter((r) => r.extended_generated_at).length,
     emailSent: redeemed.filter((r) => r.extended_email_status === "sent").length,

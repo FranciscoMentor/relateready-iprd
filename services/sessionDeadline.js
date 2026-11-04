@@ -10,12 +10,6 @@
 //      "Hasta".
 // Quien pagó, o llegó con un código que no pertenece a ninguna campaña, no tiene
 // plazo (until = null) salvo que se le ponga un ajuste manual.
-//
-// SESIÓN GRATIS = SOLO PROMOCIÓN. Desde la venta del informe con Payphone, la
-// sesión gratuita ya no forma parte de la compra. `offered` dice si a esta
-// persona se le ofrece: sí cuando tiene plazo (campaña/promo o ajuste manual) o
-// cuando SESSION_OFFER_ENABLED=true en Render (vuelve a ofrecerla a todos, como
-// antes). Apagado por defecto. PDF, correo y pantalla leen `offered`.
 // Las fechas son AAAA-MM-DD, hora de Ecuador, inclusive: la sesión se puede
 // agendar hasta las 23:59 de ese día. Este plazo solo cambia lo que ven las
 // personas en el informe, el correo y la pantalla; el enlace de reservas de
@@ -45,11 +39,7 @@ function campaignFor(sub) {
   return (day && rows.find((r) => day >= r.date_from && day <= r.date_to)) || rows[0];
 }
 
-function sessionOfferEnabled() {
-  return String(process.env.SESSION_OFFER_ENABLED || "").trim().toLowerCase() === "true";
-}
-
-/** { until: "AAAA-MM-DD"|null, source: "override"|"campaign"|null, expired: boolean, campaign: nombre|null, offered: boolean } */
+/** { until: "AAAA-MM-DD"|null, source: "override"|"campaign"|null, expired: boolean, campaign: nombre|null } */
 function sessionInfoFor(sub, now = Date.now()) {
   const override = sub && DATE_RE.test(String(sub.session_until_override || "")) ? sub.session_until_override : null;
   let until = null, source = null, campaignName = null;
@@ -63,7 +53,7 @@ function sessionInfoFor(sub, now = Date.now()) {
       if (d) { until = d; source = "campaign"; }
     }
   }
-  return { until, source, campaign: campaignName, expired: !!until && todayEcuador(now) > until, offered: !!until || sessionOfferEnabled() };
+  return { until, source, campaign: campaignName, expired: !!until && todayEcuador(now) > until };
 }
 
-module.exports = { sessionInfoFor, sessionOfferEnabled };
+module.exports = { sessionInfoFor };

@@ -23,7 +23,7 @@ function authHeaders() {
  * pestaña nueva para que la persona pague.
  * @param {{amountCents:number, clientTransactionId:string, reference:string, responseUrl:string, email?:string}} params
  */
-async function preparePayment({ amountCents, clientTransactionId, reference, responseUrl, email, lang }) {
+async function preparePayment({ amountCents, clientTransactionId, reference, responseUrl, email }) {
   if (!PAYPHONE_ENABLED) {
     throw new Error("Payphone no está configurado (faltan PAYPHONE_TOKEN / PAYPHONE_STORE_ID).");
   }
@@ -41,7 +41,6 @@ async function preparePayment({ amountCents, clientTransactionId, reference, res
     responseUrl,
     cancellationUrl: responseUrl,
     ...(email ? { email } : {}),
-    ...(lang === "en" || lang === "es" ? { lang } : {}),
   };
   const res = await fetch(PREPARE_URL, { method: "POST", headers: authHeaders(), body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));

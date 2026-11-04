@@ -89,32 +89,6 @@ const BOOK_TEASER = {
     ],
   },
 };
-// Texto cuando el libro es un REGALO de quien compró el informe (ver bookGift en
-// generateExtendedReportPDF): ya no depende de la sesión de mentoring. El enlace
-// de descarga va en el correo del informe y en la pantalla de resultados.
-const BOOK_GIFT = {
-  es: {
-    label: "De regalo contigo",
-    segments: [
-      { text: "Tu compra incluye el libro digital ", bold: false },
-      { text: '"Tú Primero"', bold: true, accent: true },
-      { text: ": ", bold: false },
-      { text: "una guía para profundizar en tus 8 pilares", bold: true },
-      { text: " y acompañarte semanas después de leer este informe. Encuentras el enlace de descarga en el correo con el que recibiste este informe y en tu pantalla de resultados.", bold: false },
-    ],
-  },
-  en: {
-    label: "A gift with your purchase",
-    segments: [
-      { text: "Your purchase includes the digital book ", bold: false },
-      { text: '"You First"', bold: true, accent: true },
-      { text: ": ", bold: false },
-      { text: "a guide to go deeper into your 8 pillars", bold: true },
-      { text: " and stay with you for weeks after you read this report. You'll find the download link in the email that came with this report and on your results screen.", bold: false },
-    ],
-  },
-};
-
 const BOOK_COVER_PATH = {
   es: path.join(__dirname, "..", "public", "assets", "tu-primero-cover-es.jpg"),
   en: path.join(__dirname, "..", "public", "assets", "you-first-cover-en.jpg"),
@@ -370,11 +344,8 @@ function linkButton(doc, text, url, opts = {}) {
 // columnas (portada a la izquierda, texto a la derecha) por pedido explícito
 // del dueño del proyecto — más prolijo que la portada centrada debajo del
 // párrafo que se usó en la primera versión.
-function bookTeaserBlock(doc, lang, bookGift, showSession) {
-  // Regalo de compra -> texto del regalo; si no, el aviso de siempre (el libro se
-  // entrega en la sesión) solo cuando a la persona se le ofrece la sesión.
-  if (!bookGift && !showSession) return;
-  const copy = bookGift ? (BOOK_GIFT[lang] || BOOK_GIFT.es) : (BOOK_TEASER[lang] || BOOK_TEASER.es);
+function bookTeaserBlock(doc, lang) {
+  const copy = BOOK_TEASER[lang] || BOOK_TEASER.es;
   const contentWidth = 612 - PAGE_MARGIN * 2;
   const imgWidth = 105;
   const gap = 18;
@@ -880,12 +851,6 @@ const INTRO_FOCUS = {
   },
 };
 
-// La sesión gratuita solo se muestra si se le ofrece a la persona (session.offered).
-// Sin objeto `session` (llamadas antiguas) se conserva el comportamiento anterior.
-function sessionShown(session) {
-  return !session || session.offered !== false;
-}
-
 function introPage(doc, lang, participant, session) {
   doc.addPage();
   h1(doc, T(lang, "Introducción", "Introduction"));
@@ -899,7 +864,7 @@ function introPage(doc, lang, participant, session) {
       `Hi ${participant.name}. This report isn't an exam you pass or fail — no one "qualifies" for love once and for all. It's here to show you, as honestly as possible, which learned patterns you already have solidly built as strengths, and which ones are worth paying attention to ${focus.en}. Think of it as a map, not a verdict.`
     )
   );
-  if (sessionShown(session)) mentorReviewBlock(doc, lang, session);
+  mentorReviewBlock(doc, lang, session);
 }
 
 function referralClosePage(doc, lang) {
@@ -932,7 +897,7 @@ function standardClosePage(doc, lang) {
   );
 }
 
-async function generateExtendedReportPDF({ participant, scoreResult, referral, aiSections, qualitativeAnswers, session, bookGift }) {
+async function generateExtendedReportPDF({ participant, scoreResult, referral, aiSections, qualitativeAnswers, session }) {
   const lang = participant.lang;
   const doc = newDoc();
   const chunks = [];
@@ -1017,15 +982,15 @@ async function generateExtendedReportPDF({ participant, scoreResult, referral, a
   // plan de acción: qué se lleva la persona de la sesión (beneficios), qué es y
   // qué no es, el plazo si lo tiene, y el botón de agendar. El plan de acción
   // de 3 semanas que sigue es uno de los temas que se revisan ahí.
-  if (sessionShown(session)) sessionSection(doc, lang, session);
+  sessionSection(doc, lang, session);
 
   // Plan de acción a 3 semanas
   ensureSpace(doc, 320);
   h1(doc, T(lang, "Tu plan de acción a 3 semanas", "Your 3-week action plan"));
   aiBlock(doc, aiSections.actionPlanNarrative);
-  if (sessionShown(session)) planInviteBlock(doc, lang, session);
+  planInviteBlock(doc, lang, session);
 
-  bookTeaserBlock(doc, lang, !!bookGift, sessionShown(session));
+  bookTeaserBlock(doc, lang);
   friendReferralBlock(doc, lang);
 
   if (referral.triggered) {

@@ -10,7 +10,6 @@ const { buildFlatCoreItems, buildFlatDesirabilityItems, coreItemsForGroup, quali
 const { scoreTest, checkReferralProtocol } = require("../services/scoring");
 const { isUnitedStates, canonicalState, canonicalCountry } = require("../services/location");
 const { preparePayment, confirmPayment, PAYPHONE_ENABLED } = require("../services/payphone");
-const { createPayment, paymentByClientTx, approvedPaymentFor, confirmForSubmission } = require("../services/payments");
 const { generatePdfForSubmission, sendExtendedReportEmail, triggerExtendedReportEmailOnce, pdfFilename } = require("../services/extendedReport");
 
 const CORE_ITEMS_FLAT = buildFlatCoreItems();
@@ -31,8 +30,7 @@ const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Numb
 // puede canjear nada.
 const { FREE_ACCESS_CODES } = require("../services/accessCodes");
 const { getActivePromo, makeRateLimiter } = require("../services/promo");
-const { sessionInfoFor, sessionOfferEnabled } = require("../services/sessionDeadline");
-const bookDownload = require("../services/bookDownload");
+const { sessionInfoFor } = require("../services/sessionDeadline");
 
 // GET /api/meta?lang=es — todo lo que el frontend necesita para renderizar el test.
 // No se exponen 'keying' ni 'dimension' de los ítems núcleo, para no sesgar
@@ -58,7 +56,6 @@ router.get("/meta", (req, res) => {
     lang,
     payphoneEnabled: PAYPHONE_ENABLED,
     extendedPriceCents: EXTENDED_PRICE_CENTS,
-    sessionOfferEnabled: sessionOfferEnabled(),
     dimensions: DIMENSIONS.map((d) => ({ code: d.code, label: d[lang] })),
     relationshipContexts: RELATIONSHIP_CONTEXTS.map((c) => ({ code: c.code, label: c[lang] })),
     vignettes: vignettesForGroup(group).map((v) => ({
@@ -261,39 +258,7 @@ router.get("/submission/:id/status", (req, res) => {
     },
     referralTriggered: !!sub.referral_triggered,
     paymentStatus: sub.payment_status,
-    // Solo si hay un pago REAL de Payphone confirmado por el servidor: el
-    // navegador lo usa para avisar a Meta (Purchase) una sola vez, con el
-    // monto real y el id de la transacción como event_id.
-    purchase: (() => {
-      const p = approvedPaymentFor(sub.id);
-      return p ? { eventId: p.client_tx_id, value: p.amount_cents / 100, currency: p.currency } : null;
-    })(),
-    // Enlace firmado (30 días) al libro de regalo; solo quien tiene derecho (informe pagado).
-    bookUrl: bookDownload.bookUrlFor(sub, ""),
   });
-});
-
-// GET /api/book/:id?t=<vence>.<firma> — descarga del libro de regalo ("Tú Primero" /
-// "You First", en el idioma del informe). Enlace firmado de 30 días (ver
-// services/bookDownload.js). Enlace falso o alterado: 404. Enlace auténtico pero
-// vencido: lleva a la pantalla de resultados, donde se genera uno nuevo.
-const bookIpLimit = makeRateLimiter(30, 60 * 1000);
-router.get("/book/:id", (req, res) => {
-  if (!bookIpLimit("ip:" + req.ip)) return res.status(429).send("Demasiadas peticiones. Espera un minuto.");
-  const id = String(req.params.id || "");
-  const sub = db.prepare("SELECT id, lang, payment_status FROM submissions WHERE id = ?").get(id);
-  const token = String(req.query.t || "");
-  if (!sub || !bookDownload.entitled(sub)) return res.status(404).send("No encontrado.");
-  if (!bookDownload.verifyToken(id, token)) {
-    // ¿Firma auténtica pero vencida? Entonces lo mandamos a su pantalla de resultados.
-    if (bookDownload.verifyToken(id, token, 0)) return res.redirect(302, `/?sid=${encodeURIComponent(id)}`);
-    return res.status(404).send("No encontrado.");
-  }
-  const book = bookDownload.bookFor(sub.lang);
-  if (!book) return res.status(503).send("El libro no está disponible por ahora. Escríbenos y te lo enviamos.");
-  bookDownload.recordDownload(id);
-  res.setHeader("Cache-Control", "private, no-store");
-  res.download(book.file, book.name);
 });
 
 // GET /api/submission/:id/session — plazo para agendar la sesión de mentoring
@@ -303,7 +268,7 @@ router.get("/submission/:id/session", (req, res) => {
   const row = db.prepare("SELECT payment_reference, code_redeemed_at, session_until_override FROM submissions WHERE id = ?").get(req.params.id);
   if (!row) return res.status(404).json({ error: "No encontrado." });
   const info = sessionInfoFor(row);
-  res.json({ until: info.until, expired: info.expired, offered: info.offered });
+  res.json({ until: info.until, expired: info.expired });
 });
 
 // Aplica un código de acceso gratuito a un envío: mismo estado de pago, misma
@@ -385,31 +350,22 @@ router.post("/promo/redeem", (req, res) => {
   res.json({ ok: true });
 });
 
-// POST /api/payment/prepare/:id — pago real con Payphone: registra el intento
-// en la tabla `payments`, prepara la transacción y devuelve la URL a la que
-// abrir una pestaña nueva para pagar.
-const prepareSubLimit = makeRateLimiter(6, 60 * 1000);
-const prepareIpLimit = makeRateLimiter(30, 60 * 1000);
+// POST /api/payment/prepare/:id — pago real con Payphone: prepara la
+// transacción y devuelve la URL a la que abrir una pestaña nueva para pagar.
 router.post("/payment/prepare/:id", async (req, res) => {
   if (!PAYPHONE_ENABLED) return res.status(400).json({ error: "Payphone no está configurado todavía." });
-  if (!prepareIpLimit("ip:" + req.ip) || !prepareSubLimit("sub:" + req.params.id)) {
-    return res.status(429).json({ error: "Demasiados intentos. Espera un minuto." });
-  }
   const sub = loadSubmission(req.params.id);
   if (!sub) return res.status(404).json({ error: "No encontrado." });
-  if (sub.payment_status && sub.payment_status !== "pending") {
-    return res.status(409).json({ error: "Este informe ya está desbloqueado.", reason: "already_unlocked" });
-  }
   try {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
-    const clientTransactionId = createPayment(sub.id, EXTENDED_PRICE_CENTS, "USD");
+    const clientTransactionId = `${sub.id}-${Date.now()}`;
     const result = await preparePayment({
       amountCents: EXTENDED_PRICE_CENTS,
       clientTransactionId,
       reference: "RelateReady - Informe Extendido",
       responseUrl: `${baseUrl}/?sid=${sub.id}`,
-      lang: sub.lang === "en" ? "en" : "es",
     });
+    db.prepare("UPDATE submissions SET payment_reference = ? WHERE id = ?").run(clientTransactionId, sub.id);
     res.json({ ok: true, payWithCard: result.payWithCard, payWithPayPhone: result.payWithPayPhone });
   } catch (err) {
     console.error("POST /api/payment/prepare —", err.message);
@@ -418,75 +374,33 @@ router.post("/payment/prepare/:id", async (req, res) => {
 });
 
 // GET /api/payment/confirm/:id — llamado por el frontend al volver de Payphone,
-// con los parámetros ?id=...&clientTransactionId=... que Payphone añade a
-// responseUrl. El navegador solo aporta los identificadores: el desbloqueo lo
-// decide el servidor al confirmar con Payphone (ver services/payments.js).
-const confirmIpLimit = makeRateLimiter(40, 60 * 1000);
+// con los parámetros ?id=...&clientTransactionId=... que Payphone añade a responseUrl.
 router.get("/payment/confirm/:id", async (req, res) => {
   if (!PAYPHONE_ENABLED) return res.status(400).json({ error: "Payphone no está configurado todavía." });
-  if (!confirmIpLimit("ip:" + req.ip)) return res.status(429).json({ error: "Demasiados intentos. Espera un minuto." });
   const sub = loadSubmission(req.params.id);
   if (!sub) return res.status(404).json({ error: "No encontrado." });
   const { id: payphoneId, clientTransactionId } = req.query;
   if (!payphoneId || !clientTransactionId) return res.status(400).json({ error: "Faltan parámetros de Payphone." });
   try {
-    const out = await confirmForSubmission(sub, { payphoneId, clientTransactionId });
-    if (!out.ok) return res.status(400).json({ error: "Pago no encontrado para este informe." });
-    if (out.newlyApproved) {
-      // Dispara el PDF + correo de inmediato (idempotente; ver services/extendedReport.js).
+    const result = await confirmPayment({ id: payphoneId, clientTransactionId });
+    if (result.approved) {
+      db.prepare("UPDATE submissions SET payment_status = ?, payment_reference = ? WHERE id = ?").run(
+        "paid",
+        result.reference || clientTransactionId,
+        sub.id
+      );
+      // Dispara el PDF + correo de inmediato — no depende de que la persona
+      // haga clic en "Descargar" (ver triggerExtendedReportEmailOnce en
+      // services/extendedReport.js).
       const baseUrl = `${req.protocol}://${req.get("host")}`;
       triggerExtendedReportEmailOnce(sub.id, baseUrl).catch((err) =>
         console.error("[routes/api] Error generando/enviando el Informe Extendido tras pago con Payphone —", err.message)
       );
     }
-    res.json({ ok: true, approved: out.approved });
+    res.json({ ok: true, approved: result.approved });
   } catch (err) {
     console.error("GET /api/payment/confirm —", err.message);
     res.status(500).json({ error: "No se pudo confirmar el pago con Payphone." });
-  }
-});
-
-// POST /api/payphone/NotificacionPago — "Notificación Externa" de Payphone (webhook).
-// Payphone avisa cada pago APROBADO de tu tienda, aunque la persona haya cerrado la
-// pestaña sin volver al sitio. Este aviso NO se usa para desbloquear: con el
-// ClientTransactionId y el TransactionId del aviso el servidor llama él mismo a
-// Confirm (dentro de los 5 minutos, antes del reverso automático) y aplica las
-// mismas verificaciones de siempre (dueño, monto, moneda, id). Un aviso falso no
-// desbloquea nada. Requiere que Payphone autorice el servicio y se registre la URL
-// https://<dominio>/api/payphone/NotificacionPago. Responde { Response, ErrorCode }
-// como pide Payphone: 000 ok, 111 cuerpo inválido, 444 faltan datos, 666 tienda
-// distinta, 222 error.
-router.post("/payphone/NotificacionPago", async (req, res) => {
-  const body = req.body && typeof req.body === "object" ? req.body : null;
-  if (!body) return res.json({ Response: false, ErrorCode: "111" });
-  const pick = (k) => body[k] !== undefined ? body[k] : body[k.charAt(0).toLowerCase() + k.slice(1)];
-  const clientTx = pick("ClientTransactionId"), txId = pick("TransactionId"), storeId = pick("StoreId"), statusCode = pick("StatusCode");
-  if (!clientTx || txId === undefined || txId === null || storeId === undefined || storeId === null || statusCode === undefined || statusCode === null) {
-    return res.json({ Response: false, ErrorCode: "444" });
-  }
-  if (!PAYPHONE_ENABLED) return res.json({ Response: false, ErrorCode: "222" });
-  if (String(storeId) !== String(process.env.PAYPHONE_STORE_ID)) return res.json({ Response: false, ErrorCode: "666" });
-  // Solo interesan los aprobados; cualquier otro estado se recibe sin hacer nada.
-  if (Number(statusCode) !== 3) return res.json({ Response: true, ErrorCode: "000" });
-  try {
-    const payment = paymentByClientTx(String(clientTx));
-    if (!payment) {
-      console.warn(`[payphone-webhook] Aviso de un pago desconocido (${String(clientTx).slice(0, 12)}…): se recibe y se ignora.`);
-      return res.json({ Response: true, ErrorCode: "000" });
-    }
-    const sub = loadSubmission(payment.submission_id);
-    if (!sub) return res.json({ Response: true, ErrorCode: "000" });
-    const out = await confirmForSubmission(sub, { payphoneId: String(txId), clientTransactionId: String(clientTx) });
-    if (out.newlyApproved) {
-      const baseUrl = `${req.protocol}://${req.get("host")}`;
-      triggerExtendedReportEmailOnce(sub.id, baseUrl).catch((err) =>
-        console.error("[payphone-webhook] Error generando/enviando el Informe Extendido —", err.message)
-      );
-    }
-    res.json({ Response: true, ErrorCode: "000" });
-  } catch (err) {
-    console.error("POST /api/payphone/NotificacionPago —", err.message);
-    res.json({ Response: false, ErrorCode: "222" });
   }
 });
 

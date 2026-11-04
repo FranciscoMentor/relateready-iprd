@@ -31,8 +31,6 @@ const { generateAISections } = require("./aiAnalysis");
 const { sendMail } = require("./graphMail");
 const { extendedReportEmail } = require("./emailTemplates");
 const { sessionInfoFor } = require("./sessionDeadline");
-const { approvedPaymentFor } = require("./payments");
-const { bookUrlFor, entitled } = require("./bookDownload");
 
 // Nombre de archivo para los PDF descargados/adjuntos: "RelateReady -
 // <Nombre> - <Tipo>.pdf" en vez del id/UUID interno. Quita caracteres que no
@@ -66,8 +64,6 @@ async function generatePdfForSubmission(sub) {
     scoreResult: sub.scoreResult,
     bandContentByCode,
     qualitativeAnswers: sub.qualitativeAnswers,
-    // Solo se menciona la sesión gratis en el plan si a esta persona se le ofrece.
-    sessionOffered: sessionInfoFor(sub).offered,
   });
 
   return generateExtendedReportPDF({
@@ -77,25 +73,7 @@ async function generatePdfForSubmission(sub) {
     aiSections,
     qualitativeAnswers: sub.qualitativeAnswers,
     session: sessionInfoFor(sub),
-    // El libro "Tú Primero"/"You First" es regalo de quien compró el informe.
-    bookGift: entitled(sub),
   });
-}
-
-/** Datos legibles del recibo a partir de un pago aprobado de la tabla payments. */
-function receiptFor(pay, lang) {
-  const amount = (Number(pay.amount_cents) / 100).toFixed(2);
-  const when = new Date(pay.confirmed_at || pay.created_at);
-  let dateText = "";
-  try {
-    dateText = new Intl.DateTimeFormat(lang === "en" ? "en-US" : "es-EC", { timeZone: "America/Guayaquil", year: "numeric", month: "long", day: "numeric" }).format(when);
-  } catch (e) { dateText = when.toISOString().slice(0, 10); }
-  return {
-    amountText: `$${amount} ${pay.currency || "USD"}`,
-    dateText,
-    transactionId: pay.payphone_id || "",
-    authorizationCode: pay.authorization_code || "",
-  };
 }
 
 /**
@@ -106,17 +84,11 @@ function receiptFor(pay, lang) {
  * esto tampoco lanza: siempre resuelve con { status, error }.
  */
 async function sendExtendedReportEmail(sub, pdf, baseUrl) {
-  const lang = sub.lang === "en" ? "en" : "es";
-  const pay = approvedPaymentFor(sub.id);
   const { subject, html } = extendedReportEmail({
     name: sub.name,
-    lang,
+    lang: sub.lang === "en" ? "en" : "es",
     resultsUrl: `${baseUrl}/?sid=${sub.id}`,
     session: sessionInfoFor(sub),
-    // Libro de regalo (enlace firmado de 30 días) y recibo: solo quien compró.
-    // Sin pago de Payphone (marca manual del panel) va el libro pero no el recibo.
-    bookUrl: bookUrlFor(sub, baseUrl),
-    receipt: pay ? receiptFor(pay, lang) : null,
   });
   const result = await sendMail({
     to: sub.email,

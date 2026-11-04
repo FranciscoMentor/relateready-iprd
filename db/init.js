@@ -151,9 +151,6 @@ addColumnIfMissing("session_until_override", "session_until_override TEXT");
 // Como máximo dos correos por persona; las columnas evitan repetirlos.
 addColumnIfMissing("session_nudge_sent_at", "session_nudge_sent_at TEXT");
 addColumnIfMissing("session_nudge2_sent_at", "session_nudge2_sent_at TEXT");
-// Libro de regalo (services/bookDownload.js): primera descarga y número de descargas.
-addColumnIfMissing("book_downloaded_at", "book_downloaded_at TEXT");
-addColumnIfMissing("book_download_count", "book_download_count INTEGER");
 // Última vez que se sincronizaron las reservas de Bookings (services/bookingSync.js).
 // El seguimiento solo se envía si esa sincronización es reciente, para no escribirle
 // a quien ya reservó y todavía no está marcado.
@@ -161,36 +158,6 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS booking_sync_state (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     last_sync_at TEXT NOT NULL
-  );
-`);
-// Pagos con Payphone: un renglón por intento de pago (services/payments.js).
-// El informe solo se desbloquea cuando el servidor confirma la transacción con
-// Payphone y el renglón queda en "approved" con el monto correcto.
-db.exec(`
-  CREATE TABLE IF NOT EXISTS payments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    submission_id TEXT NOT NULL,
-    client_tx_id TEXT NOT NULL UNIQUE,
-    amount_cents INTEGER NOT NULL,
-    currency TEXT NOT NULL DEFAULT 'USD',
-    status TEXT NOT NULL DEFAULT 'created',
-    provider TEXT NOT NULL DEFAULT 'payphone',
-    payphone_id TEXT,
-    authorization_code TEXT,
-    card_brand TEXT,
-    status_code INTEGER,
-    created_at TEXT NOT NULL,
-    confirmed_at TEXT
-  );
-  CREATE INDEX IF NOT EXISTS idx_payments_submission ON payments (submission_id);
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_payphone_approved ON payments (payphone_id) WHERE status = 'approved' AND payphone_id IS NOT NULL;
-`);
-// Gasto en anuncios capturado a mano (pestaña Ventas del panel).
-db.exec(`
-  CREATE TABLE IF NOT EXISTS ad_spend (
-    campaign TEXT PRIMARY KEY,
-    amount_cents INTEGER NOT NULL DEFAULT 0,
-    updated_at TEXT NOT NULL
   );
 `);
 // Pausa rápida del seguimiento desde el panel (/admin/seguimiento-sesion).

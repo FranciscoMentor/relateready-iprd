@@ -26,7 +26,6 @@ const { testInvitationEmail, testInvitationWhatsappText } = require("../services
 const { FREE_ACCESS_CODES, normalizeCode, isValidAccessCode } = require("../services/accessCodes");
 const { resultsLink, resultsPath, promoActive } = require("../services/promo");
 const { sessionInfoFor } = require("../services/sessionDeadline");
-const { totals: salesTotals, saleSourceOf } = require("../services/sales");
 
 const EXTENDED_PRICE_CENTS = Number(process.env.EXTENDED_PRICE_CENTS) > 0 ? Number(process.env.EXTENDED_PRICE_CENTS) : 2499;
 
@@ -83,7 +82,6 @@ router.use(requireAuth);
 
 // Análisis de las campañas con código gratuito — ver routes/campaignCode.js
 router.use("/api/campana-codigo", require("./campaignCode"));
-router.use("/api/ventas", require("./sales"));
 
 /** Formulario de login (página propia, no HTTP Basic Auth). */
 router.get("/login", (req, res) => {
@@ -186,14 +184,12 @@ function computeKpis() {
   const paidCount = rows.filter((r) => r.payment_status === "paid").length;
   const referralCount = rows.filter((r) => r.referral_triggered).length;
   const conversionPct = total ? Math.round((paidLike.length / total) * 100) : 0;
-  // Ingresos REALES: suma de los pagos aprobados y verificados de
-  // Payphone (tabla payments). Las marcas manuales y los códigos no suman dinero.
-  const t = salesTotals();
-  const revenueApprox = Math.round(t.revenueCents) / 100;
-  return {
-    total, paidCount, paidLikeCount: paidLike.length, conversionPct, referralCount, revenueApprox,
-    payphoneCount: t.payphone, codeCount: t.code, manualCount: t.manual, legacyCount: t.legacy,
-  };
+  // Ingresos: aproximado (envíos realmente pagados × precio actual del
+  // Informe Extendido). No es exacto si el precio cambió con el tiempo,
+  // porque no se guarda el monto real por transacción — ver .env.example
+  // EXTENDED_PRICE_CENTS. "simulated" y "free" no suman ingresos reales.
+  const revenueApprox = Math.round((paidCount * EXTENDED_PRICE_CENTS) / 100 * 100) / 100;
+  return { total, paidCount, paidLikeCount: paidLike.length, conversionPct, referralCount, revenueApprox };
 }
 
 function baseStyles() {
@@ -363,7 +359,7 @@ router.get("/", (req, res) => {
       <div class="stat-card"><div class="stat-num">${kpis.total}</div><div class="stat-label">Total de envíos</div></div>
       <div class="stat-card"><div class="stat-num">${kpis.conversionPct}%</div><div class="stat-label">Conversión a informe pagado</div></div>
       <div class="stat-card"><div class="stat-num">${kpis.referralCount}</div><div class="stat-label">Protocolo de derivación activado</div></div>
-      <div class="stat-card"><div class="stat-num">$${kpis.revenueApprox.toFixed(2)}</div><div class="stat-label">Ingresos reales (compras con Payphone)</div></div>
+      <div class="stat-card"><div class="stat-num">$${kpis.revenueApprox.toFixed(2)}</div><div class="stat-label">Ingresos aprox. (informes pagados)</div></div>
     </div>
 
     <p style="margin:0 0 16px;"><a href="/panel-control" class="btn">Abrir panel de control completo →</a></p>
@@ -677,7 +673,6 @@ router.get("/export.csv", (req, res) => {
 
 function serializeSubmission(r, promoOn = promoActive()) {
   const session = sessionInfoFor(r);
-  const hasApprovedPayment = !!db.prepare("SELECT 1 FROM payments WHERE submission_id = ? AND status = 'approved' LIMIT 1").get(r.id);
   let scoreResult = {};
   try { scoreResult = JSON.parse(r.score_result); } catch (e) { /* noop */ }
   let qualitativeAnswers = [];
@@ -698,8 +693,6 @@ function serializeSubmission(r, promoOn = promoActive()) {
     referral_triggered: !!r.referral_triggered,
     payment_status: r.payment_status,
     payment_reference: r.payment_reference,
-    // Origen real del desbloqueo: payphone | code | manual | legacy | simulated | null (pendiente)
-    sale_source: saleSourceOf(r, hasApprovedPayment),
     extended_generated_at: r.extended_generated_at,
     extended_email_status: r.extended_email_status,
     extended_email_error: r.extended_email_error,
