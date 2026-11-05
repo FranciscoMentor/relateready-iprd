@@ -200,6 +200,55 @@ async function sendPostponementNotice(eventId) {
   return { ok: true, sent };
 }
 
+// ── Reenvío programado del aviso de aplazamiento ────────────────────────
+// Reenviar = quitar la marca "ya enviado" (postponed_sent_at) de los
+// asistentes activos y volver a mandar el mismo correo a todos. Se programa
+// desde el panel (sd_events.postponed_resend_at, ISO UTC) y lo dispara un
+// chequeo cada minuto, una sola vez: la marca postponed_resend_done_at se
+// escribe ANTES de enviar, así que ni un reinicio ni dos chequeos seguidos
+// pueden mandarlo dos veces. Si algún envío falla, esa persona queda sin marca
+// y el botón "Enviar aviso de aplazamiento a todos" le manda solo a ella.
+async function resendPostponementNotice(eventId) {
+  const event = db.prepare("SELECT * FROM sd_events WHERE id = ?").get(eventId);
+  if (!event) return { ok: false, reason: "event_not_found" };
+  if (!isValidAccessCode(POSTPONE_GIFT_CODE)) return { ok: false, reason: "gift_code_not_in_FREE_ACCESS_CODES" };
+  db.prepare("UPDATE sd_attendees SET postponed_sent_at = NULL WHERE event_id = ? AND cancelled_at IS NULL").run(eventId);
+  return sendPostponementNotice(eventId);
+}
+
+function schedulePostponementResend(eventId, isoUtc) {
+  const ms = Date.parse(isoUtc);
+  if (!Number.isFinite(ms) || ms <= Date.now()) return { ok: false, reason: "past_or_invalid" };
+  const r = db
+    .prepare("UPDATE sd_events SET postponed_resend_at = ?, postponed_resend_done_at = NULL WHERE id = ?")
+    .run(new Date(ms).toISOString(), eventId);
+  return { ok: r.changes === 1 };
+}
+
+function cancelPostponementResend(eventId) {
+  db.prepare("UPDATE sd_events SET postponed_resend_at = NULL WHERE id = ? AND postponed_resend_done_at IS NULL").run(eventId);
+  return { ok: true };
+}
+
+async function runScheduledPostponementResends() {
+  const due = db
+    .prepare(
+      `SELECT id FROM sd_events
+       WHERE postponed_resend_at IS NOT NULL AND postponed_resend_done_at IS NULL
+         AND postponed_resend_at <= ?`
+    )
+    .all(new Date().toISOString());
+  for (const { id } of due) {
+    // Reclamar el envío antes de hacerlo: solo uno gana si hay dos chequeos a la vez.
+    const claim = db
+      .prepare("UPDATE sd_events SET postponed_resend_done_at = ? WHERE id = ? AND postponed_resend_done_at IS NULL")
+      .run(new Date().toISOString(), id);
+    if (claim.changes !== 1) continue;
+    const r = await resendPostponementNotice(id);
+    console.log(`[speedDatingReminderScheduler] reenvío programado del aviso de aplazamiento (evento ${id}):`, JSON.stringify(r));
+  }
+}
+
 // Prueba: manda UN correo de ejemplo a la dirección indicada, sin marcar a
 // nadie como enviado.
 async function sendPostponementTest(eventId, toEmail) {
@@ -234,7 +283,8 @@ function start() {
   }
   setTimeout(() => runOnce().catch((err) => console.error("[speedDatingReminderScheduler]", err.message)), FIRST_CHECK_DELAY_MS);
   setInterval(() => runOnce().catch((err) => console.error("[speedDatingReminderScheduler]", err.message)), CHECK_INTERVAL_MS);
-  console.log("[speedDatingReminderScheduler] Activo — revisa cada hora si hay eventos a 3 o 1 día de distancia.");
+  setInterval(() => runScheduledPostponementResends().catch((err) => console.error("[speedDatingReminderScheduler] reenvío programado —", err.message)), 60 * 1000);
+  console.log("[speedDatingReminderScheduler] Activo — revisa cada hora si hay eventos a 3 o 1 día de distancia (y cada minuto si hay un reenvío programado del aviso de aplazamiento).");
 }
 
-module.exports = { start, runOnce, resendReminder1dCorrected, sendSameDayReminder, sendPostponementNotice, sendPostponementTest, pendingPostponementAttendees };
+module.exports = { start, runOnce, resendReminder1dCorrected, sendSameDayReminder, sendPostponementNotice, sendPostponementTest, pendingPostponementAttendees, schedulePostponementResend, cancelPostponementResend, resendPostponementNotice, runScheduledPostponementResends };

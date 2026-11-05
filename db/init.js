@@ -383,6 +383,14 @@ addSdAttendeesColumnIfMissing("reminder_sameday_sent_at", "reminder_sameday_sent
 // evita duplicados si se pulsa el botón dos veces.
 addSdAttendeesColumnIfMissing("postponed_sent_at", "postponed_sent_at TEXT");
 
+// postponed_resend_at / postponed_resend_done_at (sd_events): reenvío
+// PROGRAMADO del aviso de aplazamiento (ISO en UTC). Lo programa el panel del
+// evento; un chequeo cada minuto (services/speedDatingReminderScheduler.js)
+// lo dispara una sola vez y deja postponed_resend_done_at con la hora en que
+// salió. Se agregan aquí porque sd_events ya existe en producción.
+addSdEventsColumnIfMissing("postponed_resend_at", "postponed_resend_at TEXT");
+addSdEventsColumnIfMissing("postponed_resend_done_at", "postponed_resend_done_at TEXT");
+
 // ── Migración: lista de espera cuando un evento se llena (2026-09) ───────
 // sd_waitlist: cuando alguien intenta registrarse a un evento que ya
 // alcanzó su aforo máximo (routes/speedDatingPublic.js, POST

@@ -463,6 +463,19 @@ router.get("/:eventId", (req, res) => {
   // Cuántas personas recibirían el recordatorio de la encuesta (ver tarjeta
   // "Recordatorio de encuesta" más abajo).
   const postponePending = speedDatingReminderScheduler.pendingPostponementAttendees(event.id).length;
+  // Reenvío programado del aviso: la hora se guarda en UTC y se muestra/pide en
+  // hora de Ecuador (UTC-5 todo el año). Por defecto sugiere la próxima 10:30.
+  const ecuadorFmt = (iso) => new Date(Date.parse(iso) - 5 * 3600 * 1000).toISOString().slice(0, 16).replace("T", " ");
+  const ecNow = new Date(Date.now() - 5 * 3600 * 1000);
+  const ecSuggest = new Date(Date.UTC(ecNow.getUTCFullYear(), ecNow.getUTCMonth(), ecNow.getUTCDate(), 10, 30));
+  if (ecSuggest <= ecNow) ecSuggest.setUTCDate(ecSuggest.getUTCDate() + 1);
+  const postponeResendDefault = ecSuggest.toISOString().slice(0, 16);
+  const postponeResendStatusHtml = event.postponed_resend_at && !event.postponed_resend_done_at
+    ? `<div style="margin:0 0 10px;"><strong>Programado:</strong> ${ecuadorFmt(event.postponed_resend_at)} (hora de Ecuador), a todos los asistentes activos.
+        <form class="inline" method="POST" action="/admin/encuentros/${event.id}/aviso-aplazamiento-cancelar-programacion"><button type="submit" class="btn small ghost">Cancelar programación</button></form></div>`
+    : event.postponed_resend_done_at
+      ? `<p class="muted" style="margin:0 0 10px;">Último reenvío programado: salió ${ecuadorFmt(event.postponed_resend_done_at)} (hora de Ecuador).</p>`
+      : `<p class="muted" style="margin:0 0 10px;">No hay ningún reenvío programado.</p>`;
   const surveyReminderPending = event.status === "finalizado" ? speedDatingSurveyScheduler.pendingSurveyReminderAttendees(event.id).length : 0;
 
   const waitlist = db.prepare("SELECT * FROM sd_waitlist WHERE event_id = ? ORDER BY created_at ASC").all(event.id);
@@ -740,6 +753,14 @@ router.get("/:eventId", (req, res) => {
       </form>
       <form method="POST" action="/admin/encuentros/${event.id}/aviso-aplazamiento" onsubmit="return confirm('¿Enviar el aviso de aplazamiento a ${postponePending} persona(s)? Esta acción no se puede deshacer.');">
         <button type="submit" class="btn small" ${postponePending === 0 ? "disabled" : ""}>Enviar aviso de aplazamiento a todos</button>
+      </form>
+      <hr style="border:0;border-top:1px solid #E7DFD2;margin:16px 0;">
+      <h3 style="margin:0 0 6px;font-size:14px;">Reenviar el mismo aviso a una hora programada</h3>
+      ${postponeResendStatusHtml}
+      <form method="POST" action="/admin/encuentros/${event.id}/aviso-aplazamiento-programar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;" onsubmit="return confirm('¿Programar el reenvío del aviso a TODOS los asistentes activos a la hora indicada (hora de Ecuador)?');">
+        <input type="datetime-local" name="at" value="${postponeResendDefault}" required style="padding:8px;border:1px solid #d9d0c1;border-radius:6px;">
+        <span class="muted">hora de Ecuador</span>
+        <button type="submit" class="btn small">Programar reenvío</button>
       </form>
     </div>
 
@@ -1433,6 +1454,25 @@ router.post("/:eventId/aviso-aplazamiento-prueba", express.urlencoded({ extended
     console.error("[speedDatingAdmin] Error enviando prueba del aviso de aplazamiento —", err.message);
   }
   res.redirect(backTo);
+});
+
+// POST /:eventId/aviso-aplazamiento-programar — programa el reenvío del aviso
+// a TODOS los asistentes activos. El campo "at" viene en hora de Ecuador.
+router.post("/:eventId/aviso-aplazamiento-programar", express.urlencoded({ extended: true }), (req, res) => {
+  const backTo = `/admin/encuentros/${req.params.eventId}`;
+  const at = String((req.body || {}).at || "");
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at)) {
+    const r = speedDatingReminderScheduler.schedulePostponementResend(req.params.eventId, new Date(`${at}:00-05:00`).toISOString());
+    if (!r.ok) console.error("[speedDatingAdmin] Reenvío del aviso de aplazamiento no programado —", r.reason || "error");
+  }
+  res.redirect(backTo);
+});
+
+// POST /:eventId/aviso-aplazamiento-cancelar-programacion — quita el reenvío
+// programado si todavía no salió.
+router.post("/:eventId/aviso-aplazamiento-cancelar-programacion", (req, res) => {
+  speedDatingReminderScheduler.cancelPostponementResend(req.params.eventId);
+  res.redirect(`/admin/encuentros/${req.params.eventId}`);
 });
 
 // POST /:eventId/aviso-aplazamiento — envía el aviso de aplazamiento (con el
